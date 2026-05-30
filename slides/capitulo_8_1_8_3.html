@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capítulos 8.1 – 8.3 — El Problema de los Pasos Grandes · PPO · CleanRL</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/black.min.css">
+<link rel="stylesheet" href="../assets/css/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"></script>
+
+<style>
+/* ── Animaciones ── */
+@keyframes cliff-fall {
+  0%,70%  { transform: translateX(0) translateY(0) rotate(0deg); }
+  80%     { transform: translateX(20px) translateY(0) rotate(5deg); }
+  100%    { transform: translateX(40px) translateY(60px) rotate(45deg); opacity: 0; }
+}
+@keyframes safe-step {
+  0%,100% { transform: translateX(0); }
+  50%     { transform: translateX(10px); }
+}
+@keyframes clip-pulse {
+  0%,100% { border-color: rgba(34,211,238,0.4); box-shadow: 0 0 0 0 rgba(34,211,238,0); }
+  50%     { border-color: rgba(34,211,238,0.8); box-shadow: 0 0 16px 3px rgba(34,211,238,0.3); }
+}
+@keyframes ratio-slide {
+  0%   { transform: translateX(-40px); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+@keyframes gradient-zero {
+  0%,100% { background: rgba(239,68,68,0.2); }
+  50%     { background: rgba(239,68,68,0.4); }
+}
+@keyframes update-allowed {
+  0%,100% { background: rgba(34,197,94,0.1); }
+  50%     { background: rgba(34,197,94,0.25); }
+}
+@keyframes ppo-loop-pulse {
+  0%,100% { opacity: 0.7; }
+  50%     { opacity: 1; }
+}
+
+/* ── Cliff landscape ── */
+.cliff-scene {
+  position: relative;
+  height: 110px;
+  background: #04060e;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.cliff-ground-l {
+  position: absolute;
+  bottom: 16px; left: 0;
+  width: 55%; height: 6px;
+  background: rgba(59,130,246,0.4);
+  border-radius: 2px;
+}
+.cliff-edge {
+  position: absolute;
+  bottom: 16px; left: 54.5%;
+  width: 2px; height: 40px;
+  background: rgba(59,130,246,0.3);
+}
+.cliff-ground-r {
+  position: absolute;
+  bottom: 60px; right: 0;
+  width: 44%; height: 6px;
+  background: rgba(59,130,246,0.25);
+  border-radius: 2px;
+  opacity: 0.5;
+}
+.cliff-agent-fall {
+  position: absolute;
+  bottom: 22px; left: 52%;
+  font-size: 1.1em;
+  animation: cliff-fall 3s ease-in infinite;
+}
+.cliff-agent-safe {
+  position: absolute;
+  bottom: 22px; left: 20%;
+  font-size: 1.1em;
+  animation: safe-step 2.5s ease-in-out infinite;
+}
+.cliff-target {
+  position: absolute;
+  bottom: 20px; right: 8%;
+  font-size: 1em;
+  opacity: 0.5;
+}
+
+/* ── Clip zone visual ── */
+.clip-zone {
+  position: relative;
+  height: 80px;
+  background: #04060e;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.clip-band {
+  position: absolute;
+  top: 0; bottom: 0;
+  background: rgba(34,211,238,0.08);
+  border-left: 2px dashed rgba(34,211,238,0.5);
+  border-right: 2px dashed rgba(34,211,238,0.5);
+  animation: clip-pulse 2s ease-in-out infinite;
+}
+.clip-label {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 0.38em;
+  color: var(--accent-cyan);
+  top: 4px;
+}
+.clip-ratio-marker {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 2px;
+  background: var(--accent-gold);
+}
+.clip-axis {
+  position: absolute;
+  bottom: 12px; left: 0; right: 0;
+  height: 1px;
+  background: rgba(255,255,255,0.15);
+}
+
+/* ── 6 casos del clipping ── */
+.case-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.case-card {
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.52em;
+  line-height: 1.5;
+}
+.case-card.allowed { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.35); animation: update-allowed 2s ease-in-out infinite; }
+.case-card.blocked { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); animation: gradient-zero 2.5s ease-in-out infinite; }
+.case-card.neutral { background: rgba(251,191,36,0.06); border: 1px solid rgba(251,191,36,0.25); }
+.case-num { font-family: var(--font-mono); font-weight: 700; font-size: 0.9em; margin-bottom: 3px; }
+.case-status { font-size: 0.85em; margin-top: 4px; }
+
+/* ── Ratio number line ── */
+.ratio-line {
+  position: relative;
+  height: 40px;
+  margin: 10px 0;
+}
+.ratio-track {
+  position: absolute;
+  top: 50%; left: 5%; right: 5%;
+  height: 2px;
+  background: var(--border);
+  transform: translateY(-50%);
+}
+.ratio-clip-zone {
+  position: absolute;
+  top: 30%; bottom: 30%;
+  background: rgba(34,211,238,0.15);
+  border-left: 1px dashed var(--accent-cyan);
+  border-right: 1px dashed var(--accent-cyan);
+}
+.ratio-tick {
+  position: absolute;
+  top: 25%; bottom: 25%;
+  width: 2px;
+  background: var(--text-muted);
+}
+.ratio-tick-label {
+  position: absolute;
+  bottom: 0;
+  font-family: var(--font-mono);
+  font-size: 0.42em;
+  color: var(--text-muted);
+  transform: translateX(-50%);
+}
+
+/* ── PPO full objective ── */
+.ppo-obj {
+  background: #05081a;
+  border: 1px solid rgba(168,85,247,0.35);
+  border-radius: 12px;
+  padding: 14px 18px;
+  position: relative;
+  overflow: hidden;
+}
+.ppo-obj::before {
+  content: "";
+  position: absolute;
+  top:0; left:0; right:0; height:2px;
+  background: linear-gradient(90deg, var(--accent-violet), var(--accent-cyan), var(--accent-gold));
+}
+
+/* ── Terminal ── */
+.terminal {
+  background: #020812;
+  border: 1px solid rgba(34,211,238,0.3);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.47em;
+  color: #a8c8e8;
+  line-height: 1.85;
+  position: relative;
+}
+.terminal::before {
+  content: "● ● ●";
+  position: absolute;
+  top: 7px; left: 10px;
+  font-size: 0.75em;
+  color: var(--text-muted);
+  letter-spacing: 4px;
+}
+.tb  { margin-top: 14px; }
+.t-c { color: #4a5568; }
+.t-k { color: #c678dd; }
+.t-s { color: #98c379; }
+.t-n { color: #d19a66; }
+.t-f { color: #61afef; }
+.t-v { color: #e5c07b; }
+.t-o { color: #22c55e; }
+.t-hi{ color: var(--accent-gold); font-weight:700; }
+
+/* ── PPO loop steps ── */
+.ppo-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 13px;
+  margin: 4px 0;
+  font-size: 0.56em;
+  animation: ppo-loop-pulse 2.5s ease-in-out infinite;
+}
+.ppo-step-num {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  display: flex; align-items:center; justify-content:center;
+  font-weight: 700; font-size: 0.85em;
+  flex-shrink: 0; color: white;
+}
+
+/* ── Comparison bar (A2C vs PPO) ── */
+.algo-compare-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+.acb-label { font-family: var(--font-mono); font-size: 0.5em; color: var(--text-muted); min-width: 80px; }
+.acb-track { flex:1; height: 14px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
+.acb-fill  { height: 100%; border-radius: 3px; display:flex; align-items:center; padding-left:4px; font-family:var(--font-mono); font-size:0.44em; font-weight:700; color:white; }
+</style>
+</head>
+
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ══ PORTADA ══════════════════════════════ -->
+<section>
+  <div class="title-slide" style="position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-60px;right:-60px;width:380px;height:380px;border-radius:50%;background:radial-gradient(circle,rgba(168,85,247,0.12) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-50px;left:-50px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(34,211,238,0.08) 0%,transparent 70%);pointer-events:none;"></div>
+    <div class="chapter-badge">Capítulos 8.1 – 8.3 · Módulo 8</div>
+    <h1>PPO:<br>
+      <span class="gradient-text">Pasos Seguros</span><br>
+      Hacia la Cima 🛡️</h1>
+    <div class="divider"></div>
+    <p style="font-size:0.62em;color:var(--text-muted);max-width:640px;margin-top:8px;line-height:1.7;">
+      Por qué los pasos grandes destruyen el entrenamiento ·<br>
+      La función objetivo recortada (clipped) · El ratio r<sub>t</sub>(θ) ·<br>
+      Los 6 casos del clipping · Función de pérdida completa ·<br>
+      CleanRL: implementar PPO desde cero 🛠️
+    </p>
+    <div style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;">
+      <span class="pill">Unit 8 — HuggingFace 🤗</span>
+      <span class="pill">Jose Miguel Lara Rangel</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SECCIÓN 8.1 ═══════════════════════ -->
+<section>
+  <div class="section-slide" style="background:linear-gradient(160deg,#04060f,#0a0614);">
+    <span class="big-emoji">💣</span>
+    <div class="chapter-badge" style="font-size:0.38em;margin-top:8px;">Capítulo 8.1</div>
+    <h1>El Problema<br>de los Pasos Grandes:<br>La Inestabilidad</h1>
+    <p style="font-size:0.6em;color:var(--text-muted);max-width:520px;text-align:center;margin-top:10px;">
+      Un paso demasiado grande puede destruir meses de entrenamiento en un instante.
+    </p>
+  </div>
+</section>
+
+<!-- ── Recapitulación ── -->
+<section>
+  <span class="slide-tag">8.1 · Recapitulación</span>
+  <h2>Lo que ya tenemos y lo que falta 🗺️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Con A2C del Módulo 6 ya resolvimos el problema de la alta varianza de REINFORCE. Pero A2C tiene otro problema que no hemos abordado todavía:</p>
+
+  <div class="cols2" style="margin-bottom:14px;">
+    <div class="card card-cyan" style="padding:16px;">
+      <h3 style="font-size:0.82em;">✅ Lo que A2C resolvió</h3>
+      <p><strong>Alta varianza.</strong> El Crítico (función de valor V) reduce el ruido del gradiente. Las actualizaciones son mucho más estables que REINFORCE.</p>
+      <div style="font-size:0.52em;font-family:var(--font-mono);color:var(--accent-cyan);margin-top:8px;">∇J ∝ log π × A(s,a)  (ventaja baja varianza)</div>
+    </div>
+    <div class="card card-pink" style="padding:16px;">
+      <h3 style="font-size:0.82em;">⚠️ Lo que A2C no resolvió</h3>
+      <p><strong>El tamaño del paso de gradiente.</strong> A2C actualiza los pesos con ascenso de gradiente sin ningún límite en cuánto puede cambiar la política en un solo paso.</p>
+      <div style="font-size:0.52em;font-family:var(--font-mono);color:#ef4444;margin-top:8px;">θ ← θ + α∇J  (α puede ser cualquier valor)</div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">🎯 El problema que PPO resuelve</span>
+    <p>Si el gradiente empuja en la dirección correcta pero el paso es <strong>demasiado grande</strong>, la política puede cambiar tanto que destruye todo lo aprendido. PPO añade una restricción que garantiza que la nueva política no se aleje demasiado de la anterior. <strong>Pasos conservadores pero consistentes.</strong></p>
+  </div>
+</section>
+
+<!-- ── El problema del acantilado ── -->
+<section>
+  <span class="slide-tag">8.1 · El Acantilado</span>
+  <h2>Caer del acantilado: el peligro del paso grande 🏔️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">La imagen del "acantilado" es la metáfora central de PPO. El paisaje de la función objetivo tiene picos — pero también bordes abruptos:</p>
+
+  <div class="cols2" style="margin-bottom:14px;">
+    <!-- Acantilado visual -->
+    <div>
+      <div class="cliff-scene">
+        <!-- Ground -->
+        <div class="cliff-ground-l"></div>
+        <div class="cliff-edge"></div>
+        <div class="cliff-ground-r"></div>
+        <!-- Agente que cae -->
+        <div class="cliff-agent-fall">🤖</div>
+        <!-- Agente seguro -->
+        <div class="cliff-agent-safe">🤖</div>
+        <!-- Meta -->
+        <div class="cliff-target">🏆</div>
+        <!-- Labels -->
+        <div style="position:absolute;top:6px;left:10px;font-family:var(--font-mono);font-size:0.38em;color:#ef4444;">Paso grande → cae del acantilado</div>
+        <div style="position:absolute;top:6px;right:10px;font-family:var(--font-mono);font-size:0.38em;color:#22c55e;text-align:right;">Paso pequeño → avanza seguro</div>
+      </div>
+      <p style="font-size:0.44em;color:var(--text-muted);text-align:center;margin-top:6px;">Un paso de gradiente demasiado grande puede "caer del acantilado" hacia una política mala de la que es muy difícil recuperarse</p>
+    </div>
+
+    <!-- Explanation -->
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div class="card card-pink" style="padding:12px 14px;">
+        <h3 style="font-size:0.78em;">¿Por qué es tan grave?</h3>
+        <p>Las redes neuronales de RL son sensibles: una política ligeramente diferente puede explorar regiones completamente distintas del entorno. Si la nueva política es mala, el agente <strong>puede tardar miles de episodios en recuperarse</strong> — o nunca hacerlo.</p>
+      </div>
+      <div class="card card-gold" style="padding:12px 14px;">
+        <h3 style="font-size:0.78em;">¿Por qué TRPO no es la solución perfecta?</h3>
+        <p>TRPO (Trust Region Policy Optimization) resuelve esto con <strong>restricciones KL</strong> fuera de la función objetivo. Funciona pero es <strong>muy complejo de implementar</strong> y computacionalmente costoso. PPO hace lo mismo de forma mucho más simple.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── La idea central de PPO ── -->
+<section>
+  <span class="slide-tag">8.1 · La Idea</span>
+  <h2>La intuición de PPO: actualizar con cuidado 🐢</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">PPO añade un mecanismo elegante para limitar cuánto puede cambiar la política en cada actualización. La idea en dos pasos:</p>
+
+  <div class="cols2" style="margin-bottom:14px;">
+    <div class="card card-violet" style="padding:16px;">
+      <h3 style="font-size:0.82em;">Paso 1: Medir el cambio de política</h3>
+      <p>En lugar de usar directamente log π(a|s), PPO calcula el <strong>ratio r<sub>t</sub>(θ)</strong>: qué tan diferente es la nueva política respecto a la anterior.</p>
+      <div class="math-block" style="padding:8px 12px;margin-top:8px;font-size:0.9em;">
+        \[ r_t(\theta) = \frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_\text{old}}(a_t|s_t)} \]
+      </div>
+      <div style="font-size:0.52em;color:var(--text-muted);margin-top:6px;">
+        r = 1.0 → la política no cambió<br>
+        r = 0.8 → la acción es 20% menos probable<br>
+        r = 1.3 → la acción es 30% más probable
+      </div>
+    </div>
+    <div class="card card-cyan" style="padding:16px;">
+      <h3 style="font-size:0.82em;">Paso 2: Recortar el ratio</h3>
+      <p>PPO <strong>recorta (clip)</strong> el ratio para que nunca salga del rango [1−ε, 1+ε]. Con ε = 0.2 (valor del paper), el ratio solo puede variar entre 0.8 y 1.2.</p>
+      <div style="font-family:var(--font-mono);font-size:0.54em;color:var(--accent-cyan);background:rgba(34,211,238,0.05);border:1px solid rgba(34,211,238,0.2);border-radius:8px;padding:8px 12px;margin-top:10px;text-align:center;">
+        clip(r<sub>t</sub>, 1−ε, 1+ε) = clip(r<sub>t</sub>, 0.8, 1.2)
+      </div>
+      <p style="font-size:0.52em;color:var(--text-muted);margin-top:6px;">Si el ratio intenta salir de ese rango, el gradiente se vuelve 0 — la actualización se detiene automáticamente.</p>
+    </div>
+  </div>
+
+  <div class="card card-gold" style="padding:12px 14px;">
+    <p>🔑 <strong>Por qué funciona:</strong> Al recortar el ratio, eliminamos el incentivo de que la política se aleje demasiado de la anterior. Si el ratio ya es 1.2 (acción 20% más probable), el gradiente es 0 — no seguimos subiendo aunque la ventaja siga siendo positiva.</p>
+  </div>
+</section>
+
+<!-- ══ SECCIÓN 8.2 ═══════════════════════ -->
+<section>
+  <div class="section-slide" style="background:linear-gradient(160deg,#04060f,#0a0614);">
+    <span class="big-emoji">🛡️</span>
+    <div class="chapter-badge" style="font-size:0.38em;border-color:var(--accent-violet);color:var(--accent-violet);background:rgba(168,85,247,0.07);margin-top:8px;">Capítulo 8.2</div>
+    <h1>La Función<br>Objetivo Recortada<br>de PPO</h1>
+    <p style="font-size:0.6em;color:var(--text-muted);max-width:520px;text-align:center;margin-top:10px;">
+      Cómo el clip transforma el ascenso de gradiente en algo robusto y controlado.
+    </p>
+  </div>
+</section>
+
+<!-- ── La función objetivo completa ── -->
+<section>
+  <span class="slide-tag">8.2 · Función Objetivo</span>
+  <h2>La función objetivo recortada de PPO 📐</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Aquí está la fórmula completa. La construiremos parte por parte:</p>
+
+  <div class="ppo-obj" style="margin-bottom:14px;">
+    <div class="math-block" style="border:none;background:none;padding:8px;font-size:0.88em;">
+      \[ L^{CLIP}(\theta) = \mathbb{E}_t \left[ \min\!\left( r_t(\theta)\,A_t,\; \text{clip}(r_t(\theta),\, 1-\varepsilon,\, 1+\varepsilon)\,A_t \right) \right] \]
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:10px;">
+      <div style="background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.3);border-radius:6px;padding:5px 10px;font-family:var(--font-mono);font-size:0.48em;color:var(--accent-violet);text-align:center;">r<sub>t</sub>(θ)×A<sub>t</sub><br><span style="font-weight:400;color:var(--text-muted);">objetivo sin recortar</span></div>
+      <div style="font-family:var(--font-mono);font-size:0.48em;color:var(--text-muted);align-self:center;">min()</div>
+      <div style="background:rgba(34,211,238,0.08);border:1px solid rgba(34,211,238,0.3);border-radius:6px;padding:5px 10px;font-family:var(--font-mono);font-size:0.48em;color:var(--accent-cyan);text-align:center;">clip(r,0.8,1.2)×A<sub>t</sub><br><span style="font-weight:400;color:var(--text-muted);">objetivo recortado</span></div>
+    </div>
+  </div>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:12px;">
+    <p style="font-size:0.5em;color:var(--text-muted);margin-bottom:10px;"><strong style="color:var(--text-primary);">¿Por qué el mínimo entre los dos?</strong></p>
+    <div style="font-size:0.56em;color:var(--text-muted);line-height:1.8;">
+      <div>• Si los dos valores coinciden (ratio dentro del rango) → el mínimo es simplemente el valor</div>
+      <div>• Si el ratio se sale del rango y eso beneficiaría al agente → el mínimo lo corta (cota pesimista)</div>
+      <div>• Si el ratio se sale del rango pero en dirección perjudicial → sí se penaliza</div>
+    </div>
+    <div class="key-idea" style="margin-top:10px;">
+      <span class="ki-label">💡 La cota pesimista</span>
+      <p>Tomar el mínimo significa que PPO siempre elige la opción <strong>más conservadora</strong>: si el objetivo sin recortar es mejor que el recortado, ignoramos esa ganancia extra. Solo actualizamos cuando es seguro.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── La línea numérica del ratio ── -->
+<section>
+  <span class="slide-tag">8.2 · El Ratio</span>
+  <h2>El ratio r<sub>t</sub>(θ): medir el cambio de política 📏</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Antes de ver los 6 casos, entendamos qué significa cada valor posible del ratio:</p>
+
+  <!-- Number line -->
+  <div class="ratio-line" style="height:50px;margin:0 0 14px;">
+    <div class="ratio-track"></div>
+    <!-- Clip zone -->
+    <div class="ratio-clip-zone" style="left:30%;right:30%;"></div>
+    <!-- Ticks -->
+    <div class="ratio-tick" style="left:5%;"></div>
+    <div class="ratio-tick" style="left:30%;background:var(--accent-cyan);"></div>
+    <div class="ratio-tick" style="left:50%;background:var(--accent-gold);width:3px;"></div>
+    <div class="ratio-tick" style="left:70%;background:var(--accent-cyan);"></div>
+    <div class="ratio-tick" style="right:5%;"></div>
+    <!-- Labels -->
+    <div class="ratio-tick-label" style="left:5%;">0</div>
+    <div class="ratio-tick-label" style="left:30%;color:var(--accent-cyan);">0.8<br>(1−ε)</div>
+    <div class="ratio-tick-label" style="left:50%;color:var(--accent-gold);">1.0</div>
+    <div class="ratio-tick-label" style="left:70%;color:var(--accent-cyan);">1.2<br>(1+ε)</div>
+    <div class="ratio-tick-label" style="right:5%;">∞</div>
+    <!-- Zone labels -->
+    <div style="position:absolute;top:2px;left:14%;font-family:var(--font-mono);font-size:0.4em;color:#ef4444;">acción mucho menos probable</div>
+    <div style="position:absolute;top:2px;left:38%;font-family:var(--font-mono);font-size:0.4em;color:var(--accent-cyan);text-align:center;">ZONA SEGURA</div>
+    <div style="position:absolute;top:2px;right:5%;font-family:var(--font-mono);font-size:0.4em;color:#ef4444;text-align:right;">mucho más probable</div>
+  </div>
+
+  <div class="cols3" style="margin-bottom:10px;">
+    <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:10px 12px;font-size:0.54em;text-align:center;">
+      <div style="font-family:var(--font-mono);color:#ef4444;font-weight:700;margin-bottom:4px;">r &lt; 0.8</div>
+      <div style="color:var(--text-muted);">La acción es mucho menos probable en la nueva política que en la antigua</div>
+    </div>
+    <div style="background:rgba(34,211,238,0.08);border:1px solid rgba(34,211,238,0.3);border-radius:8px;padding:10px 12px;font-size:0.54em;text-align:center;animation:clip-pulse 2s ease-in-out infinite;">
+      <div style="font-family:var(--font-mono);color:var(--accent-cyan);font-weight:700;margin-bottom:4px;">0.8 ≤ r ≤ 1.2 ✅</div>
+      <div style="color:var(--text-muted);">La política cambió poco. El clip no aplica. El gradiente puede actuar libremente.</div>
+    </div>
+    <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:10px 12px;font-size:0.54em;text-align:center;">
+      <div style="font-family:var(--font-mono);color:#ef4444;font-weight:700;margin-bottom:4px;">r &gt; 1.2</div>
+      <div style="color:var(--text-muted);">La acción es mucho más probable en la nueva política. Cambio demasiado grande.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Los 6 casos ── -->
+<section>
+  <span class="slide-tag">8.2 · Los 6 Casos</span>
+  <h2>Los 6 casos del clipping — la tabla completa 📊</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Combinando <strong>3 zonas del ratio</strong> × <strong>2 signos de la ventaja</strong> obtenemos 6 situaciones posibles:</p>
+
+  <div class="case-grid" style="margin-bottom:12px;">
+    <!-- Caso 1: ratio normal, A > 0 -->
+    <div class="case-card allowed">
+      <div class="case-num" style="color:#22c55e;">Caso 1</div>
+      <div>r en rango · A &gt; 0</div>
+      <div class="case-status">🟢 <strong>Actualizar</strong> — la acción es buena y la política no cambió mucho. Sube la probabilidad.</div>
+    </div>
+    <!-- Caso 2: ratio normal, A < 0 -->
+    <div class="case-card allowed">
+      <div class="case-num" style="color:#22c55e;">Caso 2</div>
+      <div>r en rango · A &lt; 0</div>
+      <div class="case-status">🟢 <strong>Actualizar</strong> — la acción es mala y el cambio es seguro. Baja la probabilidad.</div>
+    </div>
+    <!-- Caso 3: ratio bajo, A > 0 -->
+    <div class="case-card neutral">
+      <div class="case-num" style="color:var(--accent-gold);">Caso 3</div>
+      <div>r &lt; 0.8 · A &gt; 0</div>
+      <div class="case-status">🟡 <strong>Actualizar</strong> — la acción es buena pero ya es poco probable. Permite subir hacia el rango.</div>
+    </div>
+    <!-- Caso 4: ratio bajo, A < 0 -->
+    <div class="case-card blocked">
+      <div class="case-num" style="color:#ef4444;">Caso 4</div>
+      <div>r &lt; 0.8 · A &lt; 0</div>
+      <div class="case-status">🔴 <strong>Gradiente = 0</strong> — la acción ya es poco probable y es mala. No bajarla más.</div>
+    </div>
+    <!-- Caso 5: ratio alto, A > 0 -->
+    <div class="case-card blocked">
+      <div class="case-num" style="color:#ef4444;">Caso 5</div>
+      <div>r &gt; 1.2 · A &gt; 0</div>
+      <div class="case-status">🔴 <strong>Gradiente = 0</strong> — la acción ya es muy probable. No ser codicioso — no seguir subiendo.</div>
+    </div>
+    <!-- Caso 6: ratio alto, A < 0 -->
+    <div class="case-card neutral">
+      <div class="case-num" style="color:var(--accent-gold);">Caso 6</div>
+      <div>r &gt; 1.2 · A &lt; 0</div>
+      <div class="case-status">🟡 <strong>Actualizar</strong> — la acción es mala y muy probable. Permite bajar hacia el rango.</div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">🎯 La regla general</span>
+    <p>Solo se bloquea el gradiente (= 0) cuando el ratio ya salió del rango <strong>Y</strong> el gradiente lo empujaría aún más lejos. Si el gradiente lleva el ratio <em>de vuelta al rango</em>, siempre se permite la actualización.</p>
+  </div>
+</section>
+
+<!-- ── La función de pérdida total ── -->
+<section>
+  <span class="slide-tag">8.2 · Pérdida Total</span>
+  <h2>La función de pérdida completa de PPO 🧮</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">En la práctica, PPO combina tres términos en una sola función de pérdida:</p>
+
+  <div class="ppo-obj" style="margin-bottom:14px;">
+    <div class="math-block" style="border:none;background:none;padding:8px;font-size:0.85em;">
+      \[ L(\theta) = \underbrace{L^{CLIP}(\theta)}_{\text{actor}} - \underbrace{c_1\, L^{VF}(\theta)}_{\text{crítico}} + \underbrace{c_2\, S[\pi_\theta]}_{\text{entropía}} \]
+    </div>
+  </div>
+
+  <div class="cols3" style="margin-bottom:14px;">
+    <div class="card card-violet" style="padding:12px 14px;">
+      <h3 style="font-size:0.8em;">L<sup>CLIP</sup>(θ) — el Actor</h3>
+      <p>La función recortada que estudiamos. Guía al Actor hacia acciones con ventaja positiva sin cambios excesivos.</p>
+    </div>
+    <div class="card card-gold" style="padding:12px 14px;">
+      <h3 style="font-size:0.8em;">c₁·L<sup>VF</sup>(θ) — el Crítico</h3>
+      <p>Error cuadrático medio de la predicción de V(s). El Crítico aprende a predecir el valor del estado para calcular la ventaja.</p>
+      <div style="font-family:var(--font-mono);font-size:0.5em;color:var(--accent-gold);margin-top:5px;">L<sup>VF</sup> = (V_θ(s) − V_target)²</div>
+    </div>
+    <div class="card card-cyan" style="padding:12px 14px;">
+      <h3 style="font-size:0.8em;">c₂·S[π<sub>θ</sub>] — Entropía</h3>
+      <p>Bonificación de entropía que incentiva la exploración. Evita que la política colapse a siempre elegir la misma acción.</p>
+    </div>
+  </div>
+
+  <div class="card card-gold" style="padding:12px 14px;">
+    <p>⚙️ <strong>Hiperparámetros típicos:</strong> c₁ = 0.5 (peso del crítico) · c₂ = 0.01 (peso de la entropía) · ε = 0.2 (radio del clip). Estos son los valores del paper original de Schulman et al. (2017) y siguen siendo los más usados.</p>
+  </div>
+</section>
+
+<!-- ── PPO vs A2C ── -->
+<section>
+  <span class="slide-tag">8.2 · PPO vs A2C</span>
+  <h2>PPO vs. A2C: el mismo espíritu, mejor ejecución ⚖️</h2>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:14px;">
+    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;background:var(--bg-panel);">
+      <div style="padding:10px 14px;font-family:var(--font-mono);font-size:0.5em;color:var(--text-muted);text-transform:uppercase;">Aspecto</div>
+      <div style="padding:10px 14px;text-align:center;font-family:var(--font-mono);font-size:0.5em;color:var(--accent-blue);">A2C</div>
+      <div style="padding:10px 14px;text-align:center;font-family:var(--font-mono);font-size:0.5em;color:var(--accent-violet);">PPO</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Arquitectura</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-blue);text-align:center;">Actor-Critic</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-violet);text-align:center;">Actor-Critic con clip</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Restricción del paso</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#ef4444;text-align:center;">Ninguna ❌</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#22c55e;text-align:center;">Ratio clipped ✅</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Reutiliza datos</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#ef4444;text-align:center;">No (on-policy) ❌</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#22c55e;text-align:center;">Sí (múltiples épocas) ✅</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Eficiencia de muestra</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#ef4444;text-align:center;">Media ❌</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#22c55e;text-align:center;">Alta ✅</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);background:rgba(255,255,255,0.02);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Aplicaciones reales</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-blue);text-align:center;">Robótica, RL simple</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-violet);text-align:center;"><strong>ChatGPT, juegos, robótica avanzada</strong></div>
+    </div>
+  </div>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px 16px;">
+    <p style="font-size:0.5em;color:var(--text-muted);margin-bottom:8px;"><strong style="color:var(--text-primary);">¿Por qué PPO puede reutilizar los datos?</strong></p>
+    <p style="font-size:0.56em;color:var(--text-muted);">Gracias al ratio r<sub>t</sub>(θ), podemos usar los mismos datos recolectados con la política antigua para hacer <strong>múltiples actualizaciones de gradiente</strong>. Mientras el ratio se mantenga dentro del rango [0.8, 1.2], la actualización es segura. A2C solo hace 1 actualización por lote de datos.</p>
+  </div>
+</section>
+
+<!-- ══ SECCIÓN 8.3 ═══════════════════════ -->
+<section>
+  <div class="section-slide" style="background:linear-gradient(160deg,#04060f,#060a14);">
+    <span class="big-emoji">🛠️</span>
+    <div class="chapter-badge" style="font-size:0.38em;border-color:var(--accent-cyan);color:var(--accent-cyan);background:rgba(34,211,238,0.06);margin-top:8px;">Capítulo 8.3</div>
+    <h1>¡Manos a la obra!<br>PPO desde Cero<br>con CleanRL</h1>
+    <p style="font-size:0.6em;color:var(--text-muted);max-width:520px;text-align:center;margin-top:10px;">
+      La implementación más limpia y pedagógica de PPO, en un solo archivo.
+    </p>
+  </div>
+</section>
+
+<!-- ── ¿Qué es CleanRL? ── -->
+<section>
+  <span class="slide-tag">8.3 · CleanRL</span>
+  <h2>¿Qué es CleanRL y por qué lo usamos? 🧹</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Para implementar PPO usamos <strong>CleanRL</strong> — una librería creada por Costa Huang que proporciona implementaciones de alta calidad de algoritmos de RL en archivos únicos y legibles:</p>
+
+  <div class="cols2" style="margin-bottom:14px;">
+    <div class="card card-cyan" style="padding:16px;">
+      <span class="card-icon">📄</span>
+      <h3>Un algoritmo = un archivo</h3>
+      <p>Toda la implementación de PPO está en <code>ppo.py</code> — no hay módulos dispersos. Puedes leer el código completo de arriba a abajo y entenderlo todo.</p>
+    </div>
+    <div class="card card-violet" style="padding:16px;">
+      <span class="card-icon">🔬</span>
+      <h3>Research-friendly</h3>
+      <p>Incluye logging automático a Weights & Biases, tracking de experimentos, video del agente jugando, y puede comparar múltiples runs. Usado en investigación real.</p>
+    </div>
+  </div>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px 18px;">
+    <div class="cols3" style="gap:10px;">
+      <div style="text-align:center;font-size:0.54em;color:var(--text-muted);">
+        <div style="font-size:1.6em;margin-bottom:4px;">🎓</div>
+        <div style="color:var(--accent-cyan);">En este módulo</div>
+        CartPole-v1 y<br>LunarLander-v2
+      </div>
+      <div style="text-align:center;font-size:0.54em;color:var(--text-muted);">
+        <div style="font-size:1.6em;margin-bottom:4px;">⏱️</div>
+        <div style="color:var(--accent-violet);">Tiempo estimado</div>
+        ~30 min entrenamiento<br>con GPU T4
+      </div>
+      <div style="text-align:center;font-size:0.54em;color:var(--text-muted);">
+        <div style="font-size:1.6em;margin-bottom:4px;">🔗</div>
+        <div style="color:var(--accent-gold);">Conexión</div>
+        LunarLander-v2 es el<br>primer entorno del curso
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── El bucle interno de PPO ── -->
+<section>
+  <span class="slide-tag">8.3 · Bucle de PPO</span>
+  <h2>El bucle de entrenamiento de PPO — 5 fases 🔄</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">La diferencia clave con A2C: PPO <strong>reutiliza los datos recolectados durante múltiples épocas de actualización</strong>:</p>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:14px 18px;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent-violet),var(--accent-cyan));"></div>
+    <div class="ppo-step">
+      <div class="ppo-step-num" style="background:linear-gradient(135deg,var(--accent-blue),rgba(59,130,246,0.5));">1</div>
+      <div><strong style="color:var(--accent-blue);">Recolectar datos</strong> — correr la política actual por T pasos en N entornos en paralelo. Guardar (s, a, r, s', log_prob, V(s)).</div>
+    </div>
+    <div class="ppo-step">
+      <div class="ppo-step-num" style="background:linear-gradient(135deg,var(--accent-cyan),rgba(34,211,238,0.5));">2</div>
+      <div><strong style="color:var(--accent-cyan);">Calcular ventajas</strong> — con GAE (Generalized Advantage Estimation) usando los retornos y valores del Crítico.</div>
+    </div>
+    <div class="ppo-step">
+      <div class="ppo-step-num" style="background:linear-gradient(135deg,var(--accent-violet),rgba(168,85,247,0.5));">3</div>
+      <div><strong style="color:var(--accent-violet);">Múltiples épocas</strong> — con los mismos datos, hacer K épocas de actualización del gradiente (típicamente K=4 a 10).</div>
+    </div>
+    <div class="ppo-step">
+      <div class="ppo-step-num" style="background:linear-gradient(135deg,var(--accent-gold),rgba(251,191,36,0.5));">4</div>
+      <div>En cada mini-lote: calcular el ratio r(θ), aplicar el clip, calcular L<sup>CLIP</sup> + L<sup>VF</sup> + entropía, hacer un paso de gradiente.</div>
+    </div>
+    <div class="ppo-step">
+      <div class="ppo-step-num" style="background:linear-gradient(135deg,#22c55e,rgba(34,197,94,0.5));">5</div>
+      <div>Descartar los datos viejos y volver al paso 1 con la nueva política. <strong>Este es el ciclo principal de PPO.</strong></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Código CleanRL ── -->
+<section>
+  <span class="slide-tag">8.3 · Código</span>
+  <h2>Implementar PPO con CleanRL 💻</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">El notebook del curso de HF usa la implementación de CleanRL. Las partes más importantes:</p>
+
+  <div class="terminal" style="margin-bottom:10px;">
+    <div class="tb">
+      <span class="t-c"># 1. Instalar dependencias</span><br>
+      <span class="t-k">!</span>pip install -q torch gymnasium stable-baselines3 huggingface_hub<br>
+      <span class="t-k">!</span>pip install -q gymnasium[box2d] pyvirtualdisplay<br><br>
+      <span class="t-c"># 2. El corazón del clipping — la función de pérdida</span><br>
+      <span class="t-c"># (extracto del código de CleanRL)</span><br>
+      <span class="t-v">ratio</span> = (newlogprob - logprobs).<span class="t-f">exp</span>()  <span class="t-c"># r_t(θ) = π_new / π_old</span><br>
+      <span class="t-v">surr1</span> = -mb_advantages * ratio             <span class="t-c"># objetivo sin recortar × A</span><br>
+      <span class="t-v">surr2</span> = -mb_advantages * torch.<span class="t-f">clamp</span>(   <span class="t-c"># objetivo recortado × A</span><br>
+      &nbsp;&nbsp;ratio, <span class="t-n">1</span> - args.clip_coef, <span class="t-n">1</span> + args.clip_coef<br>
+      )<br>
+      <span class="t-t-hi">pg_loss</span> = torch.<span class="t-f">max</span>(surr1, surr2).<span class="t-f">mean</span>()  <span class="t-c"># min(sin clip, con clip)</span><br><br>
+      <span class="t-c"># 3. Pérdida total = actor + crítico + entropía</span><br>
+      <span class="t-v">v_loss</span>  = F.<span class="t-f">mse_loss</span>(newvalue, mb_returns)    <span class="t-c"># L_VF</span><br>
+      <span class="t-v">entropy_loss</span> = entropy.<span class="t-f">mean</span>()<br>
+      <span class="t-v">loss</span> = pg_loss - args.ent_coef * entropy_loss + args.vf_coef * v_loss
+    </div>
+  </div>
+
+  <div class="card card-violet" style="padding:12px 14px;">
+    <p>🔑 <strong>El truco del log:</strong> En lugar de calcular el ratio directamente como π_new/π_old (puede ser inestable numéricamente), calculamos exp(log π_new − log π_old). El resultado es el mismo pero numéricamente mucho más estable.</p>
+  </div>
+</section>
+
+<!-- ── Hiperparámetros PPO ── -->
+<section>
+  <span class="slide-tag">8.3 · Hiperparámetros</span>
+  <h2>Los hiperparámetros clave de PPO ⚙️</h2>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:12px;">
+    <div style="display:grid;grid-template-columns:1.2fr 0.6fr 0.8fr;background:var(--bg-panel);">
+      <div style="padding:8px 12px;font-family:var(--font-mono);font-size:0.48em;color:var(--text-muted);">Parámetro</div>
+      <div style="padding:8px 12px;font-family:var(--font-mono);font-size:0.48em;color:var(--accent-cyan);text-align:center;">Valor típico</div>
+      <div style="padding:8px 12px;font-family:var(--font-mono);font-size:0.48em;color:var(--text-muted);">¿Qué controla?</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.2fr 0.6fr 0.8fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:7px 12px;font-size:0.54em;font-family:var(--font-mono);color:var(--accent-gold);">clip_coef (ε)</div>
+      <div style="padding:7px 12px;font-size:0.54em;text-align:center;">0.2</div>
+      <div style="padding:7px 12px;font-size:0.52em;color:var(--text-muted);">Radio del clip del ratio — [0.8, 1.2]</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.2fr 0.6fr 0.8fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:7px 12px;font-size:0.54em;font-family:var(--font-mono);color:var(--accent-gold);">update_epochs</div>
+      <div style="padding:7px 12px;font-size:0.54em;text-align:center;">4–10</div>
+      <div style="padding:7px 12px;font-size:0.52em;color:var(--text-muted);">Épocas de actualización por lote de datos</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.2fr 0.6fr 0.8fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:7px 12px;font-size:0.54em;font-family:var(--font-mono);color:var(--accent-gold);">num_steps</div>
+      <div style="padding:7px 12px;font-size:0.54em;text-align:center;">128–2048</div>
+      <div style="padding:7px 12px;font-size:0.52em;color:var(--text-muted);">Pasos recolectados antes de actualizar</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.2fr 0.6fr 0.8fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:7px 12px;font-size:0.54em;font-family:var(--font-mono);color:var(--accent-gold);">gamma (γ)</div>
+      <div style="padding:7px 12px;font-size:0.54em;text-align:center;">0.99</div>
+      <div style="padding:7px 12px;font-size:0.52em;color:var(--text-muted);">Factor de descuento</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.2fr 0.6fr 0.8fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:7px 12px;font-size:0.54em;font-family:var(--font-mono);color:var(--accent-gold);">gae_lambda</div>
+      <div style="padding:7px 12px;font-size:0.54em;text-align:center;">0.95</div>
+      <div style="padding:7px 12px;font-size:0.52em;color:var(--text-muted);">Balance sesgo-varianza en las ventajas (GAE)</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.2fr 0.6fr 0.8fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:7px 12px;font-size:0.54em;font-family:var(--font-mono);color:var(--accent-gold);">ent_coef (c₂)</div>
+      <div style="padding:7px 12px;font-size:0.54em;text-align:center;">0.01</div>
+      <div style="padding:7px 12px;font-size:0.52em;color:var(--text-muted);">Peso de la bonificación de entropía</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.2fr 0.6fr 0.8fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:7px 12px;font-size:0.54em;font-family:var(--font-mono);color:var(--accent-gold);">vf_coef (c₁)</div>
+      <div style="padding:7px 12px;font-size:0.54em;text-align:center;">0.5</div>
+      <div style="padding:7px 12px;font-size:0.52em;color:var(--text-muted);">Peso de la pérdida del Crítico</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── El círculo completo ── -->
+<section>
+  <span class="slide-tag">8.3 · El Gran Cuadro</span>
+  <h2>PPO y el círculo completo del curso 🎓</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">LunarLander-v2 es el primer entorno del curso. Al implementar PPO para entrenarlo desde cero, cerramos el círculo que empezamos en el Módulo 1:</p>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:14px 18px;margin-bottom:14px;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan),var(--accent-violet),var(--accent-gold),#22c55e);"></div>
+    <div class="cols2" style="gap:16px;">
+      <div style="font-size:0.56em;">
+        <div style="font-family:var(--font-mono);color:var(--accent-blue);margin-bottom:8px;font-weight:700;">Módulo 1: LunarLander como usuario</div>
+        <div style="color:var(--text-muted);">Usaste <code>PPO("MlpPolicy", env)</code> sin saber qué había dentro. Fue una caja negra que mágicamente hacía aterrizar la nave.</div>
+      </div>
+      <div style="font-size:0.56em;">
+        <div style="font-family:var(--font-mono);color:var(--accent-gold);margin-bottom:8px;font-weight:700;">Módulo 8: LunarLander como constructor</div>
+        <div style="color:var(--text-muted);">Implementas PPO línea por línea. El ratio, el clip, las épocas de actualización, GAE. No hay caja negra — entiendes cada decisión de diseño.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cols3" style="gap:8px;">
+    <div style="background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.2);border-radius:8px;padding:10px 12px;font-size:0.52em;text-align:center;color:var(--text-muted);">
+      <div style="font-size:1.6em;margin-bottom:4px;">🚀</div>
+      <strong style="color:var(--accent-cyan);">LunarLander</strong><br>CartPole (verificación)<br>+<br>LunarLander-v2 (certificación)
+    </div>
+    <div style="background:rgba(168,85,247,0.06);border:1px solid rgba(168,85,247,0.2);border-radius:8px;padding:10px 12px;font-size:0.52em;text-align:center;color:var(--text-muted);">
+      <div style="font-size:1.6em;margin-bottom:4px;">🏆</div>
+      <strong style="color:var(--accent-violet);">Meta de certificación</strong><br>LunarLander: reward ≥ 200<br>Publicar en el Hub con CleanRL
+    </div>
+    <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:10px 12px;font-size:0.52em;text-align:center;color:var(--text-muted);">
+      <div style="font-size:1.6em;margin-bottom:4px;">🤗</div>
+      <strong style="color:#22c55e);">Leaderboard</strong><br>Compara tu implementación con la comunidad global del curso
+    </div>
+  </div>
+</section>
+
+<!-- ── Glosario ── -->
+<section>
+  <span class="slide-tag">Glosario</span>
+  <h2>Glosario del Módulo 8</h2>
+  <div style="margin-top:10px;">
+    <div class="gloss-row">
+      <span class="gloss-term">PPO</span>
+      <span class="gloss-def">Proximal Policy Optimization. Algoritmo Actor-Critic que limita el cambio de política en cada paso mediante el recorte del ratio r<sub>t</sub>(θ). Actualmente el algoritmo más utilizado en RL práctico.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Ratio r<sub>t</sub>(θ)</span>
+      <span class="gloss-def">π<sub>θ</sub>(a|s) / π<sub>θ_old</sub>(a|s). Mide cuánto cambió la probabilidad de una acción entre la política nueva y la antigua. r=1 → sin cambio. r>1 → más probable. r&lt;1 → menos probable.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Función objetivo recortada (L<sup>CLIP</sup>)</span>
+      <span class="gloss-def">E[min(r·A, clip(r, 1−ε, 1+ε)·A)]. El mínimo entre el objetivo sin recortar y el recortado garantiza que solo actualizamos cuando es seguro — una cota pesimista del objetivo original.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">ε (epsilon de PPO)</span>
+      <span class="gloss-def">Hiperparámetro del clip. Típicamente ε=0.2, lo que significa que el ratio solo puede variar entre 0.8 y 1.2. Controla cuánto puede cambiar la política en un paso.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Cota pesimista</span>
+      <span class="gloss-def">Al tomar el mínimo entre clipped y unclipped, PPO siempre elige la opción más conservadora. Si el objetivo sin clip es mayor (más ganancia), lo ignoramos para no arriesgarnos a un paso grande.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">GAE (Generalized Advantage Estimation)</span>
+      <span class="gloss-def">Técnica de PPO para estimar la ventaja A(s,a) con un balance controlado entre sesgo y varianza, usando el parámetro λ (gae_lambda). Mejora la estabilidad respecto al error TD puro.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">CleanRL</span>
+      <span class="gloss-def">Librería de Deep RL con implementaciones de alta calidad en archivos únicos y legibles. Ideal para aprender el código real de PPO, DQN, SAC, etc. Creada por Costa Huang.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Update epochs</span>
+      <span class="gloss-def">Número de veces que PPO reutiliza el mismo lote de datos para hacer pasos de gradiente. Típicamente 4–10. Es la diferencia de eficiencia de muestra respecto a A2C (que usa cada dato solo una vez).</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── Quiz ── -->
+<section>
+  <span class="slide-tag">Quiz</span>
+  <h2>🧠 Mini Quiz — Módulo 8</h2>
+  <p style="font-size:0.58em;color:var(--text-muted);margin-bottom:14px;">Sin ver las diapositivas anteriores:</p>
+
+  <div class="step-row">
+    <div class="step-num">Q1</div>
+    <div class="step-text">A2C ya reduce la varianza con el Crítico. ¿Qué problema adicional resuelve PPO que A2C no resuelve? ¿Por qué es tan grave ese problema?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q2</div>
+    <div class="step-text">El ratio r<sub>t</sub>(θ) = 1.5 y la ventaja A = +2.0. Según la tabla de los 6 casos, ¿el gradiente es cero o hay actualización? ¿Por qué?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q3</div>
+    <div class="step-text">El ratio r<sub>t</sub>(θ) = 0.6 y la ventaja A = −1.5. ¿El gradiente es cero o hay actualización? Explica la lógica: ¿tiene sentido que el gradiente sea cero aquí?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q4</div>
+    <div class="step-text">¿Por qué PPO puede hacer múltiples épocas de actualización con los mismos datos y A2C no? ¿Qué mecanismo de PPO hace eso seguro?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q5</div>
+    <div class="step-text">La función de pérdida total de PPO tiene tres términos. ¿Qué pasaría si quitamos el término de entropía? ¿Y si quitamos la pérdida del Crítico?</div>
+  </div>
+</section>
+
+<!-- ── Slide final — Cierre del Módulo 8 y del Curso ── -->
+<section>
+  <div class="title-slide" style="align-items:center;text-align:center;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-50px;right:-50px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(168,85,247,0.12) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-40px;left:-40px;width:250px;height:250px;border-radius:50%;background:radial-gradient(circle,rgba(34,211,238,0.08) 0%,transparent 70%);pointer-events:none;"></div>
+
+    <div style="font-size:2.8em;margin-bottom:8px;">💣 🛡️ 🛠️</div>
+    <div class="chapter-badge" style="font-size:0.36em;border-color:var(--accent-gold);color:var(--accent-gold);background:rgba(251,191,36,0.08);">Capítulos 8.1–8.3 completados · Módulo 8 finalizado · Curso completo 🎓</div>
+    <h1 style="text-align:center;font-size:1.6em;">
+      ¡Has completado<br>los 8 Módulos del Curso!<br>
+      <span style="background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan),var(--accent-violet),var(--accent-gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-size:0.85em;">De Q-tables a PPO — el camino completo 🚀</span>
+    </h1>
+    <div class="divider" style="margin:14px auto;background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan),var(--accent-violet),var(--accent-gold));"></div>
+    <div style="display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin-top:4px;font-size:0.52em;color:var(--text-muted);">
+      <span>✅ El problema de pasos grandes</span><span style="color:var(--border);">·</span>
+      <span>✅ Ratio r<sub>t</sub>(θ)</span><span style="color:var(--border);">·</span>
+      <span>✅ Función objetivo recortada</span><span style="color:var(--border);">·</span>
+      <span>✅ Los 6 casos del clip</span><span style="color:var(--border);">·</span>
+      <span>✅ Pérdida completa PPO</span><span style="color:var(--border);">·</span>
+      <span>✅ CleanRL + LunarLander</span>
+    </div>
+    <div style="margin-top:16px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+      <span class="pill" style="border-color:var(--accent-gold);color:var(--accent-gold);">🤗 huggingface.co/learn/deep-rl-course</span>
+    </div>
+    <p style="font-size:0.48em;color:var(--text-muted);margin-top:14px;max-width:540px;">Ahora tienes las bases de Deep RL. Los algoritmos detrás de ChatGPT, AlphaZero, OpenAI Five, y los mejores robots del mundo — ya no son cajas negras.</p>
+  </div>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+<script src="../assets/js/reveal-config.js"></script>
+</body>
+</html>

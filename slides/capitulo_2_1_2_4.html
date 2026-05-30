@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capítulos 2.1–2.4 — Q-Table · Bellman · MC vs TD · Q-Learning</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/black.min.css">
+<link rel="stylesheet" href="../assets/css/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"></script>
+
+<style>
+/* ── Animaciones locales ── */
+@keyframes cell-glow {
+  0%,100% { box-shadow: 0 0 0 0 rgba(34,211,238,0); }
+  50%      { box-shadow: 0 0 12px 3px rgba(34,211,238,0.5); }
+}
+@keyframes fill-bar {
+  from { width: 0; }
+  to   { width: var(--target-w); }
+}
+@keyframes pulse-update {
+  0%,100% { transform: scale(1); }
+  50%      { transform: scale(1.08); background: rgba(34,211,238,0.25); }
+}
+@keyframes arrow-slide {
+  0%,100% { transform: translateX(0); opacity:1; }
+  50%      { transform: translateX(5px); opacity:0.6; }
+}
+@keyframes bounce-cheese {
+  0%,100% { transform: translateY(0) rotate(-5deg); }
+  50%      { transform: translateY(-8px) rotate(5deg); }
+}
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes number-pop {
+  0%   { transform: scale(0.7); opacity:0; }
+  70%  { transform: scale(1.1); }
+  100% { transform: scale(1); opacity:1; }
+}
+
+/* Q-TABLE visual */
+.q-table {
+  border-collapse: separate;
+  border-spacing: 3px;
+  margin: 0 auto;
+}
+.q-table th {
+  font-family: var(--font-mono);
+  font-size: 0.44em;
+  color: var(--text-muted);
+  padding: 4px 10px;
+  text-align: center;
+  letter-spacing: 0.06em;
+}
+.q-table td {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.5em;
+  color: var(--text-muted);
+  min-width: 60px;
+  transition: all 0.3s;
+}
+.q-table td.q-zero   { color: var(--text-muted); }
+.q-table td.q-low    { color: #7dd3fc; background: rgba(59,130,246,0.08); }
+.q-table td.q-mid    { color: #38bdf8; background: rgba(59,130,246,0.15); }
+.q-table td.q-high   { color: var(--accent-cyan); background: rgba(34,211,238,0.18); border-color: rgba(34,211,238,0.4); font-weight:700; }
+.q-table td.q-best   { color: var(--accent-gold); background: rgba(251,191,36,0.18); border-color: rgba(251,191,36,0.5); font-weight:700; animation: cell-glow 2s ease-in-out infinite; }
+.q-table td.q-neg    { color: #f87171; background: rgba(239,68,68,0.08); }
+.q-table td.q-update { animation: pulse-update 1s ease-in-out; }
+
+/* Maze grid */
+.maze-grid {
+  display: grid;
+  gap: 3px;
+  margin: 0 auto;
+}
+.maze-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 1em;
+  aspect-ratio: 1;
+  border: 1px solid rgba(255,255,255,0.05);
+  transition: all 0.3s;
+}
+.mc-floor  { background: rgba(59,130,246,0.08); }
+.mc-wall   { background: rgba(255,255,255,0.04); color:var(--text-muted); }
+.mc-start  { background: rgba(34,211,238,0.15); border-color: rgba(34,211,238,0.4); }
+.mc-goal   { background: rgba(251,191,36,0.2);  border-color: rgba(251,191,36,0.5); }
+.mc-hole   { background: rgba(239,68,68,0.12);  border-color: rgba(239,68,68,0.3); }
+.mc-path   { background: rgba(168,85,247,0.18); border-color: rgba(168,85,247,0.4); }
+.mc-agent  { background: rgba(34,211,238,0.2);  border-color: var(--accent-cyan); box-shadow: 0 0 10px rgba(34,211,238,0.4); }
+
+/* Timeline episode */
+.ep-timeline {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin: 8px 0;
+  overflow-x: auto;
+  padding: 4px 0;
+}
+.ep-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+.ep-node {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.6em;
+  background: var(--bg-card);
+  position: relative;
+  z-index: 1;
+}
+.ep-node.active { border-color: var(--accent-cyan); background: rgba(34,211,238,0.1); color: var(--accent-cyan); }
+.ep-node.reward { border-color: #22c55e; background: rgba(34,197,94,0.1); color: #22c55e; }
+.ep-node.end    { border-color: var(--accent-gold); background: rgba(251,191,36,0.12); color: var(--accent-gold); }
+.ep-connector {
+  height: 2px;
+  width: 20px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+.ep-label { font-family: var(--font-mono); font-size: 0.36em; color: var(--text-muted); margin-top: 3px; text-align: center; max-width: 40px; }
+
+/* Formula decomposition */
+.formula-parts {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 8px 0;
+}
+.formula-part {
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.56em;
+  text-align: center;
+  line-height: 1.4;
+}
+.fp-target  { background: rgba(34,211,238,0.1); border: 1px solid rgba(34,211,238,0.4); color: var(--accent-cyan); }
+.fp-current { background: rgba(168,85,247,0.1); border: 1px solid rgba(168,85,247,0.4); color: var(--accent-violet); }
+.fp-error   { background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.4); color: var(--accent-gold); }
+.fp-alpha   { background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.4); color: var(--accent-blue); }
+.fp-op      { color: var(--text-muted); font-family: var(--font-mono); font-size: 0.7em; }
+
+/* Bellman arrow diagram */
+.bellman-chain {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+.bstate {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.56em;
+  text-align: center;
+  min-width: 80px;
+}
+.bstate.current { border-color: var(--accent-violet); background: rgba(168,85,247,0.1); }
+.bstate.next    { border-color: var(--accent-cyan); background: rgba(34,211,238,0.1); }
+.bstate.far     { border-color: var(--border); opacity: 0.6; }
+.barrow { color: var(--accent-gold); font-size: 0.9em; animation: arrow-slide 1.5s ease-in-out infinite; }
+.breward { font-family: var(--font-mono); font-size: 0.52em; color: #22c55e; text-align: center; }
+
+/* Update equation highlight */
+.eq-box {
+  background: #06091a;
+  border-radius: 12px;
+  padding: 14px 20px;
+  margin: 8px 0;
+  position: relative;
+  overflow: hidden;
+}
+.eq-box::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan), var(--accent-violet));
+}
+
+/* Pseudocode */
+.pseudocode {
+  background: #020812;
+  border: 1px solid rgba(59,130,246,0.25);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.48em;
+  line-height: 2;
+  color: #a8c8e8;
+}
+.pc-keyword { color: #c678dd; }
+.pc-comment { color: #4a5568; }
+.pc-fn      { color: #61afef; }
+.pc-val     { color: var(--accent-gold); }
+.pc-step    { color: var(--accent-cyan); font-weight: 700; }
+.pc-math    { color: #e06c75; }
+.pc-indent  { padding-left: 18px; display: block; }
+.pc-indent2 { padding-left: 36px; display: block; }
+.pc-indent3 { padding-left: 54px; display: block; }
+
+/* MC vs TD comparison */
+.mc-card, .td-card {
+  border-radius: 12px;
+  padding: 16px 18px;
+  position: relative;
+  overflow: hidden;
+}
+.mc-card { background: rgba(59,130,246,0.06); border: 1px solid rgba(59,130,246,0.3); }
+.td-card { background: rgba(168,85,247,0.06); border: 1px solid rgba(168,85,247,0.3); }
+
+/* Number animate */
+.num-animate { animation: number-pop 0.5s ease-out forwards; }
+
+/* Taxi grid */
+.taxi-grid { display: grid; gap: 2px; margin: 0 auto; }
+.taxi-cell {
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 4px; aspect-ratio: 1; font-size: 0.9em;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+</style>
+</head>
+
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ══ PORTADA ══════════════════════════════ -->
+<section>
+  <div class="title-slide" style="position:relative; overflow:hidden;">
+    <div style="position:absolute;top:-80px;right:-80px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(34,211,238,0.1) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-60px;left:-60px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(168,85,247,0.1) 0%,transparent 70%);pointer-events:none;"></div>
+    <div class="chapter-badge">Capítulos 2.1 – 2.4 · Módulo 2</div>
+    <h1>Q-Learning:<br>De la Tabla al<br><span class="gradient-text">Algoritmo Completo</span></h1>
+    <div class="divider"></div>
+    <p style="font-size:0.62em;color:var(--text-muted);max-width:640px;margin-top:8px;line-height:1.7;">
+      La Q-table como "hoja de trucos" · La ecuación de Bellman ·<br>
+      Monte Carlo vs. Diferencias Temporales · El algoritmo Q-Learning
+    </p>
+    <div style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;">
+      <span class="pill">Unit 2 — HuggingFace 🤗</span>
+      <span class="pill">Jose Miguel Lara Rangel</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══ AGENDA ════════════════════════════════ -->
+<section>
+  <span class="slide-tag">Contenido</span>
+  <h2>¿Qué vamos a aprender en el Módulo 2?</h2>
+  <div class="cols2" style="margin-top:12px;">
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div class="chapter-badge" style="font-size:0.36em;">Capítulos 2.1 + 2.2</div>
+      <div class="card card-cyan">
+        <span class="card-icon">📊</span>
+        <p><strong style="color:var(--accent-cyan);">La Q-table y la ecuación de Bellman</strong><br>La "hoja de trucos" del agente, cómo funciona Q(s,a) en un laberinto, y el truco recursivo que hace que calcular valores sea mucho más simple.</p>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div class="chapter-badge" style="font-size:0.36em;border-color:var(--accent-violet);color:var(--accent-violet);background:rgba(168,85,247,0.07);">Capítulos 2.3 + 2.4</div>
+      <div class="card card-violet">
+        <span class="card-icon">🔁</span>
+        <p><strong style="color:var(--accent-violet);">Monte Carlo, TD y Q-Learning completo</strong><br>¿Cuándo actualizamos los valores? Dos estrategias muy distintas. Y luego el algoritmo Q-Learning paso a paso, con su pseudocódigo y todos sus parámetros.</p>
+      </div>
+    </div>
+  </div>
+  <div class="key-idea" style="margin-top:14px;">
+    <span class="ki-label">🔗 Conexión con lo anterior</span>
+    <p>En el Módulo 1 aprendimos qué es Q(s,a). Ahora aprenderemos <em>cómo calcularlo y cómo mejorarlo</em> a lo largo del entrenamiento — sin redes neuronales todavía, solo con una tabla de números.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     CAP 2.1 — LA Q-TABLE
+══════════════════════════════════════════ -->
+<section>
+  <div class="section-slide" style="background:linear-gradient(135deg,#04060f,#080d20);">
+    <span class="big-emoji">📊</span>
+    <div class="chapter-badge" style="font-size:0.38em;margin-top:8px;">Capítulo 2.1</div>
+    <h1>La Q-table:<br>La Hoja de Trucos<br>del Agente</h1>
+    <p style="font-size:0.6em;color:var(--text-muted);max-width:500px;text-align:center;margin-top:10px;">
+      Una tabla que guarda cuánto vale cada acción en cada situación.
+    </p>
+  </div>
+</section>
+
+<!-- ── ¿Qué es Q-Learning? ── -->
+<section>
+  <span class="slide-tag">2.1 · Q-Learning</span>
+  <h2>Q-Learning: aprender el valor de cada decisión</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;"><strong>Q-Learning</strong> es el primer algoritmo de RL que implementaremos. Su objetivo es aprender una función que nos diga <strong>cuánto vale tomar cada acción en cada estado</strong>.</p>
+
+  <div style="display:flex;gap:14px;align-items:flex-start;">
+    <div style="flex:1.2;">
+      <div class="card card-cyan" style="padding:16px;">
+        <h3 style="font-size:0.8em;margin-bottom:8px;">La función Q(s, a)</h3>
+        <p>Toma un estado <strong>s</strong> y una acción <strong>a</strong> como entrada, y devuelve un número: <strong>el retorno esperado si tomamos esa acción en ese estado</strong> y luego seguimos la mejor política.</p>
+        <div style="margin-top:10px;text-align:center;">
+          <div style="background:#060a14;border:1px solid rgba(34,211,238,0.3);border-radius:8px;padding:8px 14px;display:inline-flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:0.6em;">
+            <span style="color:var(--text-muted);">(s, a)</span>
+            <span style="color:var(--accent-cyan);">→  Q(s,a)</span>
+            <span style="color:var(--text-muted);">→  número</span>
+          </div>
+        </div>
+        <p style="font-size:0.58em;color:var(--text-muted);margin-top:8px;">La "Q" viene de <em>Quality</em> — la calidad de esa acción en ese estado.</p>
+      </div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:8px;">
+      <div class="card card-gold">
+        <p><strong>Importante:</strong> Q-Learning distingue entre <strong class="hl-cyan">valor</strong> y <strong class="hl-green">recompensa</strong>:</p>
+        <p style="margin-top:6px; font-size:0.9em;"><span style="color:var(--accent-cyan);">Valor Q(s,a)</span> = retorno acumulado <em>esperado</em> desde aquí</p>
+        <p style="font-size:0.9em;"><span style="color:#22c55e;">Recompensa R</span> = el punto que me da el entorno <em>ahora mismo</em></p>
+      </div>
+      <div class="card">
+        <p>🧠 El agente puede recibir una recompensa pequeña (+1) pero que ese estado tenga un valor alto (+50) porque desde ahí el camino hacia la meta es corto.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── La Q-Table como hoja de cálculo ── -->
+<section>
+  <span class="slide-tag">2.1 · Q-Table</span>
+  <h2>La Q-table: una hoja de cálculo gigante 📋</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">La función Q se implementa como una <strong>tabla</strong> — como una hoja de Excel — donde cada fila es un estado y cada columna es una acción. Cada celda contiene un número: el valor Q de esa combinación.</p>
+
+  <div style="display:flex;gap:16px;align-items:flex-start;">
+    <!-- Maze -->
+    <div style="flex:1;">
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;">
+        <p style="font-size:0.48em;color:var(--text-muted);margin-bottom:8px;">Laberinto del ratón 🐭 (2×3 estados)</p>
+        <div class="maze-grid" style="grid-template-columns:repeat(3,52px);max-width:168px;margin:0 auto;">
+          <div class="maze-cell mc-start" style="font-size:1.2em;">🐭</div>
+          <div class="maze-cell mc-floor"></div>
+          <div class="maze-cell mc-goal" style="font-size:1.1em;">🧀<br><span style="font-size:0.6em;color:var(--accent-gold);">+10</span></div>
+          <div class="maze-cell mc-floor"></div>
+          <div class="maze-cell mc-wall" style="font-size:1.1em;">🧱</div>
+          <div class="maze-cell mc-hole" style="font-size:1.1em;">🕳️<br><span style="font-size:0.6em;color:#ef4444;">−10</span></div>
+        </div>
+        <div style="margin-top:8px;font-family:var(--font-mono);font-size:0.42em;color:var(--text-muted);">
+          6 estados posibles × 4 acciones = 24 celdas en la Q-table
+        </div>
+      </div>
+    </div>
+
+    <!-- Q-Table -->
+    <div style="flex:1.8;">
+      <p style="font-size:0.48em;color:var(--text-muted);margin-bottom:6px;">Q-table correspondiente (al inicio, todo en 0):</p>
+      <table class="q-table">
+        <tr>
+          <th>Estado</th>
+          <th>⬆️ Arriba</th>
+          <th>⬇️ Abajo</th>
+          <th>⬅️ Izq.</th>
+          <th>➡️ Der.</th>
+        </tr>
+        <tr>
+          <td style="font-size:0.55em;color:var(--text-muted);font-family:var(--font-mono);">S0 🐭</td>
+          <td class="q-zero">0</td>
+          <td class="q-zero">0</td>
+          <td class="q-zero">0</td>
+          <td class="q-zero">0</td>
+        </tr>
+        <tr>
+          <td style="font-size:0.55em;color:var(--text-muted);font-family:var(--font-mono);">S1</td>
+          <td class="q-zero">0</td>
+          <td class="q-zero">0</td>
+          <td class="q-zero">0</td>
+          <td class="q-zero">0</td>
+        </tr>
+        <tr>
+          <td style="font-size:0.55em;color:var(--accent-gold);font-family:var(--font-mono);">S2 🧀</td>
+          <td class="q-zero">0</td>
+          <td class="q-zero">0</td>
+          <td class="q-zero">0</td>
+          <td class="q-zero">0</td>
+        </tr>
+        <tr>
+          <td style="font-size:0.55em;color:var(--text-muted);font-family:var(--font-mono);">S3</td>
+          <td class="q-zero">0</td>
+          <td class="q-zero">0</td>
+          <td class="q-zero">0</td>
+          <td class="q-zero">0</td>
+        </tr>
+        <tr>
+          <td style="font-size:0.55em;color:var(--text-muted);font-family:var(--font-mono);">S4 🧱</td>
+          <td class="q-zero">—</td>
+          <td class="q-zero">—</td>
+          <td class="q-zero">—</td>
+          <td class="q-zero">—</td>
+        </tr>
+        <tr>
+          <td style="font-size:0.55em;color:#ef4444;font-family:var(--font-mono);">S5 🕳️</td>
+          <td class="q-neg">0</td>
+          <td class="q-neg">0</td>
+          <td class="q-neg">0</td>
+          <td class="q-neg">0</td>
+        </tr>
+      </table>
+      <p style="font-size:0.44em;color:var(--text-muted);margin-top:6px;">Al inicio todos los valores son 0. A medida que el agente explora, los números se actualizan.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Q-Table después del entrenamiento ── -->
+<section>
+  <span class="slide-tag">2.1 · Q-Table Entrenada</span>
+  <h2>La Q-table después del entrenamiento ✅</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Después de muchos episodios, los valores Q reflejan el <strong>verdadero valor de cada acción</strong>. El agente simplemente elige siempre la acción con el Q más alto.</p>
+
+  <div style="display:flex;gap:16px;align-items:flex-start;">
+    <div style="flex:1;">
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;">
+        <p style="font-size:0.46em;color:var(--text-muted);margin-bottom:8px;">La política óptima emerge de la Q-table:</p>
+        <div class="maze-grid" style="grid-template-columns:repeat(3,52px);max-width:168px;margin:0 auto;">
+          <div class="maze-cell mc-start" style="font-size:1.1em;">🐭<br><span style="font-size:0.65em;color:var(--accent-cyan);">➡️</span></div>
+          <div class="maze-cell mc-path" style="font-size:1.1em;color:var(--accent-cyan);">➡️</div>
+          <div class="maze-cell mc-goal" style="font-size:1.1em;">🧀</div>
+          <div class="maze-cell mc-path" style="font-size:1.1em;color:var(--accent-cyan);">⬆️</div>
+          <div class="maze-cell mc-wall" style="font-size:1.1em;">🧱</div>
+          <div class="maze-cell mc-hole" style="font-size:1.1em;">🕳️</div>
+        </div>
+        <div style="margin-top:8px;font-size:0.44em;color:var(--accent-gold);">La flecha en cada celda = acción con Q más alto</div>
+      </div>
+    </div>
+
+    <div style="flex:1.8;">
+      <p style="font-size:0.48em;color:var(--text-muted);margin-bottom:6px;">Q-table después del entrenamiento (valores actualizados):</p>
+      <table class="q-table">
+        <tr>
+          <th>Estado</th>
+          <th>⬆️ Arriba</th>
+          <th>⬇️ Abajo</th>
+          <th>⬅️ Izq.</th>
+          <th>➡️ Der.</th>
+        </tr>
+        <tr>
+          <td style="font-size:0.55em;color:var(--text-muted);font-family:var(--font-mono);">S0 🐭</td>
+          <td class="q-low">1.2</td>
+          <td class="q-low">0.8</td>
+          <td class="q-neg">−2.0</td>
+          <td class="q-best">8.5</td>
+        </tr>
+        <tr>
+          <td style="font-size:0.55em;color:var(--text-muted);font-family:var(--font-mono);">S1</td>
+          <td class="q-best">9.2</td>
+          <td class="q-neg">−1.5</td>
+          <td class="q-low">2.1</td>
+          <td class="q-neg">−5.0</td>
+        </tr>
+        <tr>
+          <td style="font-size:0.55em;color:var(--accent-gold);font-family:var(--font-mono);">S2 🧀</td>
+          <td class="q-zero">0</td>
+          <td class="q-zero">0</td>
+          <td class="q-zero">0</td>
+          <td class="q-zero">0</td>
+        </tr>
+        <tr>
+          <td style="font-size:0.55em;color:var(--text-muted);font-family:var(--font-mono);">S3</td>
+          <td class="q-best">7.8</td>
+          <td class="q-neg">−8.0</td>
+          <td class="q-low">1.5</td>
+          <td class="q-neg">−3.0</td>
+        </tr>
+      </table>
+      <div class="key-idea" style="margin-top:10px;padding:10px 14px;">
+        <span class="ki-label">🎯 Política óptima</span>
+        <p style="font-size:0.62em;">π*(s) = argmax<sub>a</sub> Q(s, a) — en cada estado, elige la acción cuyo valor Q es el más alto (las marcadas en dorado).</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     CAP 2.2 — ECUACIÓN DE BELLMAN
+══════════════════════════════════════════ -->
+<section>
+  <div class="section-slide" style="background:linear-gradient(135deg,#04060f,#0a0616);">
+    <span class="big-emoji">🔮</span>
+    <div class="chapter-badge" style="font-size:0.38em;border-color:var(--accent-violet);color:var(--accent-violet);background:rgba(168,85,247,0.07);margin-top:8px;">Capítulo 2.2</div>
+    <h1>La Ecuación<br>de Bellman:<br>Aprender del Futuro</h1>
+    <p style="font-size:0.6em;color:var(--text-muted);max-width:500px;text-align:center;margin-top:10px;">
+      El truco recursivo que simplifica el cálculo de todos los valores.
+    </p>
+  </div>
+</section>
+
+<!-- ── Problema sin Bellman ── -->
+<section>
+  <span class="slide-tag">2.2 · El Problema</span>
+  <h2>¿Por qué calcular V(s) es tan difícil sin un truco? 😓</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Para calcular V(S₀) — el valor del estado inicial — necesitaríamos calcular el retorno completo de ese episodio. Eso significa sumar todas las recompensas hasta el final:</p>
+
+  <!-- Chain of states -->
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:14px;">
+    <div class="ep-timeline" style="justify-content:center;">
+      <div class="ep-step">
+        <div class="ep-node active">S₀</div>
+        <div class="ep-label">inicio</div>
+      </div>
+      <div class="ep-connector"></div>
+      <div class="ep-step">
+        <div class="ep-node reward">+1</div>
+        <div class="ep-label">R₁</div>
+      </div>
+      <div class="ep-connector"></div>
+      <div class="ep-step">
+        <div class="ep-node">S₁</div>
+        <div class="ep-label">paso 1</div>
+      </div>
+      <div class="ep-connector"></div>
+      <div class="ep-step">
+        <div class="ep-node reward">+2</div>
+        <div class="ep-label">R₂</div>
+      </div>
+      <div class="ep-connector"></div>
+      <div class="ep-step">
+        <div class="ep-node">S₂</div>
+        <div class="ep-label">paso 2</div>
+      </div>
+      <div class="ep-connector"></div>
+      <div class="ep-step">
+        <div class="ep-node reward">+0</div>
+        <div class="ep-label">R₃</div>
+      </div>
+      <div class="ep-connector"></div>
+      <div class="ep-step">
+        <div class="ep-node">…</div>
+        <div class="ep-label">y así</div>
+      </div>
+      <div class="ep-connector"></div>
+      <div class="ep-step">
+        <div class="ep-node end">🧀</div>
+        <div class="ep-label">meta</div>
+      </div>
+    </div>
+    <p style="font-size:0.5em;color:var(--text-muted);text-align:center;margin-top:8px;">V(S₀) = R₁ + γR₂ + γ²R₃ + γ³R₄ + … — hay que esperar al final del episodio</p>
+  </div>
+
+  <div class="cols2">
+    <div class="card card-pink">
+      <span class="card-icon">😰</span>
+      <h3>El problema</h3>
+      <p>Para calcular V(S₀) necesitamos V(S₁), que necesita V(S₂), que necesita V(S₃)… Es un cálculo <strong>larguísimo</strong> que repite trabajo innecesariamente.</p>
+    </div>
+    <div class="card card-cyan">
+      <span class="card-icon">💡</span>
+      <h3>La solución de Bellman</h3>
+      <p>En lugar de calcular todo desde el principio, usamos el <strong>valor del siguiente estado</strong> que ya conocemos. ¡Un solo paso en lugar de toda la cadena!</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── La ecuación de Bellman ── -->
+<section>
+  <span class="slide-tag">2.2 · Ecuación de Bellman</span>
+  <h2>La Ecuación de Bellman: el valor como suma de dos partes 🔮</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">La idea brillante: el valor de estar en un estado es simplemente la recompensa inmediata más el valor (descontado) del estado al que llegamos:</p>
+
+  <div class="eq-box" style="margin-bottom:14px;">
+    <div class="math-block" style="border:none;background:none;padding:8px;font-size:1em;">
+      \[ V(S_t) = R_{t+1} + \gamma \cdot V(S_{t+1}) \]
+    </div>
+    <div class="formula-parts">
+      <div class="formula-part fp-current">V(Sₜ)<br><span style="font-size:0.85em;font-weight:400;">valor aquí</span></div>
+      <span class="fp-op">=</span>
+      <div class="formula-part fp-alpha">Rₜ₊₁<br><span style="font-size:0.85em;font-weight:400;">recompensa inmediata</span></div>
+      <span class="fp-op">+</span>
+      <div class="formula-part" style="background:rgba(34,211,238,0.08);border:1px solid rgba(34,211,238,0.3);color:var(--accent-cyan);">γ · V(Sₜ₊₁)<br><span style="font-size:0.85em;font-weight:400;">valor del siguiente (descontado)</span></div>
+    </div>
+  </div>
+
+  <!-- Visual chain con Bellman -->
+  <div class="bellman-chain">
+    <div class="bstate current">
+      <div style="color:var(--accent-violet);font-weight:700;font-size:0.9em;">V(S₀)</div>
+      <div style="color:var(--text-muted);font-size:0.8em;margin-top:2px;">= ?</div>
+    </div>
+    <div>
+      <div class="barrow">→</div>
+      <div class="breward">+1</div>
+    </div>
+    <div class="bstate next">
+      <div style="color:var(--accent-cyan);font-weight:700;font-size:0.9em;">V(S₁)</div>
+      <div style="color:var(--text-muted);font-size:0.8em;margin-top:2px;">ya conocido</div>
+    </div>
+    <div style="font-family:var(--font-mono);font-size:0.5em;color:var(--text-muted);align-self:center;">
+      <br>En vez de calcular<br>toda la cadena…
+    </div>
+  </div>
+
+  <div class="key-idea" style="margin-top:12px;">
+    <span class="ki-label">🎯 La idea clave</span>
+    <p>En lugar de sumar todas las recompensas futuras uno por uno, simplemente decimos: <strong>"el valor de aquí = la recompensa de dar un paso + γ × el valor del lugar al que llego"</strong>. Es recursivo: cada valor depende solo del siguiente.</p>
+  </div>
+</section>
+
+<!-- ── Ejemplo numérico Bellman ── -->
+<section>
+  <span class="slide-tag">2.2 · Ejemplo Numérico</span>
+  <h2>Bellman con números reales 🔢</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Usemos γ = 1 (sin descuento) para simplificar el ejemplo. Los estados van del S₀ al queso 🧀 con recompensas en el camino:</p>
+
+  <!-- State chain con valores -->
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:14px;">
+    <div style="display:flex;gap:0;align-items:center;justify-content:center;flex-wrap:wrap;">
+      <!-- S0 -->
+      <div style="text-align:center;padding:0 8px;">
+        <div style="background:rgba(168,85,247,0.15);border:1px solid var(--accent-violet);border-radius:10px;padding:10px 14px;font-family:var(--font-mono);font-size:0.6em;">
+          <div style="color:var(--accent-violet);font-weight:700;">S₀</div>
+          <div style="color:var(--text-muted);font-size:0.9em;margin-top:2px;">V = ?</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;font-size:0.52em;color:#22c55e;padding:0 2px;">
+        <span>R=+1</span>
+        <span style="color:var(--accent-gold);font-size:1.3em;animation:arrow-slide 1.5s ease-in-out infinite;display:inline-block;">→</span>
+      </div>
+      <!-- S1 -->
+      <div style="text-align:center;padding:0 8px;">
+        <div style="background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.4);border-radius:10px;padding:10px 14px;font-family:var(--font-mono);font-size:0.6em;">
+          <div style="color:var(--accent-blue);font-weight:700;">S₁</div>
+          <div style="color:var(--text-muted);font-size:0.9em;margin-top:2px;">V = ?</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;font-size:0.52em;color:#22c55e;padding:0 2px;">
+        <span>R=+2</span>
+        <span style="color:var(--accent-gold);font-size:1.3em;animation:arrow-slide 1.5s ease-in-out infinite;animation-delay:0.3s;display:inline-block;">→</span>
+      </div>
+      <!-- S2 -->
+      <div style="text-align:center;padding:0 8px;">
+        <div style="background:rgba(34,211,238,0.12);border:1px solid rgba(34,211,238,0.4);border-radius:10px;padding:10px 14px;font-family:var(--font-mono);font-size:0.6em;">
+          <div style="color:var(--accent-cyan);font-weight:700;">S₂</div>
+          <div style="color:var(--text-muted);font-size:0.9em;margin-top:2px;">V = ?</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;font-size:0.52em;color:#22c55e;padding:0 2px;">
+        <span>R=+3</span>
+        <span style="color:var(--accent-gold);font-size:1.3em;animation:arrow-slide 1.5s ease-in-out infinite;animation-delay:0.6s;display:inline-block;">→</span>
+      </div>
+      <!-- Meta -->
+      <div style="text-align:center;padding:0 8px;">
+        <div style="background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.4);border-radius:10px;padding:10px 14px;font-family:var(--font-mono);font-size:0.6em;">
+          <div style="color:var(--accent-gold);font-weight:700;">🧀 Meta</div>
+          <div style="color:var(--accent-gold);font-size:0.9em;margin-top:2px;">V = 0</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cálculo hacia atrás -->
+  <div style="display:flex;gap:10px;">
+    <div class="card" style="flex:1;padding:12px 14px;">
+      <h3 style="font-size:0.72em;color:#22c55e;">Calculando hacia atrás:</h3>
+      <div style="font-family:var(--font-mono);font-size:0.56em;line-height:2;margin-top:6px;">
+        <div><span style="color:var(--accent-gold);">V(Meta)</span> = <span style="color:#22c55e;">0</span></div>
+        <div><span style="color:var(--accent-cyan);">V(S₂)</span> = 3 + 1×<span style="color:var(--accent-gold);">0</span> = <strong style="color:var(--accent-cyan);">3</strong></div>
+        <div><span style="color:var(--accent-blue);">V(S₁)</span> = 2 + 1×<span style="color:var(--accent-cyan);">3</span> = <strong style="color:var(--accent-blue);">5</strong></div>
+        <div><span style="color:var(--accent-violet);">V(S₀)</span> = 1 + 1×<span style="color:var(--accent-blue);">5</span> = <strong style="color:var(--accent-violet);">6</strong></div>
+      </div>
+    </div>
+    <div class="key-idea" style="flex:1.2;margin:0;">
+      <span class="ki-label">💡 El poder del truco</span>
+      <p>En lugar de sumar 1+2+3 = 6 desde el principio, calculamos hacia atrás usando solo sumas de dos números a la vez. En un entorno real con miles de estados, esto ahorra un tiempo enorme.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     CAP 2.3 — MC VS TD
+══════════════════════════════════════════ -->
+<section>
+  <div class="section-slide" style="background:linear-gradient(135deg,#04060f,#060f10);">
+    <span class="big-emoji">🔁</span>
+    <div class="chapter-badge" style="font-size:0.38em;border-color:var(--accent-cyan);color:var(--accent-cyan);background:rgba(34,211,238,0.06);margin-top:8px;">Capítulo 2.3</div>
+    <h1>Monte Carlo<br>vs.<br>Diferencias Temporales</h1>
+    <p style="font-size:0.6em;color:var(--text-muted);max-width:500px;text-align:center;margin-top:10px;">
+      ¿Cuándo actualizar lo que sabemos? Dos estrategias muy distintas.
+    </p>
+  </div>
+</section>
+
+<!-- ── El problema de cuándo actualizar ── -->
+<section>
+  <span class="slide-tag">2.3 · ¿Cuándo Actualizar?</span>
+  <h2>El problema: ¿cuándo aprendemos de lo que vimos? ⏰</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Tenemos nuestra Q-table con valores. Después de cada acción, obtenemos nueva información (recompensa + nuevo estado). La pregunta es: <strong>¿actualizamos ahora o esperamos?</strong></p>
+
+  <div class="cols2">
+    <div class="mc-card">
+      <h3 style="color:var(--accent-blue);font-size:0.9em;margin-bottom:6px;">🎲 Monte Carlo (MC)</h3>
+      <p><strong>Espera al final del episodio.</strong> Solo actualiza cuando la partida termina, usando el retorno real acumulado G.</p>
+      <div style="margin-top:10px;text-align:center;font-size:1.5em;">
+        ▶️▶️▶️▶️▶️▶️▶️ 🏁
+      </div>
+      <p style="font-size:0.56em;color:var(--text-muted);margin-top:6px;text-align:center;">Actualiza aquí → solo al llegar al final</p>
+    </div>
+    <div class="td-card">
+      <h3 style="color:var(--accent-violet);font-size:0.9em;margin-bottom:6px;">⚡ Diferencias Temporales (TD)</h3>
+      <p><strong>Actualiza en cada paso.</strong> Después de cada acción, actualiza la estimación usando la recompensa inmediata más el valor estimado del siguiente estado.</p>
+      <div style="margin-top:10px;text-align:center;font-size:1.3em;">
+        ⟳▶️⟳▶️⟳▶️⟳▶️ 🏁
+      </div>
+      <p style="font-size:0.56em;color:var(--text-muted);margin-top:6px;text-align:center;">↑ actualiza aquí, y aquí, y aquí…</p>
+    </div>
+  </div>
+
+  <div class="key-idea" style="margin-top:14px;">
+    <span class="ki-label">🚗 Analogía: estimar el tiempo de llegada a casa</span>
+    <p><strong>Monte Carlo:</strong> llegas a casa, mides el tiempo real. Corriges tu estimación para la próxima vez. <strong>TD:</strong> cada vez que pasas por un semáforo, actualizas tu estimación del tiempo restante — sin esperar a llegar.</p>
+  </div>
+</section>
+
+<!-- ── Monte Carlo en detalle ── -->
+<section>
+  <span class="slide-tag">2.3 · Monte Carlo</span>
+  <h2>Monte Carlo: aprender del episodio completo 🎲</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Con Monte Carlo, esperamos a que el episodio termine y usamos el <strong>retorno real G</strong> para actualizar los valores:</p>
+
+  <div class="eq-box" style="margin-bottom:12px;">
+    <div class="math-block" style="border:none;background:none;padding:6px;font-size:1em;">
+      \[ V(S_t) \leftarrow V(S_t) + \alpha \big[ G_t - V(S_t) \big] \]
+    </div>
+    <div class="formula-parts">
+      <div class="formula-part fp-current">V(Sₜ)<br><span style="font-size:0.85em;font-weight:400;">valor actual</span></div>
+      <span class="fp-op">←</span>
+      <div class="formula-part fp-current" style="opacity:0.7;">V(Sₜ)<br><span style="font-size:0.85em;font-weight:400;">valor anterior</span></div>
+      <span class="fp-op">+</span>
+      <div class="formula-part fp-alpha">α<br><span style="font-size:0.85em;font-weight:400;">tasa de aprendizaje</span></div>
+      <span class="fp-op">·</span>
+      <span class="fp-op">[</span>
+      <div class="formula-part fp-target">Gₜ<br><span style="font-size:0.85em;font-weight:400;">retorno real</span></div>
+      <span class="fp-op">−</span>
+      <div class="formula-part fp-current" style="opacity:0.7;">V(Sₜ)<br><span style="font-size:0.85em;font-weight:400;">valor anterior</span></div>
+      <span class="fp-op">]</span>
+    </div>
+  </div>
+
+  <!-- Episode example -->
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:12px;">
+    <p style="font-size:0.48em;color:var(--text-muted);margin-bottom:8px;"><strong>Ejemplo:</strong> El ratón completa un episodio. Al final calculamos G = 6.</p>
+    <div class="ep-timeline">
+      <div class="ep-step"><div class="ep-node active">S₀</div><div class="ep-label">V=0</div></div>
+      <div class="ep-connector"></div>
+      <div class="ep-step"><div class="ep-node reward">+1</div><div class="ep-label">R</div></div>
+      <div class="ep-connector"></div>
+      <div class="ep-step"><div class="ep-node">S₁</div><div class="ep-label">V=0</div></div>
+      <div class="ep-connector"></div>
+      <div class="ep-step"><div class="ep-node reward">+2</div><div class="ep-label">R</div></div>
+      <div class="ep-connector"></div>
+      <div class="ep-step"><div class="ep-node">S₂</div><div class="ep-label">V=0</div></div>
+      <div class="ep-connector"></div>
+      <div class="ep-step"><div class="ep-node reward">+3</div><div class="ep-label">R</div></div>
+      <div class="ep-connector"></div>
+      <div class="ep-step"><div class="ep-node end">🧀</div><div class="ep-label">fin</div></div>
+    </div>
+    <div style="margin-top:10px;font-family:var(--font-mono);font-size:0.52em;color:var(--text-muted);">
+      G = 1 + 2 + 3 = 6 &nbsp;|&nbsp; α = 0.1<br>
+      <span style="color:var(--accent-violet);">V(S₀)</span> ← 0 + 0.1 × (6 − 0) = <strong style="color:var(--accent-violet);">0.6</strong>
+    </div>
+  </div>
+
+  <div class="card card-blue" style="border-left-color:var(--accent-blue);">
+    <p>⚠️ <strong>Limitación:</strong> MC solo funciona con <strong>tareas episódicas</strong> (que tienen un final). No puede usarse en tareas continuas, y necesita esperar al final del episodio para aprender — lo que lo hace lento.</p>
+  </div>
+</section>
+
+<!-- ── TD en detalle ── -->
+<section>
+  <span class="slide-tag">2.3 · Diferencias Temporales</span>
+  <h2>Diferencias Temporales (TD): aprender en cada paso ⚡</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">TD aprende sin esperar al final. Usa la recompensa inmediata más el valor estimado del siguiente estado — a esto le llamamos <strong>"bootstrapping"</strong> (apoyarse en una estimación propia):</p>
+
+  <div class="eq-box" style="margin-bottom:12px;">
+    <div class="math-block" style="border:none;background:none;padding:6px;font-size:0.95em;">
+      \[ V(S_t) \leftarrow V(S_t) + \alpha \big[ \underbrace{R_{t+1} + \gamma V(S_{t+1})}_{\text{objetivo TD}} - V(S_t) \big] \]
+    </div>
+    <div class="formula-parts">
+      <div class="formula-part fp-target">Rₜ₊₁ + γV(Sₜ₊₁)<br><span style="font-size:0.85em;font-weight:400;">objetivo TD (estimado)</span></div>
+      <span class="fp-op">←</span>
+      <span style="font-size:0.56em;color:var(--text-muted);">en lugar del G real</span>
+    </div>
+  </div>
+
+  <!-- Step by step comparison -->
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:10px;">
+    <p style="font-size:0.48em;color:var(--text-muted);margin-bottom:8px;"><strong>Con TD, actualizamos después de cada paso:</strong></p>
+    <div class="ep-timeline">
+      <div class="ep-step"><div class="ep-node active">S₀</div><div class="ep-label">V=0</div></div>
+      <div class="ep-connector" style="background:var(--accent-violet);"></div>
+      <div class="ep-step"><div class="ep-node reward">+1</div><div class="ep-label">R</div></div>
+      <div class="ep-connector" style="background:var(--accent-violet);"></div>
+      <div class="ep-step"><div class="ep-node active">S₁</div><div class="ep-label">V=0</div></div>
+    </div>
+    <div style="font-family:var(--font-mono);font-size:0.52em;color:var(--text-muted);margin-top:8px;">
+      V(S₀) ← 0 + 0.1 × [1 + 0.9×0 − 0] = <strong style="color:var(--accent-cyan);">0.1</strong> &nbsp; ← ¡actualizamos ya!<br>
+      Luego: V(S₁) ← 0 + 0.1 × [2 + 0.9×0 − 0] = <strong style="color:var(--accent-cyan);">0.2</strong><br>
+      Y así paso a paso…
+    </div>
+  </div>
+
+  <div class="card card-violet">
+    <p>✅ <strong>Ventajas de TD:</strong> Funciona en tareas continuas y episódicas. Aprende mucho más rápido porque actualiza en cada paso. <strong>Q-Learning usa este enfoque.</strong></p>
+  </div>
+</section>
+
+<!-- ── MC vs TD comparativa ── -->
+<section>
+  <span class="slide-tag">2.3 · MC vs TD</span>
+  <h2>Monte Carlo vs. TD: comparativa completa 📊</h2>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:14px;">
+    <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;background:var(--bg-panel);">
+      <div style="padding:10px 14px;font-family:var(--font-mono);font-size:0.5em;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;">Característica</div>
+      <div style="padding:10px 14px;text-align:center;font-family:var(--font-mono);font-size:0.5em;color:var(--accent-blue);">🎲 Monte Carlo</div>
+      <div style="padding:10px 14px;text-align:center;font-family:var(--font-mono);font-size:0.5em;color:var(--accent-violet);">⚡ TD (Q-Learning)</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">¿Cuándo actualiza?</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-blue);text-align:center;">Al final del episodio</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-violet);text-align:center;">En cada paso</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">¿Usa G real o estimado?</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-blue);text-align:center;">G real (exacto)</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-violet);text-align:center;">R + γV (estimado)</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Tareas continuas</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#ef4444;text-align:center;">❌ No aplica</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#22c55e;text-align:center;">✅ Funciona</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Velocidad de aprendizaje</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#f59e0b;text-align:center;">Lento (espera al final)</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#22c55e;text-align:center;">Rápido (actualiza ya)</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Varianza / Sesgo</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-blue);text-align:center;">Alta varianza, sin sesgo</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-violet);text-align:center;">Baja varianza, algo de sesgo</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);background:rgba(255,255,255,0.02);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Usado en</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-blue);text-align:center;">Algunos métodos de política</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-violet);text-align:center;font-weight:700;">Q-Learning, DQN, SARSA</div>
+    </div>
+  </div>
+
+  <div class="card card-gold">
+    <p>🔖 <strong>Terminología importante:</strong> A la estimación <span style="font-family:var(--font-mono);">Rₜ₊₁ + γV(Sₜ₊₁)</span> se le llama el <strong>"objetivo TD"</strong> (TD target). Es nuestra mejor estimación del retorno real que no tenemos todavía. Este concepto es fundamental en Q-Learning.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     CAP 2.4 — Q-LEARNING ALGORITMO COMPLETO
+══════════════════════════════════════════ -->
+<section>
+  <div class="section-slide" style="background:linear-gradient(135deg,#04060f,#0a0616);">
+    <span class="big-emoji">🧩</span>
+    <div class="chapter-badge" style="font-size:0.38em;border-color:var(--accent-gold);color:var(--accent-gold);background:rgba(251,191,36,0.07);margin-top:8px;">Capítulo 2.4</div>
+    <h1>Q-Learning:<br>El Algoritmo<br>Completo</h1>
+    <p style="font-size:0.6em;color:var(--text-muted);max-width:500px;text-align:center;margin-top:10px;">
+      La regla de actualización, el pseudocódigo completo, y por qué es "fuera de política".
+    </p>
+  </div>
+</section>
+
+<!-- ── La regla de actualización de Q ── -->
+<section>
+  <span class="slide-tag">2.4 · Actualización Q</span>
+  <h2>La regla de actualización de Q-Learning 🔧</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Combinando lo que aprendimos — la Q-table, la ecuación de Bellman y el enfoque TD — llegamos a la regla central de Q-Learning:</p>
+
+  <div class="eq-box" style="margin-bottom:16px;">
+    <div class="math-block" style="border:none;background:none;padding:8px;font-size:0.9em;">
+      \[ Q(S_t, A_t) \leftarrow Q(S_t, A_t) + \alpha \Big[ R_{t+1} + \gamma \max_{a'} Q(S_{t+1}, a') - Q(S_t, A_t) \Big] \]
+    </div>
+  </div>
+
+  <!-- Decomposition -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
+    <div class="formula-part fp-current" style="border-radius:10px;padding:10px;">
+      <div style="font-size:0.9em;font-weight:700;">Q(Sₜ,Aₜ)</div>
+      <div style="font-size:0.8em;font-weight:400;margin-top:4px;">valor Q actual que queremos mejorar</div>
+    </div>
+    <div class="formula-part fp-alpha" style="border-radius:10px;padding:10px;">
+      <div style="font-size:0.9em;font-weight:700;">α (alfa)</div>
+      <div style="font-size:0.8em;font-weight:400;margin-top:4px;">tasa de aprendizaje (cuánto cambiamos)</div>
+    </div>
+    <div class="formula-part fp-target" style="border-radius:10px;padding:10px;">
+      <div style="font-size:0.9em;font-weight:700;">Rₜ₊₁ + γ·maxQ</div>
+      <div style="font-size:0.8em;font-weight:400;margin-top:4px;">objetivo TD: lo que "debería" valer</div>
+    </div>
+    <div class="formula-part fp-error" style="border-radius:10px;padding:10px;">
+      <div style="font-size:0.9em;font-weight:700;">[ … − Q ]</div>
+      <div style="font-size:0.8em;font-weight:400;margin-top:4px;">error TD: la diferencia a corregir</div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">🎓 En palabras simples</span>
+    <p><strong>"El nuevo valor Q = el valor Q anterior + una pequeña corrección hacia lo que el valor debería ser."</strong> La corrección es α × (lo que debería ser − lo que era). Con α pequeño, los cambios son graduales y estables.</p>
+  </div>
+</section>
+
+<!-- ── Los parámetros de Q-Learning ── -->
+<section>
+  <span class="slide-tag">2.4 · Parámetros</span>
+  <h2>Los parámetros que controlan el aprendizaje ⚙️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Q-Learning tiene varios "perillas" que ajustan cómo aprende el agente. Entenderlos bien es crucial para que el entrenamiento funcione:</p>
+
+  <div class="cols2" style="margin-bottom:12px;">
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div class="card card-blue" style="border-left-color:var(--accent-blue);">
+        <h3 style="font-size:0.78em;">α — Tasa de aprendizaje</h3>
+        <p>Controla <strong>cuánto cambia el valor Q</strong> con cada actualización. Rango: (0, 1].</p>
+        <div style="font-family:var(--font-mono);font-size:0.5em;margin-top:8px;display:flex;gap:10px;">
+          <span style="color:#ef4444;">α alto (0.9) → cambios bruscos, inestable</span>
+          <span style="color:#22c55e;">α bajo (0.01) → cambios suaves, lento</span>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:0.52em;color:var(--accent-gold);margin-top:4px;">Típico: α = 0.1 o 0.3</div>
+      </div>
+      <div class="card card-violet">
+        <h3 style="font-size:0.78em;">γ — Factor de descuento (gamma)</h3>
+        <p>Controla <strong>cuánto valora el futuro</strong> el agente (ya lo conocemos del módulo 1). Rango: [0, 1].</p>
+        <div style="font-family:var(--font-mono);font-size:0.52em;color:var(--accent-gold);margin-top:8px;">Típico: γ = 0.95 a 0.99</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div class="card card-cyan">
+        <h3 style="font-size:0.78em;">ε — Epsilon (exploración)</h3>
+        <p>Controla la <strong>proporción de exploración</strong> — ya lo conocemos de 1.3. Empieza alto (1.0) y baja gradualmente.</p>
+        <div style="font-family:var(--font-mono);font-size:0.52em;color:var(--accent-gold);margin-top:8px;">Típico: ε₀=1.0, ε_min=0.05, decay=0.995</div>
+      </div>
+      <div class="card card-gold">
+        <h3 style="font-size:0.78em;">maxQ(S', a') — La clave de Q-Learning</h3>
+        <p>En el objetivo TD, usamos el <strong>máximo Q del siguiente estado</strong> — sin importar qué acción tomaríamos realmente ahí. Esto lo hace "<strong>fuera de política</strong>" (lo explicamos a continuación).</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Pseudocódigo Q-Learning ── -->
+<section>
+  <span class="slide-tag">2.4 · Pseudocódigo</span>
+  <h2>El algoritmo Q-Learning completo 📜</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Este pseudocódigo describe exactamente lo que programaremos en el Capítulo 2.5. Léelo con calma — ¡no es tan intimidante como parece!</p>
+
+  <div class="pseudocode">
+    <span class="pc-comment"># Inicializar Q-table con ceros para todos los (estado, acción)</span><br>
+    <span class="pc-step">Q</span> = zeros(n_estados, n_acciones)<br>
+    <br>
+    <span class="pc-keyword">Para cada</span> episodio <span class="pc-keyword">en</span> range(n_episodios):<br>
+    <span class="pc-indent"><span class="pc-comment"># Reducir ε — menos exploración conforme mejora la Q-table</span></span>
+    <span class="pc-indent">ε = ε_min + (ε_max − ε_min) × exp(−decay × episodio)</span>
+    <span class="pc-indent">estado = entorno.<span class="pc-fn">reset</span>()</span>
+    <br>
+    <span class="pc-indent"><span class="pc-keyword">Para cada</span> paso <span class="pc-keyword">en</span> range(max_pasos):</span>
+    <span class="pc-indent2"><span class="pc-comment"># Elegir acción con ε-greedy</span></span>
+    <span class="pc-indent2"><span class="pc-keyword">si</span> aleatorio() &lt; ε:  accion = <span class="pc-fn">accion_aleatoria</span>()</span>
+    <span class="pc-indent2"><span class="pc-keyword">sino</span>:  accion = <span class="pc-fn">argmax</span>(<span class="pc-step">Q</span>[estado])</span>
+    <br>
+    <span class="pc-indent2"><span class="pc-comment"># Ejecutar acción y obtener resultado</span></span>
+    <span class="pc-indent2">nuevo_estado, recompensa, terminado = entorno.<span class="pc-fn">step</span>(accion)</span>
+    <br>
+    <span class="pc-indent2"><span class="pc-comment"># ★ Actualizar Q-table (la parte más importante)</span></span>
+    <span class="pc-indent2"><span class="pc-step">Q</span>[estado, accion] += α × (recompensa + γ × <span class="pc-fn">max</span>(<span class="pc-step">Q</span>[nuevo_estado]) − <span class="pc-step">Q</span>[estado, accion])</span>
+    <br>
+    <span class="pc-indent2"><span class="pc-keyword">si</span> terminado:  <span class="pc-keyword">break</span></span>
+    <span class="pc-indent2">estado = nuevo_estado</span>
+  </div>
+</section>
+
+<!-- ── "Fuera de política" (off-policy) ── -->
+<section>
+  <span class="slide-tag">2.4 · Fuera de política</span>
+  <h2>¿Por qué Q-Learning es "fuera de política"? 🔀</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Esta es una propiedad importante que distingue a Q-Learning de otros algoritmos:</p>
+
+  <div class="cols2" style="margin-bottom:14px;">
+    <div class="card card-cyan" style="padding:18px;">
+      <span class="card-icon">🎭</span>
+      <h3>Política que actúa</h3>
+      <p>Cuando el agente explora el entorno, usa la <strong>política ε-greedy</strong> — que a veces toma acciones aleatorias para explorar.</p>
+      <div style="margin-top:10px;font-family:var(--font-mono);font-size:0.54em;border:1px solid rgba(34,211,238,0.3);border-radius:6px;padding:6px 10px;background:rgba(34,211,238,0.06);">
+        <span style="color:var(--accent-cyan);">ε-greedy:</span> 10% random, 90% mejor Q
+      </div>
+    </div>
+    <div class="card card-gold" style="padding:18px;">
+      <span class="card-icon">📚</span>
+      <h3>Política que aprende</h3>
+      <p>Cuando actualiza la Q-table, usa el <strong>máximo Q del siguiente estado</strong> — lo cual asume que en el futuro siempre tomará la acción óptima.</p>
+      <div style="margin-top:10px;font-family:var(--font-mono);font-size:0.54em;border:1px solid rgba(251,191,36,0.3);border-radius:6px;padding:6px 10px;background:rgba(251,191,36,0.06);">
+        <span style="color:var(--accent-gold);">max Q:</span> siempre la mejor acción posible
+      </div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">💡 La diferencia clave</span>
+    <p>Son <strong>dos políticas distintas</strong> para dos tareas distintas. La política que actúa puede explorar; la política que aprende asume siempre el mejor caso. Esto es muy útil: el agente puede aprender el comportamiento óptimo aunque no siempre lo practique durante el entrenamiento.</p>
+  </div>
+
+  <div class="card card-violet" style="margin-top:10px;">
+    <p>🔖 En el futuro veremos <strong>SARSA</strong>, que sí usa la misma política para actuar y aprender (<em>dentro de política</em>). La diferencia entre Q-Learning y SARSA es exactamente esta.</p>
+  </div>
+</section>
+
+<!-- ── Ejemplo completo de actualización ── -->
+<section>
+  <span class="slide-tag">2.4 · Ejemplo Numérico</span>
+  <h2>Un paso de Q-Learning con números reales 🔢</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Veamos exactamente cómo se actualiza una celda de la Q-table en un paso:</p>
+
+  <!-- Setup -->
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:12px;">
+    <div class="cols2" style="margin-bottom:10px;gap:10px;">
+      <div style="font-size:0.56em;font-family:var(--font-mono);">
+        <div style="color:var(--text-muted);margin-bottom:6px;">Datos del paso:</div>
+        <div>Estado actual S = <span style="color:var(--accent-cyan);">S₀</span></div>
+        <div>Acción tomada A = <span style="color:var(--accent-gold);">➡️ Derecha</span></div>
+        <div>Recompensa R = <span style="color:#22c55e;">+1</span></div>
+        <div>Siguiente estado S' = <span style="color:var(--accent-violet);">S₁</span></div>
+      </div>
+      <div style="font-size:0.56em;font-family:var(--font-mono);">
+        <div style="color:var(--text-muted);margin-bottom:6px;">Parámetros:</div>
+        <div>α (tasa aprendizaje) = <span style="color:var(--accent-blue);">0.1</span></div>
+        <div>γ (descuento) = <span style="color:var(--accent-violet);">0.9</span></div>
+        <div>Q(S₀, ➡️) actual = <span style="color:var(--accent-cyan);">0.0</span></div>
+        <div>max Q(S₁) = <span style="color:var(--accent-gold);">5.0</span> (ya calculado antes)</div>
+      </div>
+    </div>
+
+    <!-- Step by step calculation -->
+    <div style="border-top:1px solid var(--border);padding-top:10px;">
+      <p style="font-size:0.48em;color:var(--text-muted);margin-bottom:8px;">Cálculo paso a paso:</p>
+      <div style="font-family:var(--font-mono);font-size:0.54em;line-height:2;color:var(--text-primary);">
+        <div><span style="color:var(--text-muted);">Objetivo TD:</span> R + γ·max Q(S') = <span style="color:#22c55e);">1</span> + <span style="color:var(--accent-violet);">0.9</span> × <span style="color:var(--accent-gold);">5.0</span> = <strong style="color:var(--accent-cyan);">5.5</strong></div>
+        <div><span style="color:var(--text-muted);">Error TD:</span> Objetivo − Q actual = <span style="color:var(--accent-cyan);">5.5</span> − <span style="color:var(--text-muted);">0.0</span> = <strong style="color:var(--accent-gold);">5.5</strong></div>
+        <div><span style="color:var(--text-muted);">Actualización:</span> Q(S₀,➡️) ← 0.0 + <span style="color:var(--accent-blue);">0.1</span> × <span style="color:var(--accent-gold);">5.5</span> = <strong style="color:#22c55e;">0.55</strong> ✅</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-gold">
+    <p>🔄 <strong>Este proceso se repite millones de veces.</strong> Cada actualización hace que el valor Q sea un poco más preciso. Después de muchos episodios, la Q-table converge a los valores óptimos y el agente puede resolver el laberinto perfectamente.</p>
+  </div>
+</section>
+
+<!-- ── Glosario ── -->
+<section>
+  <span class="slide-tag">Glosario</span>
+  <h2>Glosario del Módulo 2 (Capítulos 2.1–2.4)</h2>
+  <div style="margin-top:10px;">
+    <div class="gloss-row">
+      <span class="gloss-term">Q-Learning</span>
+      <span class="gloss-def">Algoritmo que aprende la función Q(s,a) usando el enfoque TD. Actualiza la Q-table en cada paso sin esperar al final del episodio.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Q-table</span>
+      <span class="gloss-def">Tabla que guarda el valor Q de cada par (estado, acción). Es la memoria del agente — como una hoja de cálculo de "cuánto vale hacer qué en cada situación".</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Ecuación de Bellman</span>
+      <span class="gloss-def">V(Sₜ) = Rₜ₊₁ + γ·V(Sₜ₊₁). Truco recursivo: el valor de un estado = recompensa inmediata + valor descontado del siguiente estado.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Monte Carlo (MC)</span>
+      <span class="gloss-def">Método que actualiza los valores al final del episodio usando el retorno real acumulado G.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Diferencias Temporales (TD)</span>
+      <span class="gloss-def">Método que actualiza los valores en cada paso usando R + γV(S') como estimación del retorno. Más rápido que MC.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Objetivo TD (TD target)</span>
+      <span class="gloss-def">Rₜ₊₁ + γ·max Q(Sₜ₊₁, a'). La estimación del retorno que usamos en Q-Learning para actualizar el valor Q actual.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Error TD</span>
+      <span class="gloss-def">La diferencia entre el objetivo TD y el valor Q actual: [Rₜ₊₁ + γ·maxQ − Q(Sₜ,Aₜ)]. Es lo que el agente necesita corregir.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Bootstrapping</span>
+      <span class="gloss-def">Usar la estimación propia del valor del siguiente estado para actualizar la estimación actual. TD hace bootstrapping; MC no.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Fuera de política (off-policy)</span>
+      <span class="gloss-def">Característica de Q-Learning: usa una política (ε-greedy) para explorar, pero aprende como si siempre fuera a tomar la acción óptima (max Q).</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">α (tasa de aprendizaje)</span>
+      <span class="gloss-def">Controla cuánto cambia el valor Q en cada actualización. Pequeño (0.1) = cambios suaves. Grande (0.9) = cambios bruscos.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── Quiz ── -->
+<section>
+  <span class="slide-tag">Quiz</span>
+  <h2>🧠 Mini Quiz — Módulo 2, Capítulos 2.1–2.4</h2>
+  <p style="font-size:0.58em;color:var(--text-muted);margin-bottom:14px;">¡Sin ver las diapositivas anteriores! Escribe las respuestas primero.</p>
+
+  <div class="step-row">
+    <div class="step-num">Q1</div>
+    <div class="step-text">¿Cuál es la diferencia entre la <strong>recompensa</strong> R que recibe el agente y el <strong>valor</strong> Q(s,a) que guarda en su tabla?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q2</div>
+    <div class="step-text">Tienes una Q-table con los valores: Q(S₀, ➡️) = 2.0, Q(S₀, ⬆️) = 5.0, Q(S₀, ⬇️) = 1.0. Con la política óptima (sin exploración), ¿qué acción tomará el agente en S₀?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q3</div>
+    <div class="step-text">Explica la ecuación de Bellman con tus propias palabras, sin usar símbolos matemáticos. Usa una analogía cotidiana.</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q4</div>
+    <div class="step-text">¿Por qué Monte Carlo no funciona en tareas continuas (sin fin)? ¿Cómo resuelve este problema TD?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q5</div>
+    <div class="step-text">Calcula un paso de Q-Learning: Q(s,a) = 3.0, R = +2, γ = 0.9, max Q(s') = 4.0, α = 0.1. ¿Cuál es el nuevo Q(s,a)?</div>
+  </div>
+</section>
+
+<!-- ── Slide final ── -->
+<section>
+  <div class="title-slide" style="align-items:center;text-align:center;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-80px;right:-80px;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(34,211,238,0.1) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="font-size:2.8em;margin-bottom:8px;">🧊❄️📊</div>
+    <div class="chapter-badge" style="font-size:0.36em;">Capítulos 2.1–2.4 completados</div>
+    <h1 style="text-align:center;font-size:1.7em;">
+      ¡Ya entiendes<br>Q-Learning por dentro!<br>
+      <span class="gradient-text-cyan" style="font-size:0.85em;">Ahora a programarlo 🖥️</span>
+    </h1>
+    <div class="divider" style="margin:14px auto;"></div>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:4px;font-size:0.58em;color:var(--text-muted);">
+      <span>✅ Q-table</span><span style="color:var(--border);">·</span>
+      <span>✅ Ecuación de Bellman</span><span style="color:var(--border);">·</span>
+      <span>✅ Monte Carlo vs. TD</span><span style="color:var(--border);">·</span>
+      <span>✅ Algoritmo Q-Learning completo</span>
+    </div>
+    <div style="margin-top:20px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <span class="pill">Próximo: Cap. 2.5 — ¡Manos a la obra! FrozenLake ❄️</span>
+    </div>
+    <p style="font-size:0.5em;color:var(--text-muted);margin-top:14px;max-width:520px;">En el próximo capítulo implementarás Q-Learning desde cero con NumPy. Llenarás una Q-table real y verás cómo tu agente aprende a cruzar el lago helado.</p>
+  </div>
+</section>
+
+</div><!-- /slides -->
+</div><!-- /reveal -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+<script src="../assets/js/reveal-config.js"></script>
+</body>
+</html>

@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capítulos 3.1 & 3.2 — El problema de escala · Deep Q-Network (DQN)</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/black.min.css">
+<link rel="stylesheet" href="../assets/css/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"></script>
+
+<style>
+/* ── Animaciones locales ── */
+@keyframes overflow-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+  50%      { box-shadow: 0 0 20px 4px rgba(239,68,68,0.5); }
+}
+@keyframes network-flow {
+  0%   { opacity:0.3; transform:scaleX(0.8); }
+  50%  { opacity:1;   transform:scaleX(1); }
+  100% { opacity:0.3; transform:scaleX(0.8); }
+}
+@keyframes pixel-shift {
+  0%,100% { filter: brightness(1); }
+  50%      { filter: brightness(1.3) saturate(1.5); }
+}
+@keyframes buffer-fill {
+  from { width: 0; }
+  to   { width: 100%; }
+}
+@keyframes freeze-target {
+  0%,89% { opacity:1; }
+  90%    { opacity:0.4; }
+  100%   { opacity:1; }
+}
+@keyframes cowboy-move {
+  0%,100% { transform: translateX(0); }
+  50%     { transform: translateX(30px); }
+}
+@keyframes cow-escape {
+  0%,100% { transform: translateX(0) rotate(0deg); }
+  50%     { transform: translateX(40px) rotate(5deg); }
+}
+@keyframes loss-oscillate {
+  0%   { transform: translateY(0); }
+  20%  { transform: translateY(-18px); }
+  40%  { transform: translateY(14px); }
+  60%  { transform: translateY(-10px); }
+  80%  { transform: translateY(8px); }
+  100% { transform: translateY(0); }
+}
+
+/* ── Pixel art grid (Atari simulation) ── */
+.pixel-screen {
+  display: grid;
+  gap: 1px;
+  background: #000;
+  border: 2px solid rgba(255,255,255,0.15);
+  border-radius: 6px;
+  padding: 4px;
+  image-rendering: pixelated;
+  animation: pixel-shift 3s ease-in-out infinite;
+}
+.px { width: 100%; aspect-ratio: 1; border-radius: 1px; }
+
+/* ── State counter visual ── */
+.state-counter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 20px;
+  position: relative;
+  overflow: hidden;
+}
+.sc-number {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  line-height: 1;
+}
+.sc-label {
+  font-size: 0.46em;
+  color: var(--text-muted);
+  margin-top: 5px;
+  text-align: center;
+}
+
+/* ── Q-table row visual (overflow) ── */
+.qtable-overflow {
+  background: var(--bg-card);
+  border: 1px solid rgba(239,68,68,0.4);
+  border-radius: 10px;
+  padding: 12px 14px;
+  animation: overflow-pulse 2s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
+}
+.qtable-overflow::after {
+  content: "⚠ MEMORIA INSUFICIENTE";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%,-50%) rotate(-12deg);
+  font-family: var(--font-mono);
+  font-size: 0.6em;
+  font-weight: 700;
+  color: rgba(239,68,68,0.7);
+  white-space: nowrap;
+  letter-spacing: 0.1em;
+}
+.qtable-overflow-row {
+  height: 6px;
+  border-radius: 3px;
+  margin: 3px 0;
+  opacity: 0.3;
+}
+
+/* ── CNN layer diagram ── */
+.cnn-layer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.cnn-box {
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.38em;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.2;
+}
+.cnn-label {
+  font-family: var(--font-mono);
+  font-size: 0.38em;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 2px;
+  max-width: 70px;
+}
+.cnn-arrow {
+  color: var(--accent-cyan);
+  font-size: 1em;
+  align-self: center;
+  animation: network-flow 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+/* ── Replay buffer visual ── */
+.replay-buffer {
+  background: var(--bg-card);
+  border: 1px solid rgba(59,130,246,0.4);
+  border-radius: 10px;
+  padding: 10px 12px;
+  position: relative;
+  overflow: hidden;
+}
+.rb-slot {
+  height: 10px;
+  border-radius: 3px;
+  margin: 3px 0;
+  position: relative;
+  overflow: hidden;
+}
+.rb-slot-fill {
+  height: 100%;
+  border-radius: 3px;
+  animation: buffer-fill 1.5s ease-out forwards;
+}
+.rb-slot:nth-child(1) .rb-slot-fill { width: 100%; background: rgba(168,85,247,0.6); animation-delay: 0s; }
+.rb-slot:nth-child(2) .rb-slot-fill { width: 100%; background: rgba(59,130,246,0.6);  animation-delay: 0.15s; }
+.rb-slot:nth-child(3) .rb-slot-fill { width: 100%; background: rgba(34,211,238,0.6);  animation-delay: 0.3s; }
+.rb-slot:nth-child(4) .rb-slot-fill { width: 100%; background: rgba(251,191,36,0.5);  animation-delay: 0.45s; }
+.rb-slot:nth-child(5) .rb-slot-fill { width: 85%;  background: rgba(34,197,94,0.5);   animation-delay: 0.6s; }
+.rb-slot:nth-child(6) .rb-slot-fill { width: 60%;  background: rgba(239,68,68,0.4);   animation-delay: 0.75s; }
+
+/* ── Target network visual ── */
+.network-box {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 14px 16px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.network-box.online {
+  border: 1px solid var(--accent-blue);
+  box-shadow: 0 0 20px rgba(59,130,246,0.2);
+}
+.network-box.target {
+  border: 1px solid rgba(251,191,36,0.5);
+  box-shadow: 0 0 20px rgba(251,191,36,0.15);
+  animation: freeze-target 4s ease-in-out infinite;
+}
+.network-box .nb-title {
+  font-family: var(--font-mono);
+  font-size: 0.54em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+.network-box .nb-icon { font-size: 1.8em; margin-bottom: 4px; }
+.network-layers {
+  display: flex;
+  gap: 3px;
+  justify-content: center;
+  margin: 6px 0;
+}
+.nl {
+  width: 8px;
+  border-radius: 3px;
+  background: currentColor;
+  opacity: 0.6;
+}
+
+/* ── Copy arrow ── */
+.copy-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.44em;
+  color: var(--accent-gold);
+}
+
+/* ── Loss function chart ── */
+.loss-chart {
+  background: #06090f;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  position: relative;
+  overflow: hidden;
+  height: 80px;
+}
+.loss-line-stable {
+  position: absolute;
+  bottom: 20px;
+  left: 10px;
+  right: 10px;
+  height: 2px;
+}
+.loss-line-unstable {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+}
+
+/* ── Double DQN flow ── */
+.double-flow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.54em;
+  margin: 6px 0;
+}
+.df-icon { font-size: 1.3em; flex-shrink: 0; }
+.df-arrow { color: var(--accent-cyan); font-size: 0.9em; flex-shrink: 0; }
+
+/* ── Comparison Q-learning vs DQN ── */
+.algo-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.algo-box {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 0.56em;
+  line-height: 1.6;
+}
+.algo-box.ql  { border: 1px solid rgba(34,211,238,0.35); }
+.algo-box.dqn { border: 1px solid rgba(168,85,247,0.35); }
+
+/* ── Pixel colors for Atari mock ── */
+.px-sky   { background: #6699cc; }
+.px-bld   { background: #228b22; }
+.px-tank  { background: #808080; }
+.px-shot  { background: #ff4444; }
+.px-inv   { background: #00ff88; }
+.px-blk   { background: #111; }
+.px-wht   { background: #eee; }
+.px-yel   { background: #ffcc00; }
+</style>
+</head>
+
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ══ PORTADA ══════════════════════════════ -->
+<section>
+  <div class="title-slide" style="position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-60px;right:-60px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(168,85,247,0.12) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-60px;left:-60px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(59,130,246,0.1) 0%,transparent 70%);pointer-events:none;"></div>
+
+    <div class="chapter-badge">Capítulos 3.1 + 3.2 · Módulo 3</div>
+    <h1>De la Tabla<br>a la Red:<br><span class="gradient-text">Deep Q-Learning</span></h1>
+    <div class="divider"></div>
+    <p style="font-size:0.62em;color:var(--text-muted);max-width:640px;margin-top:8px;line-height:1.7;">
+      Por qué la Q-table no puede escalar a Atari ·<br>
+      La red neuronal como función Q · DQN completo ·<br>
+      Memoria de repetición · Red objetivo · Double DQN
+    </p>
+    <div style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;">
+      <span class="pill">Unit 3 — HuggingFace 🤗</span>
+      <span class="pill">Jose Miguel Lara Rangel</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SECCIÓN 3.1 ═══════════════════════ -->
+<section>
+  <div class="section-slide" style="background:linear-gradient(160deg,#04060f,#0a0614);">
+    <span class="big-emoji">📈</span>
+    <div class="chapter-badge" style="font-size:0.38em;margin-top:8px;">Capítulo 3.1</div>
+    <h1>El Problema<br>de Escala</h1>
+    <p style="font-size:0.6em;color:var(--text-muted);max-width:500px;text-align:center;margin-top:10px;">
+      ¿Qué pasa cuando los estados son millones? La Q-table se rompe.
+    </p>
+  </div>
+</section>
+
+<!-- ── Recapitulación ── -->
+<section>
+  <span class="slide-tag">3.1 · Recapitulación</span>
+  <h2>Lo que hemos logrado hasta ahora ✅</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Con Q-Learning y una Q-table, resolvimos dos entornos reales:</p>
+
+  <div class="cols2" style="margin-bottom:14px;">
+    <div class="card card-cyan" style="padding:16px;">
+      <span class="card-icon">❄️</span>
+      <h3>FrozenLake-v1</h3>
+      <div style="display:flex;gap:12px;align-items:center;margin-top:8px;">
+        <div class="state-counter" style="min-width:80px;padding:10px;">
+          <div class="sc-number" style="font-size:1.6em;color:var(--accent-cyan);">16</div>
+          <div class="sc-label">estados</div>
+        </div>
+        <div style="font-size:0.56em;color:var(--text-muted);">Q-table de 64 celdas. Aprendizaje perfecto en &lt; 10,000 episodios.</div>
+      </div>
+    </div>
+    <div class="card card-gold" style="padding:16px;">
+      <span class="card-icon">🚖</span>
+      <h3>Taxi-v3</h3>
+      <div style="display:flex;gap:12px;align-items:center;margin-top:8px;">
+        <div class="state-counter" style="min-width:80px;padding:10px;">
+          <div class="sc-number" style="font-size:1.6em;color:var(--accent-gold);">500</div>
+          <div class="sc-label">estados</div>
+        </div>
+        <div style="font-size:0.56em;color:var(--text-muted);">Q-table de 3,000 celdas. Más lento, pero funcionó bien.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">🔮 La pregunta del módulo</span>
+    <p>FrozenLake: 16 estados. Taxi: 500 estados. ¿Y si el entorno tiene <strong>10,000,000,000 estados posibles</strong>, como un juego de Atari? ¿Puede la Q-table sobrevivir a eso?</p>
+  </div>
+</section>
+
+<!-- ── El problema: Atari tiene demasiados estados ── -->
+<section>
+  <span class="slide-tag">3.1 · El Problema</span>
+  <h2>Atari: el estado es una imagen 🎮</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Los entornos de Atari no describen el estado con 8 números. <strong>El estado es directamente la imagen en pantalla</strong> — una cuadrícula de píxeles con colores:</p>
+
+  <div style="display:flex;gap:16px;align-items:center;">
+    <!-- Atari mock screen -->
+    <div style="flex-shrink:0;text-align:center;">
+      <div style="background:#000;border:2px solid rgba(255,255,255,0.15);border-radius:8px;padding:8px;display:inline-block;">
+        <!-- Space Invaders pixel art mock (16×12 grid) -->
+        <div class="pixel-screen" style="grid-template-columns:repeat(16,12px);">
+          <!-- Row 1 -->
+          <div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div>
+          <!-- Row 2: invaders -->
+          <div class="px px-sky"></div><div class="px px-inv"></div><div class="px px-sky"></div><div class="px px-inv"></div><div class="px px-sky"></div><div class="px px-inv"></div><div class="px px-sky"></div><div class="px px-inv"></div><div class="px px-sky"></div><div class="px px-inv"></div><div class="px px-sky"></div><div class="px px-inv"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div>
+          <!-- Row 3 -->
+          <div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div>
+          <!-- Row 4: more invaders -->
+          <div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-inv"></div><div class="px px-sky"></div><div class="px px-inv"></div><div class="px px-sky"></div><div class="px px-inv"></div><div class="px px-sky"></div><div class="px px-inv"></div><div class="px px-sky"></div><div class="px px-inv"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div>
+          <!-- Rows 5-8: sky + shot -->
+          <div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-shot"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div>
+          <div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div>
+          <!-- Row shields -->
+          <div class="px px-sky"></div><div class="px px-bld"></div><div class="px px-bld"></div><div class="px px-bld"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-bld"></div><div class="px px-bld"></div><div class="px px-bld"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-bld"></div><div class="px px-bld"></div><div class="px px-bld"></div><div class="px px-sky"></div><div class="px px-sky"></div>
+          <!-- Row cannon -->
+          <div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-yel"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div><div class="px px-sky"></div>
+        </div>
+      </div>
+      <div style="font-size:0.4em;color:var(--text-muted);margin-top:6px;">Space Invaders 👾 (vista simplificada)</div>
+    </div>
+
+    <!-- Explanation -->
+    <div style="flex:1;display:flex;flex-direction:column;gap:10px;">
+      <div class="card card-violet" style="padding:14px;">
+        <h3 style="font-size:0.78em;">Dimensiones reales de Atari</h3>
+        <div style="font-family:var(--font-mono);font-size:0.54em;color:var(--text-muted);margin-top:6px;line-height:1.8;">
+          Pantalla original: <span style="color:var(--accent-violet);">210 × 160 píxeles</span><br>
+          Canales de color: <span style="color:var(--accent-violet);">3 (Rojo, Verde, Azul)</span><br>
+          Valores por píxel: <span style="color:var(--accent-violet);">0 a 255</span>
+        </div>
+      </div>
+      <div class="card card-pink" style="padding:14px;">
+        <h3 style="font-size:0.78em;">El tamaño del espacio de estados</h3>
+        <div style="font-family:var(--font-mono);font-size:0.54em;color:var(--accent-pink);margin-top:6px;line-height:1.8;">
+          256<sup>(210 × 160 × 3)</sup> = 256<sup>100,800</sup><br>
+          ≈ 10<sup>241,920</sup> estados posibles
+        </div>
+        <div style="font-size:0.5em;color:var(--text-muted);margin-top:6px;">Para comparar: hay ~10<sup>80</sup> átomos en el universo observable.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Por qué la Q-table falla ── -->
+<section>
+  <span class="slide-tag">3.1 · Límite de la Q-table</span>
+  <h2>La Q-table explota 💥</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Veamos visualmente el salto de escala entre lo que resolvimos y Atari:</p>
+
+  <div style="display:flex;gap:12px;align-items:stretch;justify-content:center;margin-bottom:14px;">
+    <!-- FrozenLake -->
+    <div class="state-counter" style="flex:1;">
+      <div style="font-size:0.5em;color:var(--accent-cyan);font-family:var(--font-mono);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;">FrozenLake</div>
+      <div class="sc-number" style="font-size:2em;color:var(--accent-cyan);">16</div>
+      <div class="sc-label">estados<br>64 celdas en la Q-table<br>~512 bytes</div>
+      <div style="margin-top:8px;width:100%;height:8px;background:rgba(34,211,238,0.3);border-radius:4px;"></div>
+    </div>
+    <!-- Taxi -->
+    <div class="state-counter" style="flex:1;">
+      <div style="font-size:0.5em;color:var(--accent-gold);font-family:var(--font-mono);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;">Taxi</div>
+      <div class="sc-number" style="font-size:2em;color:var(--accent-gold);">500</div>
+      <div class="sc-label">estados<br>3,000 celdas<br>~24 KB</div>
+      <div style="margin-top:8px;width:100%;height:8px;background:rgba(251,191,36,0.3);border-radius:4px;"></div>
+    </div>
+    <!-- Atari -->
+    <div class="state-counter" style="flex:1.2;border-color:rgba(239,68,68,0.5);">
+      <div style="font-size:0.5em;color:#ef4444;font-family:var(--font-mono);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;">Atari 👾</div>
+      <div class="sc-number" style="font-size:1.5em;color:#ef4444;">10<sup style="font-size:0.6em;">241,920</sup></div>
+      <div class="sc-label">estados posibles<br>Q-table imposible<br>más grande que el universo</div>
+      <div style="margin-top:8px;position:relative;">
+        <div class="qtable-overflow" style="height:32px;">
+          <div class="qtable-overflow-row" style="background:#ef4444;"></div>
+          <div class="qtable-overflow-row" style="background:#ef4444;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">💡 La solución</span>
+    <p>En lugar de <em>guardar</em> el valor Q de cada estado en una tabla, usamos una <strong>red neuronal que estima</strong> el valor Q de cualquier estado sin haberlo visto antes. Es la diferencia entre memorizar y entender.</p>
+  </div>
+</section>
+
+<!-- ── La solución: aproximar Q con una red ── -->
+<section>
+  <span class="slide-tag">3.1 → 3.2 · La solución</span>
+  <h2>La idea: reemplazar la tabla por una red neuronal 🧠</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">El salto conceptual es elegante: en lugar de una tabla de consulta, entrenamos una <strong>red neuronal que aprende la función Q</strong>.</p>
+
+  <div class="algo-compare" style="margin-bottom:14px;">
+    <div class="algo-box ql">
+      <div style="font-family:var(--font-mono);font-size:0.9em;color:var(--accent-cyan);font-weight:700;margin-bottom:8px;">Q-Learning clásico</div>
+      <div style="text-align:center;margin:10px 0;font-size:1.2em;">
+        (s, a) → 📋 tabla → número
+      </div>
+      <div style="color:var(--text-muted);">Busca en la tabla el valor exacto del par (estado, acción). Si nunca vio ese par, no sabe.</div>
+      <div style="margin-top:8px;font-family:var(--font-mono);font-size:0.85em;color:var(--accent-cyan);">Funciona hasta ~miles de estados</div>
+    </div>
+    <div class="algo-box dqn">
+      <div style="font-family:var(--font-mono);font-size:0.9em;color:var(--accent-violet);font-weight:700;margin-bottom:8px;">Deep Q-Learning (DQN)</div>
+      <div style="text-align:center;margin:10px 0;font-size:1.2em;">
+        s → 🧠 red → [Q(s,a₁), Q(s,a₂)…]
+      </div>
+      <div style="color:var(--text-muted);">Pasa el estado por la red y obtiene los valores Q de todas las acciones a la vez. <em>Generaliza</em> a estados nuevos.</div>
+      <div style="margin-top:8px;font-family:var(--font-mono);font-size:0.85em;color:var(--accent-violet);">Escala a billones de estados</div>
+    </div>
+  </div>
+
+  <div class="card card-gold">
+    <p>🔑 <strong>Diferencia clave:</strong> La red neuronal no "recuerda" cada estado — <em>aprende patrones</em>. Igual que un jugador experto de ajedrez que no memorizó cada posición posible, sino que aprendió a reconocer buenas y malas posiciones.</p>
+  </div>
+</section>
+
+<!-- ══ SECCIÓN 3.2 ═══════════════════════ -->
+<section>
+  <div class="section-slide" style="background:linear-gradient(160deg,#04060f,#08060f);">
+    <span class="big-emoji">🧠</span>
+    <div class="chapter-badge" style="font-size:0.38em;border-color:var(--accent-violet);color:var(--accent-violet);background:rgba(168,85,247,0.07);margin-top:8px;">Capítulo 3.2</div>
+    <h1>Deep Q-Network<br>(DQN)</h1>
+    <p style="font-size:0.6em;color:var(--text-muted);max-width:500px;text-align:center;margin-top:10px;">
+      La arquitectura · Memoria de repetición · Red objetivo · Double DQN
+    </p>
+  </div>
+</section>
+
+<!-- ── La arquitectura DQN ── -->
+<section>
+  <span class="slide-tag">3.2 · Arquitectura DQN</span>
+  <h2>La arquitectura de DQN: píxeles → valores Q 🏗️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">DQN toma como entrada <strong>imágenes de pantalla</strong> y produce como salida los <strong>valores Q de cada acción posible</strong>. La red tiene tres etapas:</p>
+
+  <!-- CNN Architecture diagram -->
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:14px;overflow-x:auto;">
+    <div style="display:flex;align-items:center;gap:6px;justify-content:center;min-width:680px;">
+
+      <!-- Input: 4 stacked frames -->
+      <div class="cnn-layer">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;">
+          <div style="width:28px;height:28px;background:rgba(59,130,246,0.3);border-radius:3px;border:1px solid rgba(59,130,246,0.5);"></div>
+          <div style="width:28px;height:28px;background:rgba(59,130,246,0.22);border-radius:3px;border:1px solid rgba(59,130,246,0.4);margin-left:2px;margin-top:2px;"></div>
+          <div style="width:28px;height:28px;background:rgba(59,130,246,0.14);border-radius:3px;border:1px solid rgba(59,130,246,0.3);margin-left:4px;margin-top:4px;"></div>
+          <div style="width:28px;height:28px;background:rgba(59,130,246,0.08);border-radius:3px;border:1px solid rgba(59,130,246,0.2);margin-left:6px;margin-top:6px;"></div>
+        </div>
+        <div class="cnn-label" style="color:var(--accent-blue);">4 frames<br>84×84 px<br>escala de grises</div>
+      </div>
+
+      <div class="cnn-arrow">→</div>
+
+      <!-- Conv layer 1 -->
+      <div class="cnn-layer">
+        <div style="display:flex;gap:2px;">
+          <div style="width:6px;height:44px;background:rgba(34,211,238,0.6);border-radius:2px;"></div>
+          <div style="width:6px;height:44px;background:rgba(34,211,238,0.5);border-radius:2px;"></div>
+          <div style="width:6px;height:44px;background:rgba(34,211,238,0.4);border-radius:2px;"></div>
+          <div style="width:6px;height:44px;background:rgba(34,211,238,0.3);border-radius:2px;"></div>
+          <div style="width:6px;height:44px;background:rgba(34,211,238,0.2);border-radius:2px;"></div>
+          <div style="width:6px;height:44px;background:rgba(34,211,238,0.15);border-radius:2px;"></div>
+          <div style="width:6px;height:44px;background:rgba(34,211,238,0.1);border-radius:2px;"></div>
+          <div style="width:6px;height:44px;background:rgba(34,211,238,0.08);border-radius:2px;"></div>
+        </div>
+        <div class="cnn-label" style="color:var(--accent-cyan);">Conv 1<br>32 filtros<br>8×8, paso 4<br>+ ReLU</div>
+      </div>
+
+      <div class="cnn-arrow">→</div>
+
+      <!-- Conv layer 2 -->
+      <div class="cnn-layer">
+        <div style="display:flex;gap:1px;flex-wrap:wrap;width:60px;justify-content:center;">
+          <div style="width:5px;height:28px;background:rgba(168,85,247,0.6);border-radius:2px;"></div>
+          <div style="width:5px;height:28px;background:rgba(168,85,247,0.5);border-radius:2px;"></div>
+          <div style="width:5px;height:28px;background:rgba(168,85,247,0.4);border-radius:2px;"></div>
+          <div style="width:5px;height:28px;background:rgba(168,85,247,0.35);border-radius:2px;"></div>
+          <div style="width:5px;height:28px;background:rgba(168,85,247,0.3);border-radius:2px;"></div>
+          <div style="width:5px;height:28px;background:rgba(168,85,247,0.25);border-radius:2px;"></div>
+          <div style="width:5px;height:28px;background:rgba(168,85,247,0.2);border-radius:2px;"></div>
+          <div style="width:5px;height:28px;background:rgba(168,85,247,0.15);border-radius:2px;"></div>
+        </div>
+        <div class="cnn-label" style="color:var(--accent-violet);">Conv 2<br>64 filtros<br>4×4, paso 2<br>+ ReLU</div>
+      </div>
+
+      <div class="cnn-arrow">→</div>
+
+      <!-- Conv layer 3 -->
+      <div class="cnn-layer">
+        <div style="display:flex;gap:1px;flex-wrap:wrap;width:56px;justify-content:center;">
+          <div style="width:4px;height:20px;background:rgba(251,191,36,0.7);border-radius:2px;"></div>
+          <div style="width:4px;height:20px;background:rgba(251,191,36,0.6);border-radius:2px;"></div>
+          <div style="width:4px;height:20px;background:rgba(251,191,36,0.5);border-radius:2px;"></div>
+          <div style="width:4px;height:20px;background:rgba(251,191,36,0.4);border-radius:2px;"></div>
+          <div style="width:4px;height:20px;background:rgba(251,191,36,0.35);border-radius:2px;"></div>
+          <div style="width:4px;height:20px;background:rgba(251,191,36,0.3);border-radius:2px;"></div>
+          <div style="width:4px;height:20px;background:rgba(251,191,36,0.25);border-radius:2px;"></div>
+          <div style="width:4px;height:20px;background:rgba(251,191,36,0.2);border-radius:2px;"></div>
+          <div style="width:4px;height:20px;background:rgba(251,191,36,0.15);border-radius:2px;"></div>
+          <div style="width:4px;height:20px;background:rgba(251,191,36,0.1);border-radius:2px;"></div>
+        </div>
+        <div class="cnn-label" style="color:var(--accent-gold);">Conv 3<br>64 filtros<br>3×3, paso 1<br>+ ReLU</div>
+      </div>
+
+      <div class="cnn-arrow">→</div>
+
+      <!-- FC layers -->
+      <div class="cnn-layer">
+        <div style="display:flex;gap:3px;flex-direction:column;">
+          <div style="width:40px;height:6px;background:rgba(34,197,94,0.5);border-radius:3px;"></div>
+          <div style="width:40px;height:6px;background:rgba(34,197,94,0.45);border-radius:3px;"></div>
+          <div style="width:40px;height:6px;background:rgba(34,197,94,0.4);border-radius:3px;"></div>
+          <div style="width:40px;height:6px;background:rgba(34,197,94,0.35);border-radius:3px;"></div>
+          <div style="width:40px;height:6px;background:rgba(34,197,94,0.3);border-radius:3px;"></div>
+        </div>
+        <div class="cnn-label" style="color:#22c55e;">Capa FC<br>512 neuronas<br>+ ReLU</div>
+      </div>
+
+      <div class="cnn-arrow">→</div>
+
+      <!-- Output: Q values -->
+      <div class="cnn-layer">
+        <div style="display:flex;gap:3px;flex-direction:column;">
+          <div style="width:44px;height:8px;border-radius:4px;background:rgba(239,68,68,0.6);display:flex;align-items:center;padding-left:4px;"><span style="font-size:0.5em;font-family:var(--font-mono);">Q(s,←)</span></div>
+          <div style="width:44px;height:8px;border-radius:4px;background:rgba(239,68,68,0.5);display:flex;align-items:center;padding-left:4px;"><span style="font-size:0.5em;font-family:var(--font-mono);">Q(s,→)</span></div>
+          <div style="width:44px;height:8px;border-radius:4px;background:rgba(239,68,68,0.35);display:flex;align-items:center;padding-left:4px;"><span style="font-size:0.5em;font-family:var(--font-mono);">Q(s,↑)</span></div>
+          <div style="width:44px;height:8px;border-radius:4px;background:rgba(239,68,68,0.25);display:flex;align-items:center;padding-left:4px;"><span style="font-size:0.5em;font-family:var(--font-mono);">Q(s,↓)</span></div>
+          <div style="width:44px;height:8px;border-radius:4px;background:rgba(239,68,68,0.15);display:flex;align-items:center;padding-left:4px;"><span style="font-size:0.5em;font-family:var(--font-mono);">Q(s,🔫)</span></div>
+        </div>
+        <div class="cnn-label" style="color:#ef4444;">Salida<br>1 valor Q<br>por acción</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="cols3">
+    <div class="card card-cyan" style="padding:12px 14px;">
+      <h3 style="font-size:0.72em;">Capas convolucionales</h3>
+      <p>Detectan <strong>patrones visuales</strong>: bordes, formas, objetos. Igual que las primeras capas del ojo humano.</p>
+    </div>
+    <div class="card card-violet" style="padding:12px 14px;">
+      <h3 style="font-size:0.72em;">Capa totalmente conectada</h3>
+      <p>Combina los patrones detectados para <strong>razonar</strong> sobre la situación del juego.</p>
+    </div>
+    <div class="card card-gold" style="padding:12px 14px;">
+      <h3 style="font-size:0.72em;">Capa de salida</h3>
+      <p>Produce un valor Q para <strong>cada acción posible</strong> simultáneamente, en un solo paso.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── DQN vs Q-Learning: diferencia en el entrenamiento ── -->
+<section>
+  <span class="slide-tag">3.2 · DQN vs Q-Learning</span>
+  <h2>¿Cómo aprende DQN? La función de pérdida 📉</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">En Q-Learning clásico actualizamos la Q-table directamente. En DQN usamos <strong>descenso de gradiente</strong> para ajustar los pesos de la red:</p>
+
+  <div class="algo-compare" style="margin-bottom:14px;">
+    <div class="algo-box ql">
+      <div style="font-family:var(--font-mono);color:var(--accent-cyan);font-size:0.85em;font-weight:700;margin-bottom:8px;">Q-Learning clásico</div>
+      <p>Actualización directa de la tabla:</p>
+      <div class="math-block" style="padding:8px 12px;margin-top:8px;font-size:0.85em;">
+        \[ Q(s,a) \leftarrow Q(s,a) + \alpha[\text{objetivo} - Q(s,a)] \]
+      </div>
+      <p style="margin-top:8px;">Sin función de pérdida. Sin gradientes.</p>
+    </div>
+    <div class="algo-box dqn">
+      <div style="font-family:var(--font-mono);color:var(--accent-violet);font-size:0.85em;font-weight:700;margin-bottom:8px;">Deep Q-Learning (DQN)</div>
+      <p>Se define una pérdida y se minimizan los pesos:</p>
+      <div class="math-block" style="padding:8px 12px;margin-top:8px;font-size:0.85em;">
+        \[ \mathcal{L} = \big(Q_{\text{objetivo}} - Q_\theta(s,a)\big)^2 \]
+      </div>
+      <p style="margin-top:8px;">Descenso de gradiente ajusta θ para minimizar L.</p>
+    </div>
+  </div>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px 18px;">
+    <p style="font-size:0.5em;color:var(--text-muted);margin-bottom:8px;">El ciclo de entrenamiento de DQN tiene dos fases:</p>
+    <div class="step-row">
+      <div class="step-num" style="background:rgba(59,130,246,0.3);border:1px solid var(--accent-blue);color:var(--accent-blue);">1</div>
+      <div class="step-text"><strong style="color:var(--accent-blue);">Muestreo:</strong> el agente interactúa con el entorno y guarda experiencias (s, a, r, s') en una memoria.</div>
+    </div>
+    <div class="step-row" style="margin-top:6px;">
+      <div class="step-num" style="background:rgba(168,85,247,0.3);border:1px solid var(--accent-violet);color:var(--accent-violet);">2</div>
+      <div class="step-text"><strong style="color:var(--accent-violet);">Entrenamiento:</strong> se toma un lote aleatorio de la memoria y se hace un paso de descenso de gradiente.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Problema de inestabilidad ── -->
+<section>
+  <span class="slide-tag">3.2 · Inestabilidad</span>
+  <h2>El problema: DQN es inestable sin cuidado ⚠️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Combinar una red neuronal con bootstrapping puede generar <strong>oscilaciones o divergencia</strong> durante el entrenamiento. Por eso DQN introduce tres soluciones:</p>
+
+  <div class="cols3">
+    <div class="card card-blue" style="border-left-color:var(--accent-blue);padding:14px;">
+      <span class="card-icon">💾</span>
+      <h3 style="font-size:0.78em;">① Memoria de Repetición</h3>
+      <p>Guarda experiencias pasadas y las reutiliza. Evita que la red olvide.</p>
+    </div>
+    <div class="card card-gold" style="padding:14px;">
+      <span class="card-icon">🎯</span>
+      <h3 style="font-size:0.78em;">② Red Objetivo Fija</h3>
+      <p>Una copia congelada de la red para calcular el objetivo TD. Evita que el objetivo se mueva constantemente.</p>
+    </div>
+    <div class="card card-violet" style="padding:14px;">
+      <span class="card-icon">⚖️</span>
+      <h3 style="font-size:0.78em;">③ Double DQN</h3>
+      <p>Usa dos redes para separar "qué acción elegir" de "cuánto vale". Evita sobreestimar Q-values.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Memoria de repetición ── -->
+<section>
+  <span class="slide-tag">3.2 · Memoria de Repetición</span>
+  <h2>① Memoria de Repetición: no desperdiciar experiencias 💾</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">En RL clásico, cada experiencia se usa una vez y se descarta. DQN las guarda en un <strong>búfer de repetición</strong> y las reutiliza muchas veces:</p>
+
+  <div style="display:flex;gap:16px;align-items:flex-start;">
+    <!-- Buffer visual -->
+    <div style="flex:0.8;">
+      <div style="background:var(--bg-card);border:1px solid rgba(59,130,246,0.4);border-radius:14px;padding:16px;text-align:center;">
+        <div style="font-family:var(--font-mono);font-size:0.5em;color:var(--accent-blue);margin-bottom:10px;letter-spacing:0.08em;">BÚFER DE REPETICIÓN (capacidad N)</div>
+        <div class="replay-buffer" style="margin-bottom:8px;">
+          <div style="font-family:var(--font-mono);font-size:0.44em;color:var(--text-muted);margin-bottom:6px;">Experiencias almacenadas:</div>
+          <div class="rb-slot"><div class="rb-slot-fill" style="width:100%;background:rgba(168,85,247,0.6);"></div></div>
+          <div class="rb-slot"><div class="rb-slot-fill" style="width:100%;background:rgba(59,130,246,0.6);"></div></div>
+          <div class="rb-slot"><div class="rb-slot-fill" style="width:100%;background:rgba(34,211,238,0.6);"></div></div>
+          <div class="rb-slot"><div class="rb-slot-fill" style="width:100%;background:rgba(251,191,36,0.5);"></div></div>
+          <div class="rb-slot"><div class="rb-slot-fill" style="width:85%;background:rgba(34,197,94,0.5);"></div></div>
+          <div class="rb-slot"><div class="rb-slot-fill" style="width:60%;background:rgba(239,68,68,0.4);"></div></div>
+          <div style="font-family:var(--font-mono);font-size:0.42em;color:var(--text-muted);margin-top:6px;">Cada barra = un tuple (s, a, r, s')</div>
+        </div>
+        <div style="font-size:0.46em;color:var(--accent-cyan);font-family:var(--font-mono);">↑ muestrea lote aleatorio para entrenar</div>
+      </div>
+    </div>
+
+    <!-- Explanation -->
+    <div style="flex:1.2;display:flex;flex-direction:column;gap:10px;">
+      <div class="card card-blue" style="padding:14px;border-left-color:var(--accent-blue);">
+        <h3 style="font-size:0.78em;">Ventaja 1: reutilizar experiencias</h3>
+        <p>Una experiencia del nivel 1 puede usarse para entrenar mientras el agente está en el nivel 10. Aprende mucho más con el mismo número de interacciones.</p>
+      </div>
+      <div class="card card-cyan" style="padding:14px;">
+        <h3 style="font-size:0.78em;">Ventaja 2: eliminar correlaciones</h3>
+        <p>Si entrenaras con experiencias consecutivas (paso 1, 2, 3…), la red aprendería a "esperar" la siguiente experiencia. Muestreando <strong>al azar</strong> del búfer, rompemos esa correlación.</p>
+      </div>
+      <div class="card card-gold" style="padding:12px 14px;">
+        <p style="font-size:0.9em;">🧠 <strong>Analogía:</strong> Es como estudiar con fichas de repaso mezcladas al azar, en lugar de leer el libro de principio a fin cada vez. Aprendes más rápido y retienes mejor.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Red Objetivo Fija ── -->
+<section>
+  <span class="slide-tag">3.2 · Red Objetivo Fija</span>
+  <h2>② Red Objetivo Fija: atrapar una vaca quieta 🐄</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">El problema sin red objetivo: usamos la <em>misma</em> red para calcular el valor Q actual y el objetivo TD. Eso significa que <strong>el objetivo se mueve en cada paso de entrenamiento</strong>.</p>
+
+  <!-- Cowboy analogy -->
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:12px;">
+    <p style="font-size:0.5em;color:var(--text-muted);margin-bottom:10px;text-align:center;">Analogía original del curso de HuggingFace 🤗</p>
+    <div style="display:flex;gap:0;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;">
+      <div style="text-align:center;font-size:0.6em;">
+        <div style="font-size:2em;animation:cowboy-move 2s ease-in-out infinite;display:inline-block;">🤠</div>
+        <div style="color:var(--accent-blue);">La estimación Q</div>
+        <div style="color:var(--text-muted);">(tratando de acercarse al objetivo)</div>
+      </div>
+      <div style="font-size:0.6em;color:var(--text-muted);padding:0 10px;">persigue →</div>
+      <div style="text-align:center;font-size:0.6em;">
+        <div style="font-size:2em;animation:cow-escape 2.3s ease-in-out infinite;display:inline-block;">🐄</div>
+        <div style="color:var(--accent-gold);">El objetivo TD</div>
+        <div style="color:var(--text-muted);">(que también se mueve porque usa la misma red)</div>
+      </div>
+    </div>
+    <p style="font-size:0.48em;color:var(--text-muted);text-align:center;margin-top:10px;">Resultado: el entrenamiento oscila sin converger — como tratar de atrapar una vaca que también se escapa cada vez que das un paso.</p>
+  </div>
+
+  <!-- Solution -->
+  <div style="display:flex;gap:12px;align-items:center;justify-content:center;">
+    <div class="network-box online" style="flex:1;max-width:200px;">
+      <div class="nb-icon">🧠</div>
+      <div class="nb-title" style="color:var(--accent-blue);">Red Principal</div>
+      <div class="network-layers">
+        <div class="nl" style="height:30px;color:var(--accent-blue);"></div>
+        <div class="nl" style="height:40px;color:var(--accent-blue);"></div>
+        <div class="nl" style="height:35px;color:var(--accent-blue);"></div>
+        <div class="nl" style="height:25px;color:var(--accent-blue);"></div>
+      </div>
+      <div style="font-size:0.48em;color:var(--text-muted);">Se actualiza en cada paso. Elige acciones y se entrena.</div>
+    </div>
+    <div class="copy-arrow">
+      <span>cada C pasos</span>
+      <span style="font-size:2em;">→</span>
+      <span>copia de pesos</span>
+    </div>
+    <div class="network-box target" style="flex:1;max-width:200px;">
+      <div class="nb-icon">🧊</div>
+      <div class="nb-title" style="color:var(--accent-gold);">Red Objetivo</div>
+      <div class="network-layers">
+        <div class="nl" style="height:30px;color:var(--accent-gold);"></div>
+        <div class="nl" style="height:40px;color:var(--accent-gold);"></div>
+        <div class="nl" style="height:35px;color:var(--accent-gold);"></div>
+        <div class="nl" style="height:25px;color:var(--accent-gold);"></div>
+      </div>
+      <div style="font-size:0.48em;color:var(--text-muted);">Congelada entre actualizaciones. Solo calcula el objetivo TD.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Double DQN ── -->
+<section>
+  <span class="slide-tag">3.2 · Double DQN</span>
+  <h2>③ Double DQN: evitar la sobreestimación ⚖️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">DQN estándar puede <strong>sobreestimar los valores Q</strong> al principio del entrenamiento, lo que desestabiliza el aprendizaje. Double DQN lo resuelve separando dos tareas:</p>
+
+  <!-- Problem -->
+  <div class="card card-pink" style="margin-bottom:12px;padding:14px 16px;">
+    <h3 style="font-size:0.78em;margin-bottom:6px;">El problema con DQN estándar</h3>
+    <p>Para calcular el objetivo TD: <span style="font-family:var(--font-mono);color:var(--accent-violet);">y = R + γ · max<sub>a'</sub> Q<sub>objetivo</sub>(s', a')</span></p>
+    <p style="margin-top:6px;">Usamos la misma red para elegir qué acción tomar en s' <strong>y</strong> calcular cuánto vale esa acción. Si la red tiene un error, <em>amplifica</em> ese error al maximizar el Q-value.</p>
+  </div>
+
+  <!-- Solution -->
+  <div style="font-size:0.6em;color:var(--text-muted);margin-bottom:8px;"><strong style="color:var(--accent-cyan);">La solución de Double DQN:</strong> separar las dos responsabilidades entre las dos redes que ya tenemos:</div>
+
+  <div class="double-flow">
+    <span class="df-icon">🧠</span>
+    <div><strong style="color:var(--accent-blue);">Red Principal</strong> → elige qué acción tomaríamos en el estado s'</div>
+    <span class="df-arrow">→ acción*</span>
+    <span class="df-icon">🧊</span>
+    <div><strong style="color:var(--accent-gold);">Red Objetivo</strong> → calcula cuánto vale tomar esa acción específica</div>
+    <span class="df-arrow">→ Q-valor</span>
+  </div>
+
+  <div class="key-idea" style="margin-top:12px;">
+    <span class="ki-label">🎯 En una frase</span>
+    <p>Double DQN dice: <strong>"Una red decide qué hacer, la otra evalúa qué tan bueno es."</strong> Al separar estos dos roles, se reduce drásticamente la sobreestimación y el entrenamiento se estabiliza.</p>
+  </div>
+</section>
+
+<!-- ── Resumen DQN completo ── -->
+<section>
+  <span class="slide-tag">Resumen</span>
+  <h2>DQN: el algoritmo completo de un vistazo 🗺️</h2>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:14px;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent-blue),var(--accent-violet));"></div>
+
+    <div class="step-row">
+      <div class="step-num">1</div>
+      <div class="step-text"><strong style="color:var(--accent-cyan);">Preprocesar</strong> los frames (84×84, escala de grises) y apilar 4 consecutivos → estado s</div>
+    </div>
+    <div class="step-row" style="margin-top:6px;">
+      <div class="step-num">2</div>
+      <div class="step-text"><strong style="color:var(--accent-cyan);">Elegir acción</strong> con ε-greedy: pasar s por la Red Principal → tomar acción a</div>
+    </div>
+    <div class="step-row" style="margin-top:6px;">
+      <div class="step-num">3</div>
+      <div class="step-text"><strong style="color:var(--accent-cyan);">Ejecutar</strong> la acción → recibir recompensa r y nuevo estado s' → guardar (s,a,r,s') en el búfer</div>
+    </div>
+    <div class="step-row" style="margin-top:6px;">
+      <div class="step-num">4</div>
+      <div class="step-text"><strong style="color:var(--accent-violet);">Muestrear</strong> un lote aleatorio del búfer → calcular el objetivo TD con la Red Objetivo</div>
+    </div>
+    <div class="step-row" style="margin-top:6px;">
+      <div class="step-num">5</div>
+      <div class="step-text"><strong style="color:var(--accent-violet);">Calcular la pérdida</strong> L = (objetivo − Q estimado)² → paso de descenso de gradiente sobre la Red Principal</div>
+    </div>
+    <div class="step-row" style="margin-top:6px;">
+      <div class="step-num">6</div>
+      <div class="step-text"><strong style="color:var(--accent-gold);">Cada C pasos:</strong> copiar pesos de la Red Principal a la Red Objetivo → volver al paso 2</div>
+    </div>
+  </div>
+
+  <div class="cols2">
+    <div class="card card-cyan" style="padding:12px 14px;">
+      <p>🎮 <strong>En el capítulo 3.4</strong> veremos DQN en acción jugando Space Invaders con un modelo ya entrenado — sin código, solo análisis del comportamiento aprendido.</p>
+    </div>
+    <div class="card card-violet" style="padding:12px 14px;">
+      <p>🛠️ <strong>En el capítulo 3.3</strong> profundizamos en el preprocesamiento: por qué escala de grises, cómo funciona el frame stacking y qué ve realmente la red.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Glosario ── -->
+<section>
+  <span class="slide-tag">Glosario</span>
+  <h2>Glosario de los capítulos 3.1 y 3.2</h2>
+  <div style="margin-top:10px;">
+    <div class="gloss-row">
+      <span class="gloss-term">Métodos tabulares</span>
+      <span class="gloss-def">Algoritmos como Q-Learning que representan la función Q en una tabla. Solo funcionan cuando el espacio de estados es pequeño y discreto.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">DQN</span>
+      <span class="gloss-def">Deep Q-Network. Usa una red neuronal profunda para aproximar la función Q en lugar de una tabla. Funciona con entornos de imagen como Atari.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Función de pérdida (Loss)</span>
+      <span class="gloss-def">Número que mide cuánto se equivoca la red: L = (Q objetivo − Q estimado)². El entrenamiento consiste en minimizarla.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Descenso de gradiente</span>
+      <span class="gloss-def">Técnica para ajustar los pesos de la red en la dirección que reduce la pérdida. El "motor" del entrenamiento de cualquier red neuronal.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Búfer de repetición</span>
+      <span class="gloss-def">Memoria que guarda experiencias (s, a, r, s') pasadas para reutilizarlas en el entrenamiento. Evita olvidar y reduce correlaciones.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Red objetivo (Target Network)</span>
+      <span class="gloss-def">Copia congelada de la red principal que solo se actualiza cada C pasos. Sirve para calcular el objetivo TD de forma estable.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Red principal (Online Network)</span>
+      <span class="gloss-def">La red que se entrena en cada paso. Elige las acciones y es la que termina siendo el agente final entrenado.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Double DQN</span>
+      <span class="gloss-def">Variante de DQN que usa la red principal para elegir la acción y la red objetivo para evaluar su valor. Reduce la sobreestimación de Q-values.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Sobreestimación de Q</span>
+      <span class="gloss-def">Error sistemático donde la red asigna valores Q demasiado altos a acciones subóptimas al inicio del entrenamiento. Double DQN lo corrige.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── Quiz ── -->
+<section>
+  <span class="slide-tag">Quiz</span>
+  <h2>🧠 Mini Quiz — Capítulos 3.1 y 3.2</h2>
+  <p style="font-size:0.58em;color:var(--text-muted);margin-bottom:14px;">Sin ver las diapositivas anteriores, intenta responder:</p>
+
+  <div class="step-row">
+    <div class="step-num">Q1</div>
+    <div class="step-text">FrozenLake tiene 16 estados y Taxi tiene 500. Atari tiene ~10<sup>241,920</sup> estados. ¿Por qué es imposible usar una Q-table para Atari aunque tuvieras un disco duro infinito?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q2</div>
+    <div class="step-text">¿Cuál es la diferencia principal entre cómo Q-Learning clásico actualiza sus valores y cómo lo hace DQN?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q3</div>
+    <div class="step-text">Explica el problema de la vaca y el vaquero 🤠🐄 con tus propias palabras. ¿Qué lo causa y cómo la Red Objetivo lo resuelve?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q4</div>
+    <div class="step-text">¿Por qué el búfer de repetición muestrea experiencias al azar en lugar de usarlas en orden de llegada?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q5</div>
+    <div class="step-text">DQN estándar usa la misma red para seleccionar la acción y para evaluar su valor. ¿Por qué esto causa sobreestimación? ¿Cómo lo arregla Double DQN?</div>
+  </div>
+</section>
+
+<!-- ── Slide final ── -->
+<section>
+  <div class="title-slide" style="align-items:center;text-align:center;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-60px;right:-60px;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(168,85,247,0.12) 0%,transparent 70%);pointer-events:none;"></div>
+
+    <div style="font-size:2.8em;margin-bottom:8px;">📈 🧠 👾</div>
+    <div class="chapter-badge" style="font-size:0.36em;">Capítulos 3.1 y 3.2 completados</div>
+    <h1 style="text-align:center;font-size:1.7em;">
+      ¡Ya entiendes<br>por qué existe DQN<br>
+      <span class="gradient-text-cyan" style="font-size:0.85em;">y cómo funciona!</span>
+    </h1>
+    <div class="divider" style="margin:14px auto;"></div>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:4px;font-size:0.56em;color:var(--text-muted);">
+      <span>✅ Límite de la Q-table</span><span style="color:var(--border);">·</span>
+      <span>✅ Red neuronal como función Q</span><span style="color:var(--border);">·</span>
+      <span>✅ Arquitectura CNN de DQN</span><span style="color:var(--border);">·</span>
+      <span>✅ Búfer de repetición</span><span style="color:var(--border);">·</span>
+      <span>✅ Red objetivo fija</span><span style="color:var(--border);">·</span>
+      <span>✅ Double DQN</span>
+    </div>
+    <div style="margin-top:20px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <span class="pill">Próximo: Cap. 3.3 — Preprocesamiento y frame stacking 🖼️</span>
+    </div>
+    <p style="font-size:0.5em;color:var(--text-muted);margin-top:14px;max-width:540px;">En el siguiente capítulo veremos exactamente cómo se transforma una imagen de Atari (210×160 a color) en el input que recibe la red: por qué escala de grises, por qué 84×84, y cómo apilar 4 frames captura el movimiento.</p>
+  </div>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+<script src="../assets/js/reveal-config.js"></script>
+</body>
+</html>

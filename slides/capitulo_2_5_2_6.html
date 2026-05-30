@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capítulos 2.5 & 2.6 — Q-Learning en FrozenLake y Taxi</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/black.min.css">
+<link rel="stylesheet" href="../assets/css/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"></script>
+
+<style>
+/* ── Animaciones ── */
+@keyframes snow-fall {
+  0%   { transform: translateY(-10px) rotate(0deg); opacity:0; }
+  20%  { opacity:1; }
+  100% { transform: translateY(200px) rotate(360deg); opacity:0; }
+}
+@keyframes slip-wobble {
+  0%,100% { transform: translateX(0) rotate(0deg); }
+  25%  { transform: translateX(8px) rotate(8deg); }
+  75%  { transform: translateX(-8px) rotate(-8deg); }
+}
+@keyframes taxi-drive {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(20px); }
+}
+@keyframes heat-pulse {
+  0%,100% { opacity:0.6; }
+  50%      { opacity:1; }
+}
+@keyframes check-pop {
+  0%   { transform: scale(0); opacity:0; }
+  70%  { transform: scale(1.2); }
+  100% { transform: scale(1); opacity:1; }
+}
+@keyframes count-up {
+  from { opacity:0; transform:translateY(4px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+@keyframes cell-fill {
+  from { background-color: rgba(59,130,246,0.05); }
+  to   { background-color: inherit; }
+}
+
+/* ── FrozenLake grid ── */
+.fl-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  max-width: 240px;
+  margin: 0 auto;
+}
+.fl-cell {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3em;
+  border: 1px solid rgba(255,255,255,0.06);
+  position: relative;
+  transition: all 0.3s;
+}
+.fl-S { background: rgba(34,211,238,0.2);  border-color: rgba(34,211,238,0.5); }
+.fl-F { background: rgba(147,197,253,0.08); }
+.fl-H { background: rgba(239,68,68,0.15);  border-color: rgba(239,68,68,0.3); }
+.fl-G { background: rgba(251,191,36,0.2);  border-color: rgba(251,191,36,0.4); }
+.fl-agent { background: rgba(168,85,247,0.3); border-color: var(--accent-violet); box-shadow: 0 0 12px rgba(168,85,247,0.5); }
+.fl-path  { background: rgba(168,85,247,0.12); border-color: rgba(168,85,247,0.3); }
+
+/* Arrow overlay on FL cell */
+.fl-arrow {
+  position: absolute;
+  font-size: 0.75em;
+  bottom: 1px;
+  right: 2px;
+  color: var(--accent-cyan);
+  line-height: 1;
+}
+
+/* ── Q-table heatmap for FrozenLake ── */
+.qtable-fl {
+  border-collapse: separate;
+  border-spacing: 2px;
+  margin: 0 auto;
+  font-family: var(--font-mono);
+}
+.qtable-fl th {
+  font-size: 0.42em;
+  color: var(--text-muted);
+  padding: 4px 8px;
+  text-align: center;
+  letter-spacing: 0.04em;
+}
+.qtable-fl td {
+  padding: 5px 9px;
+  border-radius: 5px;
+  font-size: 0.46em;
+  text-align: center;
+  min-width: 48px;
+  border: 1px solid rgba(255,255,255,0.04);
+  transition: all 0.3s;
+}
+.qv-0    { background: rgba(255,255,255,0.03); color: var(--text-muted); }
+.qv-low  { background: rgba(59,130,246,0.1);   color: #93c5fd; }
+.qv-mid  { background: rgba(34,211,238,0.15);  color: var(--accent-cyan); }
+.qv-high { background: rgba(34,211,238,0.25);  color: var(--accent-cyan); font-weight: 700; }
+.qv-best { background: rgba(251,191,36,0.25);  color: var(--accent-gold); font-weight: 700; border-color: rgba(251,191,36,0.4) !important; }
+.qv-hole { background: rgba(239,68,68,0.1);    color: #fca5a5; }
+
+/* ── Taxi grid ── */
+.taxi-world {
+  background: #060a14;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.52em;
+  line-height: 1.8;
+  color: var(--text-primary);
+  white-space: pre;
+  letter-spacing: 0.05em;
+}
+.tw-R { color: #ef4444; font-weight: 700; }
+.tw-G { color: #22c55e; font-weight: 700; }
+.tw-Y { color: #eab308; font-weight: 700; }
+.tw-B { color: #3b82f6; font-weight: 700; }
+.tw-taxi { color: var(--accent-violet); font-weight: 700; }
+.tw-wall { color: rgba(255,255,255,0.2); }
+.tw-pass { color: var(--accent-cyan); font-weight: 700; }
+
+/* ── Terminal / code block ── */
+.terminal {
+  background: #020812;
+  border: 1px solid rgba(34,211,238,0.3);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.49em;
+  color: #a8c8e8;
+  line-height: 1.85;
+  position: relative;
+  overflow: hidden;
+}
+.terminal::before {
+  content: "● ● ●";
+  position: absolute;
+  top: 7px; left: 10px;
+  font-size: 0.75em;
+  color: var(--text-muted);
+  letter-spacing: 4px;
+}
+.terminal .t-body { margin-top: 14px; }
+.t-c { color: #4a5568; }
+.t-k { color: #c678dd; }
+.t-s { color: #98c379; }
+.t-n { color: #d19a66; }
+.t-f { color: #61afef; }
+.t-v { color: #e5c07b; }
+.t-o { color: #22c55e; }
+.t-p { color: var(--accent-cyan); }
+.t-hi { color: var(--accent-gold); font-weight: 700; }
+
+/* ── Snowflakes ── */
+.snowflake {
+  position: absolute;
+  font-size: 0.9em;
+  pointer-events: none;
+  animation: snow-fall linear infinite;
+  opacity: 0;
+}
+
+/* ── Slippery visual ── */
+.slippery-demo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin: 6px 0;
+  font-size: 0.56em;
+}
+
+/* ── State counter badge ── */
+.state-badge {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 0.54em;
+  text-align: center;
+  min-width: 80px;
+}
+.state-badge .sb-num {
+  font-family: var(--font-mono);
+  font-size: 1.6em;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ── Steps progress visual ── */
+.step-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-card);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.54em;
+  border: 1px solid var(--border);
+  margin: 5px 0;
+}
+.step-badge.active { border-color: var(--accent-cyan); }
+.step-badge.done   { border-color: #22c55e; opacity: 0.8; }
+.step-badge .sb-icon { font-size: 1.3em; flex-shrink: 0; }
+
+/* ── Reward pills ── */
+.rew-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-family: var(--font-mono);
+  font-size: 0.52em;
+  font-weight: 700;
+}
+.rp-pos { background: rgba(34,197,94,0.15);  border: 1px solid rgba(34,197,94,0.4);  color: #22c55e; }
+.rp-neg { background: rgba(239,68,68,0.15);  border: 1px solid rgba(239,68,68,0.4);  color: #ef4444; }
+.rp-neu { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); color: var(--text-muted); }
+
+/* ── Hub upload visual ── */
+.hub-upload {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: linear-gradient(135deg, rgba(34,211,238,0.06), rgba(168,85,247,0.06));
+  border: 1px solid rgba(34,211,238,0.25);
+  border-radius: 12px;
+  padding: 14px 18px;
+  position: relative;
+  overflow: hidden;
+}
+.hub-upload::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--accent-cyan), var(--accent-violet));
+}
+
+/* ── vs divider ── */
+.vs-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+}
+.vs-divider::before,
+.vs-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.vs-label {
+  font-family: var(--font-mono);
+  font-size: 0.52em;
+  color: var(--text-muted);
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+/* ── Heatmap legend ── */
+.heatmap-legend {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  margin: 6px 0;
+}
+.hl-cell {
+  width: 20px; height: 12px;
+  border-radius: 3px;
+}
+.hl-label {
+  font-family: var(--font-mono);
+  font-size: 0.4em;
+  color: var(--text-muted);
+}
+
+/* ── Check animation ── */
+.check-anim {
+  animation: check-pop 0.4s ease-out forwards;
+  display: inline-block;
+}
+</style>
+</head>
+
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ══ PORTADA ══════════════════════════════ -->
+<section>
+  <div class="title-slide" style="position:relative;overflow:hidden;">
+    <!-- Snowflakes decorativas -->
+    <div class="snowflake" style="left:8%;animation-duration:3s;animation-delay:0s;">❄️</div>
+    <div class="snowflake" style="left:25%;animation-duration:4s;animation-delay:0.8s;">❄️</div>
+    <div class="snowflake" style="left:55%;animation-duration:3.5s;animation-delay:1.5s;">❄️</div>
+    <div class="snowflake" style="left:78%;animation-duration:2.8s;animation-delay:0.3s;">❄️</div>
+    <div class="snowflake" style="left:90%;animation-duration:4.2s;animation-delay:2s;">❄️</div>
+
+    <div style="position:absolute;top:-80px;right:-80px;width:380px;height:380px;border-radius:50%;background:radial-gradient(circle,rgba(147,197,253,0.12) 0%,transparent 70%);pointer-events:none;"></div>
+
+    <div class="chapter-badge">Capítulos 2.5 + 2.6 · Módulo 2</div>
+    <h1>¡Manos a la obra!<br>
+      <span class="gradient-text">Q-Learning desde</span><br>
+      <span style="font-size:0.85em;">cero con NumPy ❄️🚖</span>
+    </h1>
+    <div class="divider"></div>
+    <p style="font-size:0.62em;color:var(--text-muted);max-width:640px;margin-top:8px;line-height:1.7;">
+      Implementar Q-Learning sin librerías mágicas ·<br>
+      FrozenLake: cruzar el lago helado · Taxi: llevar pasajeros por la ciudad
+    </p>
+    <div style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;">
+      <span class="pill">Unit 2 Hands-on — HuggingFace 🤗</span>
+      <span class="pill">Jose Miguel Lara Rangel</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SECCIÓN CAP 2.5 ═══════════════════ -->
+<section>
+  <div class="section-slide" style="background:linear-gradient(160deg,#04060f,#070d1a);position:relative;overflow:hidden;">
+    <div class="snowflake" style="left:15%;animation-duration:3.2s;font-size:1.2em;">❄️</div>
+    <div class="snowflake" style="left:60%;animation-duration:4s;animation-delay:1s;font-size:1.4em;">❄️</div>
+    <div class="snowflake" style="left:82%;animation-duration:3.6s;animation-delay:0.5s;">❄️</div>
+    <span class="big-emoji">❄️</span>
+    <div class="chapter-badge" style="font-size:0.38em;margin-top:8px;">Capítulo 2.5</div>
+    <h1>¡Manos a la obra!<br>Q-Learning en FrozenLake</h1>
+    <p style="font-size:0.6em;color:var(--text-muted);max-width:520px;text-align:center;margin-top:10px;">
+      Tu primer agente implementado <em>desde cero</em> con NumPy. Sin atajos.
+    </p>
+  </div>
+</section>
+
+<!-- ── El entorno FrozenLake ── -->
+<section>
+  <span class="slide-tag">2.5 · FrozenLake</span>
+  <h2>El entorno: FrozenLake-v1 ❄️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Un duende 🧝 debe cruzar un lago helado desde la partida (S) hasta la meta (G), pisando solo casillas congeladas (F) y evitando los hoyos (H).</p>
+
+  <div style="display:flex;gap:16px;align-items:flex-start;">
+    <!-- Map visual -->
+    <div style="flex:1;text-align:center;">
+      <div style="background:var(--bg-card);border:1px solid rgba(147,197,253,0.3);border-radius:14px;padding:14px;position:relative;overflow:hidden;">
+        <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(147,197,253,0.05) 0%,transparent 70%);pointer-events:none;"></div>
+        <div class="fl-grid">
+          <!-- Row 0: SFFF -->
+          <div class="fl-cell fl-S" style="font-size:1.2em;">🧝<div class="fl-arrow">➡️</div></div>
+          <div class="fl-cell fl-F"><div class="fl-arrow">⬇️</div></div>
+          <div class="fl-cell fl-F"><div class="fl-arrow">⬇️</div></div>
+          <div class="fl-cell fl-F"><div class="fl-arrow">⬇️</div></div>
+          <!-- Row 1: FHFH -->
+          <div class="fl-cell fl-F"><div class="fl-arrow">⬇️</div></div>
+          <div class="fl-cell fl-H">🕳️</div>
+          <div class="fl-cell fl-F"><div class="fl-arrow">⬇️</div></div>
+          <div class="fl-cell fl-H">🕳️</div>
+          <!-- Row 2: FFFH -->
+          <div class="fl-cell fl-F"><div class="fl-arrow">➡️</div></div>
+          <div class="fl-cell fl-F"><div class="fl-arrow">➡️</div></div>
+          <div class="fl-cell fl-F"><div class="fl-arrow">⬇️</div></div>
+          <div class="fl-cell fl-H">🕳️</div>
+          <!-- Row 3: HFFG -->
+          <div class="fl-cell fl-H">🕳️</div>
+          <div class="fl-cell fl-F"><div class="fl-arrow">➡️</div></div>
+          <div class="fl-cell fl-F"><div class="fl-arrow">➡️</div></div>
+          <div class="fl-cell fl-G">🏆</div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:10px;font-size:0.44em;color:var(--text-muted);">
+          <span><span style="color:var(--accent-cyan);">S</span>=Inicio</span>
+          <span><span style="color:rgba(147,197,253,0.6);">F</span>=Hielo</span>
+          <span><span style="color:#ef4444;">H</span>=Hoyo</span>
+          <span><span style="color:var(--accent-gold);">G</span>=Meta</span>
+        </div>
+        <div style="margin-top:6px;font-size:0.42em;color:var(--text-muted);">Las flechas = política óptima aprendida</div>
+      </div>
+    </div>
+
+    <!-- Environment details -->
+    <div style="flex:1.3;display:flex;flex-direction:column;gap:8px;">
+      <div class="card card-cyan" style="padding:12px 14px;">
+        <h3 style="font-size:0.75em;margin-bottom:6px;">Espacio de estados</h3>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div class="state-badge">
+            <div class="sb-num" style="color:var(--accent-cyan);">16</div>
+            <div style="color:var(--text-muted);">estados</div>
+          </div>
+          <p style="font-size:0.58em;">Cuadrícula de 4×4 = 16 casillas. Cada estado es un número del 0 al 15.</p>
+        </div>
+      </div>
+      <div class="card card-violet" style="padding:12px 14px;">
+        <h3 style="font-size:0.75em;margin-bottom:6px;">Espacio de acciones</h3>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">
+          <span class="rew-pill rp-neu">0 ← Izq.</span>
+          <span class="rew-pill rp-neu">1 ↓ Abajo</span>
+          <span class="rew-pill rp-neu">2 → Der.</span>
+          <span class="rew-pill rp-neu">3 ↑ Arriba</span>
+        </div>
+      </div>
+      <div class="card card-gold" style="padding:12px 14px;">
+        <h3 style="font-size:0.75em;margin-bottom:6px;">Sistema de recompensas</h3>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <span class="rew-pill rp-pos">🏆 Meta: +1</span>
+          <span class="rew-pill rp-neu">❄️ Hielo: 0</span>
+          <span class="rew-pill rp-neu">🕳️ Hoyo: 0</span>
+        </div>
+        <p style="font-size:0.52em;color:var(--text-muted);margin-top:6px;">⚠️ El episodio termina al caer en un hoyo o llegar a la meta.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── ¿Resbaladizo? ── -->
+<section>
+  <span class="slide-tag">2.5 · Versión Resbaladiza</span>
+  <h2>¡El lago resbala! ¿Versión resbaladiza o no? 🛝</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">FrozenLake tiene dos modos. En el curso de HuggingFace usamos la <strong>versión no-resbaladiza</strong> primero para facilitar el aprendizaje:</p>
+
+  <div class="cols2" style="margin-bottom:12px;">
+    <div class="card card-cyan" style="padding:18px;">
+      <h3 style="font-size:0.85em;color:var(--accent-cyan);">✅ No resbaladiza</h3>
+      <code style="font-family:var(--font-mono);font-size:0.54em;color:var(--text-muted);">is_slippery=False</code>
+      <p style="margin-top:8px;">El agente se mueve <strong>exactamente donde quiere</strong>. Si elige ir a la derecha, va a la derecha. Sin sorpresas.</p>
+      <div class="slippery-demo" style="margin-top:10px;">
+        <span style="font-size:1.5em;">🧝</span>
+        <span style="color:var(--accent-cyan);">→ elige ➡️</span>
+        <span style="font-size:1.2em;">→</span>
+        <span style="font-size:1.5em;">🧝</span>
+        <span style="color:#22c55e;font-size:0.9em;">siempre ➡️ ✅</span>
+      </div>
+    </div>
+    <div class="card card-violet" style="padding:18px;">
+      <h3 style="font-size:0.85em;color:var(--accent-violet);">⚠️ Resbaladiza (el reto)</h3>
+      <code style="font-family:var(--font-mono);font-size:0.54em;color:var(--text-muted);">is_slippery=True</code>
+      <p style="margin-top:8px;">El agente elige una dirección, pero el hielo lo puede desviar a los lados. <strong>Solo tiene 33% de probabilidad</strong> de ir adonde quiere.</p>
+      <div class="slippery-demo" style="margin-top:10px;animation:slip-wobble 2s ease-in-out infinite;">
+        <span style="font-size:1.5em;">🧝</span>
+        <span style="color:var(--accent-violet);">→ elige ➡️</span>
+        <span style="font-size:1.2em;">→</span>
+        <span style="font-size:1em;color:var(--text-muted);">puede ir ➡️, ⬆️ o ⬇️</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">🎯 Estrategia del curso</span>
+    <p>Empezamos con <code>is_slippery=False</code> para que el agente aprenda la política perfecta sin ambigüedad. Luego el <strong>Capítulo 2.6</strong> usa Taxi-v3, que tiene un espacio de estados mucho mayor como reto adicional.</p>
+  </div>
+</section>
+
+<!-- ── Setup e instalación ── -->
+<section>
+  <span class="slide-tag">2.5 · Código: Setup</span>
+  <h2>Preparando el entorno en Colab 💻</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Abre el notebook del curso de HuggingFace Unit 2 en Google Colab y ejecuta las primeras celdas:</p>
+
+  <div class="terminal" style="margin-bottom:12px;">
+    <div class="t-body">
+      <span class="t-c"># 1. Instalar dependencias</span><br>
+      <span class="t-p">!</span><span class="t-f">pip install</span> <span class="t-s">gymnasium</span> numpy tqdm pickle5 <span class="t-s">huggingface_hub</span><br><br>
+      <span class="t-c"># 2. Importar librerías</span><br>
+      <span class="t-k">import</span> <span class="t-v">numpy</span> <span class="t-k">as</span> <span class="t-v">np</span><br>
+      <span class="t-k">import</span> <span class="t-v">gymnasium</span> <span class="t-k">as</span> <span class="t-v">gym</span><br>
+      <span class="t-k">import</span> <span class="t-v">random</span><br>
+      <span class="t-k">from</span> <span class="t-v">tqdm.notebook</span> <span class="t-k">import</span> <span class="t-f">tqdm</span>  <span class="t-c"># barra de progreso</span><br><br>
+      <span class="t-c"># 3. Crear el entorno (versión no-resbaladiza)</span><br>
+      <span class="t-v">env</span> = <span class="t-f">gym.make</span>(<span class="t-s">"FrozenLake-v1"</span>, map_name=<span class="t-s">"4x4"</span>, is_slippery=<span class="t-k">False</span>)<br><br>
+      <span class="t-c"># 4. Explorar el entorno</span><br>
+      <span class="t-f">print</span>(<span class="t-s">"Número de estados:"</span>, <span class="t-v">env</span>.observation_space.n)   <span class="t-c"># → 16</span><br>
+      <span class="t-f">print</span>(<span class="t-s">"Número de acciones:"</span>, <span class="t-v">env</span>.action_space.n)  <span class="t-c"># → 4</span>
+    </div>
+  </div>
+
+  <div class="cols2">
+    <div class="card card-cyan">
+      <p>📐 <strong>Q-table = 16 × 4 = 64 celdas.</strong> Con solo 64 números podemos representar la política óptima completa para FrozenLake. ¡Mucho más manejable que la red neuronal que usamos con LunarLander!</p>
+    </div>
+    <div class="card card-gold">
+      <p>💡 <strong>¿Por qué NumPy y no Stable-Baselines3?</strong> Implementar desde cero es la mejor manera de entender cómo funciona el algoritmo. SB3 lo hace todo automático — aquí nosotros controlamos cada línea.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Inicializar Q-table y políticas ── -->
+<section>
+  <span class="slide-tag">2.5 · Código: Q-table y políticas</span>
+  <h2>Inicializar la Q-table y definir las políticas 🗂️</h2>
+
+  <div class="terminal" style="margin-bottom:10px;">
+    <div class="t-body">
+      <span class="t-c"># ── Inicializar la Q-table con ceros ──────────────────</span><br>
+      <span class="t-k">def</span> <span class="t-f">inicializar_qtable</span>(env):<br>
+      &nbsp;&nbsp;<span class="t-v">n_estados</span>  = <span class="t-v">env</span>.observation_space.n<br>
+      &nbsp;&nbsp;<span class="t-v">n_acciones</span> = <span class="t-v">env</span>.action_space.n<br>
+      &nbsp;&nbsp;<span class="t-k">return</span> <span class="t-v">np</span>.<span class="t-f">zeros</span>((<span class="t-v">n_estados</span>, <span class="t-v">n_acciones</span>))  <span class="t-c"># → (16, 4)</span><br><br>
+      <span class="t-c"># ── Política óptima: siempre elige la mejor acción ───</span><br>
+      <span class="t-k">def</span> <span class="t-f">politica_optima</span>(Qtable, estado):<br>
+      &nbsp;&nbsp;<span class="t-k">return</span> <span class="t-v">np</span>.<span class="t-f">argmax</span>(<span class="t-v">Qtable</span>[<span class="t-v">estado</span>])<br><br>
+      <span class="t-c"># ── Política ε-greedy: explora O explota ─────────────</span><br>
+      <span class="t-k">def</span> <span class="t-f">politica_epsilon_greedy</span>(Qtable, estado, epsilon):<br>
+      &nbsp;&nbsp;<span class="t-k">if</span> <span class="t-v">random</span>.<span class="t-f">uniform</span>(<span class="t-n">0</span>, <span class="t-n">1</span>) &gt; <span class="t-v">epsilon</span>:<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="t-k">return</span> <span class="t-v">np</span>.<span class="t-f">argmax</span>(<span class="t-v">Qtable</span>[<span class="t-v">estado</span>])  <span class="t-c"># explotación</span><br>
+      &nbsp;&nbsp;<span class="t-k">else</span>:<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="t-k">return</span> <span class="t-v">env</span>.action_space.<span class="t-f">sample</span>()     <span class="t-c"># exploración</span>
+    </div>
+  </div>
+
+  <div class="key-idea" style="padding:10px 16px;">
+    <span class="ki-label">🔑 Las dos políticas</span>
+    <p><code>politica_optima</code> se usa al <strong>evaluar</strong> el agente (sin explorar). <code>politica_epsilon_greedy</code> se usa durante el <strong>entrenamiento</strong> para equilibrar exploración y explotación.</p>
+  </div>
+</section>
+
+<!-- ── La función de entrenamiento ── -->
+<section>
+  <span class="slide-tag">2.5 · Código: Entrenamiento</span>
+  <h2>El bucle de entrenamiento: donde todo ocurre 🔁</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:8px;">Esta función es el corazón del notebook. Contiene el algoritmo Q-Learning en ~20 líneas:</p>
+
+  <div class="terminal">
+    <div class="t-body">
+      <span class="t-k">def</span> <span class="t-f">entrenar</span>(n_episodios, min_eps, max_eps, decay, env, max_pasos, Qtable, alpha, gamma):<br>
+      &nbsp;&nbsp;<span class="t-k">for</span> <span class="t-v">episodio</span> <span class="t-k">in</span> <span class="t-f">tqdm</span>(<span class="t-f">range</span>(<span class="t-v">n_episodios</span>)):<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="t-c"># 1. Reducir ε conforme avanza el entrenamiento</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="t-v">epsilon</span> = <span class="t-v">min_eps</span> + (<span class="t-v">max_eps</span> - <span class="t-v">min_eps</span>) * <span class="t-v">np</span>.<span class="t-f">exp</span>(-<span class="t-v">decay</span> * <span class="t-v">episodio</span>)<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="t-v">estado</span>, _ = <span class="t-v">env</span>.<span class="t-f">reset</span>()<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="t-v">terminado</span> = <span class="t-k">False</span><br><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="t-k">for</span> <span class="t-v">paso</span> <span class="t-k">in</span> <span class="t-f">range</span>(<span class="t-v">max_pasos</span>):<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-c"># 2. Elegir acción con ε-greedy</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-v">accion</span> = <span class="t-f">politica_epsilon_greedy</span>(<span class="t-v">Qtable</span>, <span class="t-v">estado</span>, <span class="t-v">epsilon</span>)<br><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-c"># 3. Ejecutar acción</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-v">nuevo_estado</span>, <span class="t-v">recompensa</span>, <span class="t-v">terminado</span>, _, _ = <span class="t-v">env</span>.<span class="t-f">step</span>(<span class="t-v">accion</span>)<br><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-c"># 4. ★ Actualizar Q-table (la línea más importante)</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-v">Qtable</span>[<span class="t-v">estado</span>, <span class="t-v">accion</span>] += <span class="t-v">alpha</span> * (<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-v">recompensa</span> + <span class="t-v">gamma</span> * <span class="t-v">np</span>.<span class="t-f">max</span>(<span class="t-v">Qtable</span>[<span class="t-v">nuevo_estado</span>]) - <span class="t-v">Qtable</span>[<span class="t-v">estado</span>, <span class="t-v">accion</span>]<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-k">if</span> <span class="t-v">terminado</span>: <span class="t-k">break</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-v">estado</span> = <span class="t-v">nuevo_estado</span><br>
+      &nbsp;&nbsp;<span class="t-k">return</span> <span class="t-v">Qtable</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── Parámetros e hiperparámetros ── -->
+<section>
+  <span class="slide-tag">2.5 · Hiperparámetros</span>
+  <h2>Los hiperparámetros del entrenamiento ⚙️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Estos son los valores exactos que usa el curso de HuggingFace para FrozenLake. Después podrás experimentar cambiándolos:</p>
+
+  <div class="terminal" style="margin-bottom:12px;">
+    <div class="t-body">
+      <span class="t-c"># Parámetros de entrenamiento</span><br>
+      <span class="t-v">n_episodios</span>     = <span class="t-n">10_000</span>    <span class="t-c"># 10,000 partidas</span><br>
+      <span class="t-v">tasa_aprendizaje</span> = <span class="t-n">0.7</span>       <span class="t-c"># α = 0.7 (bastante agresivo)</span><br>
+      <span class="t-v">gamma</span>           = <span class="t-n">0.95</span>      <span class="t-c"># descuento γ</span><br>
+      <span class="t-v">max_pasos</span>       = <span class="t-n">99</span>        <span class="t-c"># máximo de pasos por episodio</span><br><br>
+      <span class="t-c"># Parámetros de exploración</span><br>
+      <span class="t-v">max_epsilon</span>  = <span class="t-n">1.0</span>        <span class="t-c"># ε al inicio: 100% exploración</span><br>
+      <span class="t-v">min_epsilon</span>  = <span class="t-n">0.05</span>       <span class="t-c"># ε mínimo: siempre 5% de exploración</span><br>
+      <span class="t-v">decay_rate</span>   = <span class="t-n">0.0005</span>     <span class="t-c"># velocidad de decaimiento de ε</span>
+    </div>
+  </div>
+
+  <div class="cols3">
+    <div class="card card-cyan" style="padding:12px 14px;">
+      <h3 style="font-size:0.72em;">α = 0.7 — ¿Por qué tan alto?</h3>
+      <p>FrozenLake no-resbaladizo es determinista. Con recompensas que no tienen ruido, podemos aprender más rápido con una tasa mayor.</p>
+    </div>
+    <div class="card card-violet" style="padding:12px 14px;">
+      <h3 style="font-size:0.72em;">10,000 episodios</h3>
+      <p>Con 16 estados y sin resbalones, el agente converge rápido. Este número es más que suficiente.</p>
+    </div>
+    <div class="card card-gold" style="padding:12px 14px;">
+      <h3 style="font-size:0.72em;">decay = 0.0005</h3>
+      <p>Decaimiento lento: el agente explora mucho durante los primeros miles de episodios antes de explotación.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── La Q-table entrenada de FrozenLake ── -->
+<section>
+  <span class="slide-tag">2.5 · Resultado</span>
+  <h2>La Q-table después de 10,000 episodios 🔥</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Cada celda ahora tiene un valor. El agente aprendió cuánto vale moverse en cada dirección desde cada estado. El color más cálido = mayor valor:</p>
+
+  <div style="display:flex;gap:16px;align-items:flex-start;">
+    <div style="flex:1;">
+      <!-- Q-table entrenada (16 states × 4 actions, valores ilustrativos post-entrenamiento) -->
+      <table class="qtable-fl">
+        <tr>
+          <th>S</th><th>⬅️</th><th>⬇️</th><th>➡️</th><th>⬆️</th>
+        </tr>
+        <tr><td style="font-size:0.5em;color:var(--text-muted);font-family:var(--font-mono);">0🧝</td><td class="qv-low">0.54</td><td class="qv-low">0.59</td><td class="qv-best">0.73</td><td class="qv-low">0.54</td></tr>
+        <tr><td style="font-size:0.5em;color:var(--text-muted);font-family:var(--font-mono);">1</td><td class="qv-low">0.47</td><td class="qv-best">0.62</td><td class="qv-low">0.38</td><td class="qv-low">0.43</td></tr>
+        <tr><td style="font-size:0.5em;color:var(--text-muted);font-family:var(--font-mono);">2</td><td class="qv-low">0.37</td><td class="qv-best">0.69</td><td class="qv-low">0.29</td><td class="qv-low">0.32</td></tr>
+        <tr><td style="font-size:0.5em;color:var(--text-muted);font-family:var(--font-mono);">3</td><td class="qv-low">0.15</td><td class="qv-best">0.58</td><td class="qv-low">0.16</td><td class="qv-low">0.21</td></tr>
+        <tr><td style="font-size:0.5em;color:var(--text-muted);font-family:var(--font-mono);">4🧝</td><td class="qv-low">0.55</td><td class="qv-low">0.42</td><td class="qv-low">0.28</td><td class="qv-best">0.66</td></tr>
+        <tr><td style="font-size:0.5em;color:#ef4444;font-family:var(--font-mono);">5🕳️</td><td class="qv-hole">0</td><td class="qv-hole">0</td><td class="qv-hole">0</td><td class="qv-hole">0</td></tr>
+        <tr><td style="font-size:0.5em;color:var(--text-muted);font-family:var(--font-mono);">6</td><td class="qv-low">0.29</td><td class="qv-best">0.78</td><td class="qv-low">0.16</td><td class="qv-low">0.14</td></tr>
+        <tr><td style="font-size:0.5em;color:#ef4444;font-family:var(--font-mono);">7🕳️</td><td class="qv-hole">0</td><td class="qv-hole">0</td><td class="qv-hole">0</td><td class="qv-hole">0</td></tr>
+      </table>
+      <div class="heatmap-legend" style="margin-top:8px;">
+        <div class="hl-cell" style="background:rgba(255,255,255,0.04);"></div>
+        <div class="hl-cell" style="background:rgba(59,130,246,0.15);"></div>
+        <div class="hl-cell" style="background:rgba(34,211,238,0.2);"></div>
+        <div class="hl-cell" style="background:rgba(251,191,36,0.28);"></div>
+        <span class="hl-label">bajo → alto valor</span>
+      </div>
+    </div>
+
+    <div style="flex:1;display:flex;flex-direction:column;gap:8px;">
+      <div class="card card-cyan" style="padding:12px 14px;">
+        <h3 style="font-size:0.75em;">Leer la Q-table</h3>
+        <p>Para cada fila (estado), la celda en <strong style="color:var(--accent-gold);">dorado</strong> es la acción óptima — la que el agente tomará con la política greedy.</p>
+      </div>
+      <div class="card" style="padding:12px 14px;">
+        <h3 style="font-size:0.75em;">Los hoyos tienen todo en 0</h3>
+        <p>Los estados 5 y 7 son hoyos 🕳️ — el episodio termina ahí, así que nunca se actualiza su Q-value. Se quedan en cero.</p>
+      </div>
+      <div class="card card-gold" style="padding:12px 14px;">
+        <h3 style="font-size:0.75em;">Meta del curso</h3>
+        <p>El agente debe alcanzar una tasa de éxito ≥ 1.0 en la versión no-resbaladiza. Con los parámetros del curso, esto se logra consistentemente.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Evaluación y subida al Hub ── -->
+<section>
+  <span class="slide-tag">2.5 · Evaluar y publicar</span>
+  <h2>Evaluar el agente y publicarlo en el Hub 📊🤗</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Una vez entrenado, evaluamos en 100 episodios y guardamos la Q-table en el Hub:</p>
+
+  <div class="terminal" style="margin-bottom:12px;">
+    <div class="t-body">
+      <span class="t-c"># Evaluación: correr 100 episodios sin exploración</span><br>
+      <span class="t-k">def</span> <span class="t-f">evaluar</span>(env, Qtable, n_episodios=<span class="t-n">100</span>):<br>
+      &nbsp;&nbsp;<span class="t-v">recompensas</span> = []<br>
+      &nbsp;&nbsp;<span class="t-k">for</span> _ <span class="t-k">in</span> <span class="t-f">range</span>(<span class="t-v">n_episodios</span>):<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="t-v">estado</span>, _ = <span class="t-v">env</span>.<span class="t-f">reset</span>()<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="t-v">total</span> = <span class="t-n">0</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="t-k">for</span> _ <span class="t-k">in</span> <span class="t-f">range</span>(<span class="t-n">200</span>):<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-v">accion</span> = <span class="t-f">politica_optima</span>(<span class="t-v">Qtable</span>, <span class="t-v">estado</span>)<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-v">estado</span>, <span class="t-v">r</span>, <span class="t-v">done</span>, _, _ = <span class="t-v">env</span>.<span class="t-f">step</span>(<span class="t-v">accion</span>)<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-v">total</span> += <span class="t-v">r</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-k">if</span> <span class="t-v">done</span>: <span class="t-k">break</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="t-v">recompensas</span>.<span class="t-f">append</span>(<span class="t-v">total</span>)<br>
+      &nbsp;&nbsp;<span class="t-k">return</span> <span class="t-v">np</span>.<span class="t-f">mean</span>(<span class="t-v">recompensas</span>), <span class="t-v">np</span>.<span class="t-f">std</span>(<span class="t-v">recompensas</span>)<br><br>
+      <span class="t-c"># Guardar Q-table en el Hub</span><br>
+      <span class="t-k">import</span> <span class="t-v">pickle</span><br>
+      <span class="t-k">with</span> <span class="t-f">open</span>(<span class="t-s">"qtable_frozenlake.pkl"</span>, <span class="t-s">"wb"</span>) <span class="t-k">as</span> <span class="t-v">f</span>:<br>
+      &nbsp;&nbsp;<span class="t-v">pickle</span>.<span class="t-f">dump</span>(<span class="t-v">Qtable</span>, <span class="t-v">f</span>)
+    </div>
+  </div>
+
+  <div class="hub-upload">
+    <div style="font-size:2em;flex-shrink:0;">🤗</div>
+    <div style="font-size:0.56em;">
+      <div style="color:var(--accent-cyan);font-weight:700;margin-bottom:4px;">La Q-table se sube al Hub como archivo JSON o pickle</div>
+      <div style="color:var(--text-muted);">Tu modelo queda disponible en: <code style="color:var(--accent-violet);">huggingface.co/TU_USUARIO/q-FrozenLake-v1-4x4-noSlippery</code></div>
+      <div style="color:var(--text-muted);margin-top:4px;">Criterio de certificación HF: <strong style="color:#22c55e;">tasa de éxito media ≥ 1.0</strong> (siempre llegar a la meta)</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SECCIÓN CAP 2.6 ═══════════════════ -->
+<section>
+  <div class="section-slide" style="background:linear-gradient(160deg,#04060f,#0d0a00);position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-40px;right:-40px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(251,191,36,0.08) 0%,transparent 70%);"></div>
+    <span class="big-emoji">🚖</span>
+    <div class="chapter-badge" style="font-size:0.38em;border-color:var(--accent-gold);color:var(--accent-gold);background:rgba(251,191,36,0.07);margin-top:8px;">Capítulo 2.6</div>
+    <h1>¡Reto!<br>Q-Learning en Taxi-v3</h1>
+    <p style="font-size:0.6em;color:var(--text-muted);max-width:520px;text-align:center;margin-top:10px;">
+      El mismo algoritmo, un entorno 30× más grande. ¿Puede la Q-table escalar?
+    </p>
+  </div>
+</section>
+
+<!-- ── El entorno Taxi ── -->
+<section>
+  <span class="slide-tag">2.6 · Taxi-v3</span>
+  <h2>El entorno: Taxi-v3 🚖</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Un taxi inteligente debe recoger a un pasajero y llevarlo a su destino en una ciudad de 5×5. Suena simple, pero hay muchas situaciones posibles:</p>
+
+  <div style="display:flex;gap:16px;align-items:flex-start;">
+    <!-- Taxi world ASCII -->
+    <div style="flex:1;">
+      <div style="background:var(--bg-card);border:1px solid rgba(251,191,36,0.3);border-radius:14px;padding:16px;position:relative;overflow:hidden;">
+        <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent-gold),var(--accent-violet));"></div>
+        <p style="font-size:0.44em;color:var(--text-muted);margin-bottom:8px;text-align:center;">El mapa de la ciudad (5×5)</p>
+        <div class="taxi-world">
+<span class="tw-wall">+---------+</span>
+<span class="tw-wall">|</span><span class="tw-R">R</span>: | : :<span class="tw-G">G</span><span class="tw-wall">|</span>
+<span class="tw-wall">|</span> : | : : <span class="tw-wall">|</span>
+<span class="tw-wall">|</span> : : : : <span class="tw-wall">|</span>
+<span class="tw-wall">|</span> | : | : <span class="tw-wall">|</span>
+<span class="tw-wall">|</span><span class="tw-Y">Y</span>| : |<span class="tw-B">B</span>: <span class="tw-wall">|</span>
+<span class="tw-wall">+---------+</span>
+<span class="tw-taxi">🚖</span> = taxi  <span class="tw-pass">👤</span> = pasajero
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px;justify-content:center;font-size:0.44em;">
+          <span style="color:#ef4444;">R=Rojo</span>
+          <span style="color:#22c55e;">G=Verde</span>
+          <span style="color:#eab308;">Y=Amarillo</span>
+          <span style="color:#3b82f6;">B=Azul</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div style="flex:1.2;display:flex;flex-direction:column;gap:8px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div class="state-badge" style="border-color:rgba(251,191,36,0.4);">
+          <div class="sb-num" style="color:var(--accent-gold);">500</div>
+          <div style="color:var(--text-muted);">estados</div>
+        </div>
+        <div class="state-badge" style="border-color:rgba(168,85,247,0.4);">
+          <div class="sb-num" style="color:var(--accent-violet);">6</div>
+          <div style="color:var(--text-muted);">acciones</div>
+        </div>
+        <div class="state-badge" style="border-color:rgba(34,211,238,0.4);">
+          <div class="sb-num" style="color:var(--accent-cyan);">3K</div>
+          <div style="color:var(--text-muted);">celdas Q</div>
+        </div>
+      </div>
+      <div class="card card-gold" style="padding:12px 14px;">
+        <h3 style="font-size:0.75em;">¿Cómo se calculan 500 estados?</h3>
+        <div style="font-family:var(--font-mono);font-size:0.52em;color:var(--text-muted);margin-top:6px;">
+          25 posiciones del taxi<br>
+          × 5 posiciones del pasajero (R, G, Y, B + en el taxi)<br>
+          × 4 destinos posibles<br>
+          <strong style="color:var(--accent-gold);">= 500 estados totales</strong>
+        </div>
+      </div>
+      <div class="card card-violet" style="padding:12px 14px;">
+        <h3 style="font-size:0.75em;">Las 6 acciones</h3>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;">
+          <span class="rew-pill rp-neu">0 ↓ Sur</span>
+          <span class="rew-pill rp-neu">1 ↑ Norte</span>
+          <span class="rew-pill rp-neu">2 → Este</span>
+          <span class="rew-pill rp-neu">3 ← Oeste</span>
+          <span class="rew-pill rp-pos">4 📥 Recoger</span>
+          <span class="rew-pill rp-pos">5 📤 Dejar</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Sistema de recompensas Taxi ── -->
+<section>
+  <span class="slide-tag">2.6 · Recompensas Taxi</span>
+  <h2>Las recompensas de Taxi: muchas formas de equivocarse 💰</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Taxi tiene un sistema de recompensas más rico que FrozenLake, diseñado para que el agente aprenda comportamientos específicos:</p>
+
+  <div class="cols2" style="margin-bottom:12px;">
+    <div>
+      <h3 style="font-size:0.8em;color:#22c55e;margin-bottom:8px;">Recompensas positivas ✅</h3>
+      <div class="step-badge active">
+        <span class="sb-icon">📤</span>
+        <div>
+          <strong style="color:#22c55e;">+20 puntos</strong><br>
+          <span style="color:var(--text-muted);">Dejar al pasajero en el destino correcto</span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <h3 style="font-size:0.8em;color:#ef4444;margin-bottom:8px;">Penalizaciones ❌</h3>
+      <div class="step-badge">
+        <span class="sb-icon">🚗</span>
+        <div>
+          <strong style="color:#ef4444;">−1 punto</strong><br>
+          <span style="color:var(--text-muted);">Cada paso de movimiento (incentiva la eficiencia)</span>
+        </div>
+      </div>
+      <div class="step-badge" style="margin-top:6px;">
+        <span class="sb-icon">⚠️</span>
+        <div>
+          <strong style="color:#ef4444;">−10 puntos</strong><br>
+          <span style="color:var(--text-muted);">Recoger o dejar pasajero en el lugar equivocado</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">🧠 Por qué −1 por cada paso</span>
+    <p>Si el agente solo recibiera +20 al final, podría aprender a dar vueltas infinitas antes de terminar — ¡seguiría ganando en algún momento! La penalización de −1 por paso lo obliga a llegar lo más rápido posible.</p>
+  </div>
+</section>
+
+<!-- ── Código Taxi: diferencias con FrozenLake ── -->
+<section>
+  <span class="slide-tag">2.6 · Código</span>
+  <h2>Taxi con el mismo código que FrozenLake 🔄</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">La gran ventaja de Q-Learning: <strong>el algoritmo es idéntico</strong>. Solo cambian los parámetros y el entorno. Esto demuestra que aprendiste algo general, no solo un truco específico:</p>
+
+  <div class="terminal" style="margin-bottom:12px;">
+    <div class="t-body">
+      <span class="t-c"># ── Cambios mínimos para Taxi ─────────────────────────</span><br><br>
+      <span class="t-c"># 1. Cambiar el entorno</span><br>
+      <span class="t-v">env</span> = <span class="t-f">gym.make</span>(<span class="t-s">"Taxi-v3"</span>)<br>
+      <span class="t-f">print</span>(<span class="t-s">"Estados:"</span>, <span class="t-v">env</span>.observation_space.n)  <span class="t-c"># → 500 (vs 16 de FrozenLake)</span><br>
+      <span class="t-f">print</span>(<span class="t-s">"Acciones:"</span>, <span class="t-v">env</span>.action_space.n)   <span class="t-c"># → 6  (vs 4 de FrozenLake)</span><br><br>
+      <span class="t-c"># 2. La Q-table ahora es más grande</span><br>
+      <span class="t-v">Qtable</span> = <span class="t-v">np</span>.<span class="t-f">zeros</span>((<span class="t-n">500</span>, <span class="t-n">6</span>))  <span class="t-c"># 3,000 celdas (vs 64)</span><br><br>
+      <span class="t-c"># 3. Ajustar parámetros (más episodios, más exploración)</span><br>
+      <span class="t-v">n_episodios</span>     = <span class="t-n">25_000</span>    <span class="t-c"># más episodios: espacio más grande</span><br>
+      <span class="t-v">tasa_aprendizaje</span> = <span class="t-n">0.7</span><br>
+      <span class="t-v">gamma</span>           = <span class="t-n">0.95</span><br>
+      <span class="t-v">decay_rate</span>      = <span class="t-n">0.0005</span><br><br>
+      <span class="t-c"># 4. ¡El resto del código es exactamente igual! ✅</span><br>
+      <span class="t-v">Qtable_taxi</span> = <span class="t-f">entrenar</span>(n_episodios, min_epsilon, max_epsilon,<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-n">0.0005</span>, <span class="t-v">env</span>, <span class="t-n">200</span>, <span class="t-v">Qtable</span>, <span class="t-n">0.7</span>, <span class="t-n">0.95</span>)
+    </div>
+  </div>
+
+  <div class="card card-gold">
+    <p>🎯 <strong>Este es el punto pedagógico clave del capítulo:</strong> Q-Learning es un algoritmo <em>general</em>. El mismo código que resolvió FrozenLake (16 estados) resuelve Taxi (500 estados) sin cambiar la lógica. Solo escala la tabla.</p>
+  </div>
+</section>
+
+<!-- ── Comparativa FrozenLake vs Taxi ── -->
+<section>
+  <span class="slide-tag">2.6 · Comparativa</span>
+  <h2>FrozenLake vs. Taxi: mismo algoritmo, distinta escala 📐</h2>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:14px;">
+    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;background:var(--bg-panel);">
+      <div style="padding:10px 14px;font-family:var(--font-mono);font-size:0.5em;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;">Característica</div>
+      <div style="padding:10px 14px;text-align:center;font-family:var(--font-mono);font-size:0.5em;color:var(--accent-cyan);">❄️ FrozenLake</div>
+      <div style="padding:10px 14px;text-align:center;font-family:var(--font-mono);font-size:0.5em;color:var(--accent-gold);">🚖 Taxi</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Número de estados</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-cyan);text-align:center;font-weight:700;">16</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-gold);text-align:center;font-weight:700;">500</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Número de acciones</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-cyan);text-align:center;">4</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-gold);text-align:center;">6</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Tamaño Q-table</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-cyan);text-align:center;">64 celdas</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-gold);text-align:center;">3,000 celdas</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Episodios de entrenamiento</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-cyan);text-align:center;">10,000</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-gold);text-align:center;">25,000</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Criterio de certificación HF</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-cyan);text-align:center;">Tasa de éxito ≥ 1.0</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-gold);text-align:center;">Recompensa media ≥ 4.5</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);background:rgba(255,255,255,0.02);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Código del algoritmo</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#22c55e;text-align:center;">Idéntico ✅</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#22c55e;text-align:center;">Idéntico ✅</div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">🔮 La limitación que viene</span>
+    <p>FrozenLake tiene 16 estados, Taxi tiene 500. ¿Y si tuviéramos 10,000,000,000 de estados, como en un juego de Atari? Una Q-table tendría que tener miles de millones de filas — <strong>imposible.</strong> Por eso en el Módulo 3 introducimos las redes neuronales: Deep Q-Learning.</p>
+  </div>
+</section>
+
+<!-- ── Depuración: errores comunes ── -->
+<section>
+  <span class="slide-tag">2.5 & 2.6 · Errores frecuentes</span>
+  <h2>Errores comunes y cómo resolverlos 🔧</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Si tu agente no aprende bien, revisa estos problemas típicos:</p>
+
+  <div style="display:flex;flex-direction:column;gap:8px;">
+    <div class="step-badge">
+      <span class="sb-icon">❌</span>
+      <div>
+        <strong style="color:#ef4444;">El agente siempre obtiene 0 de recompensa</strong><br>
+        <span style="color:var(--text-muted);">Causas: ε demasiado alto (siempre explora al azar), alpha demasiado bajo (aprende muy lento), pocos episodios. Solución: revisa que decay_rate no sea 0 y aumenta n_episodios.</span>
+      </div>
+    </div>
+    <div class="step-badge">
+      <span class="sb-icon">❌</span>
+      <div>
+        <strong style="color:#ef4444;">Error "gymnasium not found"</strong><br>
+        <span style="color:var(--text-muted);">El curso usa <code>gymnasium</code> (con "y"), no <code>gym</code> (la versión antigua). Instala con: <code>pip install gymnasium</code>.</span>
+      </div>
+    </div>
+    <div class="step-badge">
+      <span class="sb-icon">❌</span>
+      <div>
+        <strong style="color:#ef4444;">La Q-table no cambia después del entrenamiento</strong><br>
+        <span style="color:var(--text-muted);">Asegúrate de que estás pasando la <code>Qtable</code> a la función <code>entrenar()</code> y guardando el resultado: <code>Qtable = entrenar(...)</code>.</span>
+      </div>
+    </div>
+    <div class="step-badge">
+      <span class="sb-icon">❌</span>
+      <div>
+        <strong style="color:#ef4444;">El agente de Taxi siempre choca con paredes</strong><br>
+        <span style="color:var(--text-muted);">Normal al principio — con ε = 1.0 explora aleatoriamente. Después de ~5,000 episodios debe aprender a evitarlas con la penalización de −1 por paso.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Quiz ── -->
+<section>
+  <span class="slide-tag">Quiz</span>
+  <h2>🧠 Mini Quiz — Capítulos 2.5 y 2.6</h2>
+  <p style="font-size:0.58em;color:var(--text-muted);margin-bottom:14px;">Pon a prueba lo que programaste:</p>
+
+  <div class="step-row">
+    <div class="step-num">Q1</div>
+    <div class="step-text">¿Por qué usamos <code>np.argmax(Qtable[estado])</code> para elegir la acción en la política óptima? ¿Qué devuelve exactamente esa línea?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q2</div>
+    <div class="step-text">¿Qué pasaría si usaras <code>alpha = 0.001</code> (muy pequeño) en FrozenLake con 10,000 episodios? ¿Funcionaría igual de bien?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q3</div>
+    <div class="step-text">Taxi tiene 500 estados. Si quisieras escalar Q-Learning a un juego de Atari con 10<sup>9</sup> estados posibles, ¿cuánta memoria necesitaría la Q-table? ¿Por qué esto es un problema?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q4</div>
+    <div class="step-text">En Taxi, ¿por qué hay una penalización de −10 por recoger/dejar al pasajero en el lugar equivocado, en lugar de simplemente dar 0? ¿Qué comportamiento se genera?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q5</div>
+    <div class="step-text">Describe con tus palabras qué hace la línea:<br>
+    <code style="font-size:0.9em;color:var(--accent-cyan);">epsilon = min_eps + (max_eps - min_eps) * np.exp(-decay * episodio)</code></div>
+  </div>
+</section>
+
+<!-- ── Slide final ── -->
+<section>
+  <div class="title-slide" style="align-items:center;text-align:center;position:relative;overflow:hidden;">
+    <div class="snowflake" style="left:10%;animation-duration:3s;">❄️</div>
+    <div class="snowflake" style="left:80%;animation-duration:4s;animation-delay:1s;">❄️</div>
+
+    <div style="font-size:2.8em;margin-bottom:8px;">❄️ 🧝 🏆 🚖</div>
+    <div class="chapter-badge" style="font-size:0.36em;">Capítulos 2.5 y 2.6 completados · Módulo 2 finalizado</div>
+    <h1 style="text-align:center;font-size:1.6em;">
+      ¡Implementaste Q-Learning<br>desde cero! 💪<br>
+      <span class="gradient-text-cyan" style="font-size:0.8em;">El Módulo 2 está completo.</span>
+    </h1>
+    <div class="divider" style="margin:14px auto;"></div>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:4px;font-size:0.56em;color:var(--text-muted);">
+      <span>✅ Q-table conceptual</span><span style="color:var(--border);">·</span>
+      <span>✅ Ecuación de Bellman</span><span style="color:var(--border);">·</span>
+      <span>✅ MC vs TD</span><span style="color:var(--border);">·</span>
+      <span>✅ Algoritmo Q-Learning</span><span style="color:var(--border);">·</span>
+      <span>✅ FrozenLake desde cero</span><span style="color:var(--border);">·</span>
+      <span>✅ Taxi-v3</span>
+    </div>
+    <div style="margin-top:18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <span class="pill">Próximo: Módulo 3 — Deep Q-Learning (DQN) 🧠🎮</span>
+    </div>
+    <p style="font-size:0.5em;color:var(--text-muted);margin-top:14px;max-width:560px;">En el Módulo 3 la Q-table desaparece y aparece una red neuronal en su lugar. Aprenderás por qué y cómo las CNNs hacen posible jugar a Atari. ¡La parte más visual del curso!</p>
+  </div>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+<script src="../assets/js/reveal-config.js"></script>
+</body>
+</html>

@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capítulos 6.1 – 6.3 — El Problema de Varianza · Actor-Critic · A2C con Panda</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/black.min.css">
+<link rel="stylesheet" href="../assets/css/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"></script>
+
+<style>
+/* ── Animaciones locales ── */
+@keyframes noisy-climb {
+  0%   { transform: translateY(0) translateX(0); }
+  15%  { transform: translateY(-8px) translateX(4px); }
+  30%  { transform: translateY(-4px) translateX(-6px); }
+  45%  { transform: translateY(-18px) translateX(2px); }
+  60%  { transform: translateY(-10px) translateX(-4px); }
+  75%  { transform: translateY(-25px) translateX(3px); }
+  90%  { transform: translateY(-20px) translateX(-2px); }
+  100% { transform: translateY(-30px) translateX(0); }
+}
+@keyframes smooth-climb {
+  0%   { transform: translateY(0); }
+  100% { transform: translateY(-30px); }
+}
+@keyframes actor-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
+  50%      { box-shadow: 0 0 20px 4px rgba(59,130,246,0.45); }
+}
+@keyframes critic-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(251,191,36,0); }
+  50%      { box-shadow: 0 0 20px 4px rgba(251,191,36,0.45); }
+}
+@keyframes signal-flow {
+  0%   { opacity:0; transform: translateX(-8px); }
+  50%  { opacity:1; transform: translateX(0); }
+  100% { opacity:0; transform: translateX(8px); }
+}
+@keyframes advantage-pop {
+  0%   { transform: scale(0.8); opacity:0; }
+  60%  { transform: scale(1.08); }
+  100% { transform: scale(1); opacity:1; }
+}
+@keyframes robot-arm {
+  0%,100% { transform: rotate(0deg); transform-origin: bottom center; }
+  40%      { transform: rotate(-20deg); transform-origin: bottom center; }
+  70%      { transform: rotate(15deg); transform-origin: bottom center; }
+}
+@keyframes target-blink {
+  0%,100% { opacity:1; }
+  50%      { opacity:0.4; }
+}
+@keyframes variance-oscillate {
+  0%   { transform: translateY(0); }
+  20%  { transform: translateY(-24px); }
+  40%  { transform: translateY(18px); }
+  60%  { transform: translateY(-16px); }
+  80%  { transform: translateY(12px); }
+  100% { transform: translateY(0); }
+}
+
+/* ── Landscape for gradient ascent comparison ── */
+.hill-wrap {
+  position: relative;
+  height: 100px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #06090f;
+  border: 1px solid var(--border);
+}
+.hill-svg { position: absolute; bottom: 0; left: 0; width: 100%; }
+.climber {
+  position: absolute;
+  font-size: 1em;
+  bottom: 38px;
+}
+.climber.noisy  { left: 18%; animation: noisy-climb 3s ease-in-out infinite; }
+.climber.smooth { left: 60%; animation: smooth-climb 3s ease-in-out infinite; }
+.hill-peak { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); font-size: 0.8em; }
+
+/* ── Variance visualizer ── */
+.var-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
+}
+.vb-label {
+  font-family: var(--font-mono);
+  font-size: 0.5em;
+  color: var(--text-muted);
+  min-width: 110px;
+}
+.vb-track { flex:1; height: 16px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow:hidden; position:relative; }
+.vb-fill  { height:100%; border-radius:4px; }
+.vb-arrow { font-size: 0.8em; min-width: 20px; text-align:center; }
+
+/* ── Actor-Critic boxes ── */
+.actor-box {
+  background: rgba(59,130,246,0.08);
+  border: 2px solid rgba(59,130,246,0.5);
+  border-radius: 12px;
+  padding: 14px 18px;
+  text-align: center;
+  animation: actor-pulse 2.5s ease-in-out infinite;
+}
+.critic-box {
+  background: rgba(251,191,36,0.08);
+  border: 2px solid rgba(251,191,36,0.45);
+  border-radius: 12px;
+  padding: 14px 18px;
+  text-align: center;
+  animation: critic-pulse 2.8s ease-in-out infinite;
+}
+.ac-title {
+  font-family: var(--font-mono);
+  font-size: 0.62em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+.ac-icon { font-size: 1.8em; margin-bottom: 4px; }
+.ac-body { font-size: 0.56em; color: var(--text-muted); line-height: 1.55; }
+
+/* ── Signal arrow between boxes ── */
+.signal-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.44em;
+  color: var(--accent-cyan);
+}
+.sa-line {
+  width: 2px;
+  height: 22px;
+  background: linear-gradient(180deg, var(--accent-cyan), var(--accent-violet));
+  border-radius: 1px;
+  animation: signal-flow 1.5s ease-in-out infinite;
+}
+.sa-label { color: var(--text-muted); }
+
+/* ── A2C loop steps ── */
+.ac-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin: 5px 0;
+  font-size: 0.56em;
+}
+.ac-step-num {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex; align-items:center; justify-content:center;
+  font-weight: 700;
+  font-size: 0.85em;
+  flex-shrink: 0;
+  color: white;
+}
+
+/* ── Advantage diagram ── */
+.adv-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 5px 0;
+}
+.adv-label {
+  font-family: var(--font-mono);
+  font-size: 0.5em;
+  min-width: 100px;
+  text-align: right;
+  color: var(--text-muted);
+}
+.adv-track {
+  flex:1; height: 18px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+.adv-center { position:absolute; left:50%; top:0; bottom:0; width:1px; background:rgba(255,255,255,0.2); }
+.adv-pos {
+  position: absolute;
+  left: 50%; top:0; bottom:0;
+  background: rgba(34,197,94,0.5);
+  border-right: none;
+}
+.adv-neg {
+  position: absolute;
+  right: 50%; top:0; bottom:0;
+  background: rgba(239,68,68,0.5);
+  border-left: none;
+}
+.adv-val {
+  font-family: var(--font-mono);
+  font-size: 0.5em;
+  min-width: 50px;
+  text-align: left;
+  font-weight: 700;
+}
+
+/* ── Panda arm scene ── */
+.panda-scene {
+  background: linear-gradient(180deg, #04060e 0%, #080d1a 60%, #0a1008 100%);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 14px;
+  position: relative;
+  overflow: hidden;
+  min-height: 130px;
+}
+.robot-base {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30px; height: 10px;
+  background: rgba(59,130,246,0.4);
+  border: 1px solid rgba(59,130,246,0.6);
+  border-radius: 3px;
+}
+.robot-arm1 {
+  position: absolute;
+  bottom: 26px;
+  left: 50%;
+  width: 4px; height: 45px;
+  background: linear-gradient(0deg, var(--accent-blue), rgba(59,130,246,0.5));
+  transform-origin: bottom center;
+  transform: translateX(-50%) rotate(-15deg);
+  border-radius: 2px;
+  animation: robot-arm 3s ease-in-out infinite;
+}
+.robot-arm2 {
+  position: absolute;
+  bottom: 68px;
+  left: calc(50% + 5px);
+  width: 3px; height: 35px;
+  background: linear-gradient(0deg, rgba(34,211,238,0.6), rgba(34,211,238,0.3));
+  transform-origin: bottom center;
+  transform: rotate(20deg);
+  border-radius: 2px;
+}
+.robot-target {
+  position: absolute;
+  top: 18px;
+  right: 22%;
+  font-size: 1.2em;
+  animation: target-blink 1.2s ease-in-out infinite;
+}
+.robot-gripper {
+  position: absolute;
+  top: 22px;
+  left: 46%;
+  font-size: 0.9em;
+  color: var(--accent-cyan);
+}
+
+/* ── Reward environment mini-cards ── */
+.env-mini {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.54em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 5px 0;
+}
+.env-mini-icon { font-size: 1.5em; flex-shrink:0; }
+
+/* ── Equation highlight ── */
+.eq-highlight {
+  background: #06091a;
+  border-radius: 12px;
+  padding: 12px 18px;
+  position: relative;
+  overflow: hidden;
+  margin: 10px 0;
+}
+.eq-highlight::before {
+  content: "";
+  position: absolute;
+  top:0; left:0; right:0; height:2px;
+  background: linear-gradient(90deg, var(--accent-blue), var(--accent-violet));
+}
+
+/* ── Terminal ── */
+.terminal {
+  background: #020812;
+  border: 1px solid rgba(34,211,238,0.3);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.48em;
+  color: #a8c8e8;
+  line-height: 1.85;
+  position: relative;
+}
+.terminal::before {
+  content: "● ● ●";
+  position: absolute;
+  top: 7px; left: 10px;
+  font-size: 0.75em;
+  color: var(--text-muted);
+  letter-spacing: 4px;
+}
+.tb { margin-top: 14px; }
+.t-c { color: #4a5568; }
+.t-k { color: #c678dd; }
+.t-s { color: #98c379; }
+.t-n { color: #d19a66; }
+.t-f { color: #61afef; }
+.t-v { color: #e5c07b; }
+</style>
+</head>
+
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ══ PORTADA ══════════════════════════════ -->
+<section>
+  <div class="title-slide" style="position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-60px;right:-60px;width:380px;height:380px;border-radius:50%;background:radial-gradient(circle,rgba(59,130,246,0.12) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-50px;left:-50px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(251,191,36,0.08) 0%,transparent 70%);pointer-events:none;"></div>
+    <div class="chapter-badge">Capítulos 6.1 – 6.3 · Módulo 6</div>
+    <h1>Actor-Critic:<br>
+      <span class="gradient-text">Lo Mejor de</span><br>
+      Ambos Mundos 🎭</h1>
+    <div class="divider"></div>
+    <p style="font-size:0.62em;color:var(--text-muted);max-width:640px;margin-top:8px;line-height:1.7;">
+      Por qué REINFORCE tiene varianza alta ·<br>
+      El Crítico que evalúa al Actor · La función de Ventaja ·<br>
+      A2C: Advantage Actor-Critic · Brazo robótico Panda 🦾
+    </p>
+    <div style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;">
+      <span class="pill">Unit 6 — HuggingFace 🤗</span>
+      <span class="pill">Jose Miguel Lara Rangel</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SECCIÓN 6.1 ═══════════════════════ -->
+<section>
+  <div class="section-slide" style="background:linear-gradient(160deg,#04060f,#0a0614);">
+    <span class="big-emoji">📉</span>
+    <div class="chapter-badge" style="font-size:0.38em;margin-top:8px;">Capítulo 6.1</div>
+    <h1>El Problema<br>de la Varianza<br>en REINFORCE</h1>
+    <p style="font-size:0.6em;color:var(--text-muted);max-width:520px;text-align:center;margin-top:10px;">
+      REINFORCE funciona — pero aprende lento y de forma ruidosa. ¿Por qué?
+    </p>
+  </div>
+</section>
+
+<!-- ── Recapitulación ── -->
+<section>
+  <span class="slide-tag">6.1 · Recapitulación</span>
+  <h2>Lo que logramos con REINFORCE 🎯</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">En el Módulo 4 implementamos REINFORCE y lo entrenamos en CartPole y PixelCopter. Funcionó — pero notamos que el entrenamiento era lento y la curva de aprendizaje muy ruidosa:</p>
+
+  <div class="cols2" style="margin-bottom:14px;">
+    <div class="card card-cyan" style="padding:16px;">
+      <h3 style="font-size:0.82em;">✅ Lo que REINFORCE hace bien</h3>
+      <p>Aprende directamente la política π<sub>θ</sub>. Funciona con acciones continuas y discretas. La exploración es intrínseca — no necesita ε-greedy.</p>
+    </div>
+    <div class="card card-pink" style="padding:16px;">
+      <h3 style="font-size:0.82em;">⚠️ El problema que notamos</h3>
+      <p>La curva de aprendizaje sube y baja agresivamente. CartPole tardó ~500 episodios en converger y luego podía perder todo lo aprendido. PixelCopter tardó 50,000 episodios. ¿Por qué tan lento?</p>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">🔍 La respuesta: alta varianza</span>
+    <p>REINFORCE usa Monte Carlo para estimar el retorno — espera al final del episodio y usa el retorno real G. Eso es <strong>sin sesgo</strong> (no asume nada) pero tiene <strong>alta varianza</strong> — el mismo estado puede dar retornos muy diferentes en distintas partidas.</p>
+  </div>
+</section>
+
+<!-- ── El problema de varianza en detalle ── -->
+<section>
+  <span class="slide-tag">6.1 · Alta Varianza</span>
+  <h2>¿Qué significa "alta varianza" en la práctica? 🌊</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Imagina que el agente está en el estado S₀ y toma la acción "ir a la derecha" en 3 episodios distintos. Cada vez, el <em>resto del episodio</em> es diferente por la estocasticidad del entorno:</p>
+
+  <!-- Episode examples -->
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:14px 18px;margin-bottom:14px;">
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div style="display:flex;align-items:center;gap:10px;font-size:0.56em;">
+        <div style="width:80px;text-align:right;font-family:var(--font-mono);color:var(--text-muted);">Episodio 1:</div>
+        <div style="flex:1;display:flex;gap:4px;align-items:center;">
+          <div style="padding:3px 8px;background:rgba(34,211,238,0.15);border:1px solid rgba(34,211,238,0.3);border-radius:4px;">S₀→a</div>
+          <span style="color:var(--text-muted);">→</span>
+          <div style="padding:3px 8px;background:rgba(34,211,238,0.1);border-radius:4px;color:var(--text-muted);">…buenas acciones…</div>
+          <span style="color:var(--text-muted);">→</span>
+          <div style="padding:3px 8px;background:rgba(34,197,94,0.2);border:1px solid rgba(34,197,94,0.4);border-radius:4px;color:#22c55e;">G = +200 🏆</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:0.56em;">
+        <div style="width:80px;text-align:right;font-family:var(--font-mono);color:var(--text-muted);">Episodio 2:</div>
+        <div style="flex:1;display:flex;gap:4px;align-items:center;">
+          <div style="padding:3px 8px;background:rgba(34,211,238,0.15);border:1px solid rgba(34,211,238,0.3);border-radius:4px;">S₀→a</div>
+          <span style="color:var(--text-muted);">→</span>
+          <div style="padding:3px 8px;background:rgba(34,211,238,0.1);border-radius:4px;color:var(--text-muted);">…acciones mediocres…</div>
+          <span style="color:var(--text-muted);">→</span>
+          <div style="padding:3px 8px;background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.3);border-radius:4px;color:var(--accent-gold);">G = +50</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:0.56em;">
+        <div style="width:80px;text-align:right;font-family:var(--font-mono);color:var(--text-muted);">Episodio 3:</div>
+        <div style="flex:1;display:flex;gap:4px;align-items:center;">
+          <div style="padding:3px 8px;background:rgba(34,211,238,0.15);border:1px solid rgba(34,211,238,0.3);border-radius:4px;">S₀→a</div>
+          <span style="color:var(--text-muted);">→</span>
+          <div style="padding:3px 8px;background:rgba(34,211,238,0.1);border-radius:4px;color:var(--text-muted);">…mala suerte…</div>
+          <span style="color:var(--text-muted);">→</span>
+          <div style="padding:3px 8px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);border-radius:4px;color:#ef4444;">G = −30 💀</div>
+        </div>
+      </div>
+    </div>
+    <p style="font-size:0.48em;color:var(--text-muted);margin-top:10px;text-align:center;">La misma acción a en el mismo estado S₀ → retornos G completamente distintos según cómo fue el resto del episodio.</p>
+  </div>
+
+  <div class="cols2">
+    <div class="card card-pink" style="padding:13px;">
+      <h3 style="font-size:0.78em;">El efecto en el gradiente</h3>
+      <p>REINFORCE ajusta la probabilidad de la acción a proporcionalmente a G. Con G = +200, sube mucho. Con G = −30, baja mucho. El gradiente oscila violentamente entre episodios.</p>
+    </div>
+    <div class="card card-gold" style="padding:13px;">
+      <h3 style="font-size:0.78em;">La solución clásica — y su límite</h3>
+      <p>Usar <em>más episodios</em> promedia la varianza. Pero necesitamos cientos o miles de episodios para cada actualización — muy ineficiente en muestra.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Comparativa visual ── -->
+<section>
+  <span class="slide-tag">6.1 · Varianza vs Sesgo</span>
+  <h2>El tradeoff varianza-sesgo en RL ⚖️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Los dos enfoques que conocemos están en extremos opuestos de este tradeoff:</p>
+
+  <!-- Two hills comparison -->
+  <div class="cols2" style="margin-bottom:14px;">
+    <div>
+      <div style="font-family:var(--font-mono);font-size:0.5em;color:var(--accent-blue);margin-bottom:6px;text-align:center;">REINFORCE — Monte Carlo</div>
+      <div class="hill-wrap">
+        <svg class="hill-svg" viewBox="0 0 300 60" preserveAspectRatio="none">
+          <path d="M0,60 Q150,0 300,60" fill="rgba(59,130,246,0.12)" stroke="rgba(59,130,246,0.4)" stroke-width="1.5"/>
+        </svg>
+        <div class="hill-peak">🏆</div>
+        <div class="climber noisy" style="font-size:0.9em;">🤖</div>
+      </div>
+      <p style="font-size:0.46em;color:var(--text-muted);text-align:center;margin-top:6px;">Camino ruidoso — alta varianza, sin sesgo</p>
+      <div class="var-bar" style="margin-top:8px;">
+        <span class="vb-label">Varianza</span>
+        <div class="vb-track"><div class="vb-fill" style="width:85%;background:rgba(239,68,68,0.5);"></div></div>
+        <span class="vb-arrow" style="color:#ef4444;">📈</span>
+      </div>
+      <div class="var-bar">
+        <span class="vb-label">Sesgo</span>
+        <div class="vb-track"><div class="vb-fill" style="width:5%;background:rgba(34,197,94,0.5);"></div></div>
+        <span class="vb-arrow" style="color:#22c55e;">✅</span>
+      </div>
+    </div>
+    <div>
+      <div style="font-family:var(--font-mono);font-size:0.5em;color:var(--accent-violet);margin-bottom:6px;text-align:center;">TD Learning — Q-Learning</div>
+      <div class="hill-wrap">
+        <svg class="hill-svg" viewBox="0 0 300 60" preserveAspectRatio="none">
+          <path d="M0,60 Q150,0 300,60" fill="rgba(168,85,247,0.1)" stroke="rgba(168,85,247,0.35)" stroke-width="1.5"/>
+        </svg>
+        <div class="hill-peak">🏆</div>
+        <div class="climber smooth" style="font-size:0.9em;animation:smooth-climb 3s ease-in-out infinite;">🤖</div>
+      </div>
+      <p style="font-size:0.46em;color:var(--text-muted);text-align:center;margin-top:6px;">Camino suave — baja varianza, con sesgo</p>
+      <div class="var-bar" style="margin-top:8px;">
+        <span class="vb-label">Varianza</span>
+        <div class="vb-track"><div class="vb-fill" style="width:12%;background:rgba(34,197,94,0.5);"></div></div>
+        <span class="vb-arrow" style="color:#22c55e;">✅</span>
+      </div>
+      <div class="var-bar">
+        <span class="vb-label">Sesgo</span>
+        <div class="vb-track"><div class="vb-fill" style="width:70%;background:rgba(239,68,68,0.5);"></div></div>
+        <span class="vb-arrow" style="color:#ef4444;">📈</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">💡 La pregunta del módulo</span>
+    <p>¿Podemos tener <strong>baja varianza</strong> (como TD) sin introducir mucho <strong>sesgo</strong> (como MC)? Los métodos Actor-Critic responden: sí, combinando lo mejor de ambos. El Crítico reduce la varianza; el Actor mantiene el gradiente de política.</p>
+  </div>
+</section>
+
+<!-- ── La solución ── -->
+<section>
+  <span class="slide-tag">6.1 → 6.2</span>
+  <h2>La solución: añadir un Crítico que evalúe cada acción 🎭</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">El problema de REINFORCE es que usa el retorno G del <em>episodio completo</em> como señal. Eso incluye mucho ruido de lo que pasó después de la acción. La solución es reemplazar G por una <strong>estimación más informada</strong>.</p>
+
+  <div class="cols2" style="margin-bottom:14px;">
+    <div class="card card-pink" style="padding:14px;">
+      <h3 style="font-size:0.82em;">REINFORCE — usa G del episodio completo</h3>
+      <div class="math-block" style="padding:8px;border:none;background:none;font-size:0.9em;">
+        \[ \nabla J(\theta) \propto \log \pi_\theta(a|s) \cdot \underbrace{G}_{\text{retorno real}} \]
+      </div>
+      <p style="font-size:0.58em;color:var(--text-muted);">G depende de todo lo que pasó hasta el final. Alta varianza.</p>
+    </div>
+    <div class="card card-cyan" style="padding:14px;">
+      <h3 style="font-size:0.82em;">Actor-Critic — usa Q(s,a) estimado por la red Crítica</h3>
+      <div class="math-block" style="padding:8px;border:none;background:none;font-size:0.9em;">
+        \[ \nabla J(\theta) \propto \log \pi_\theta(a|s) \cdot \underbrace{\hat{q}_w(s,a)}_{\text{crítico neural}} \]
+      </div>
+      <p style="font-size:0.58em;color:var(--text-muted);">Q(s,a) es aprendido por una red neuronal. Baja varianza.</p>
+    </div>
+  </div>
+
+  <div class="card card-violet" style="padding:12px 14px;">
+    <p>🎓 <strong>Actor-Critic es una arquitectura híbrida:</strong> combina un método de política (Actor) con un método de valor (Crítico). El Actor aprende a actuar. El Crítico le dice qué tan buenas son sus acciones para guiar el aprendizaje.</p>
+  </div>
+</section>
+
+<!-- ══ SECCIÓN 6.2 ═══════════════════════ -->
+<section>
+  <div class="section-slide" style="background:linear-gradient(160deg,#04060f,#0a0614);">
+    <span class="big-emoji">🎭</span>
+    <div class="chapter-badge" style="font-size:0.38em;border-color:var(--accent-gold);color:var(--accent-gold);background:rgba(251,191,36,0.07);margin-top:8px;">Capítulo 6.2</div>
+    <h1>Actor-Critic (A2C):<br>La Arquitectura<br>Híbrida</h1>
+    <p style="font-size:0.6em;color:var(--text-muted);max-width:520px;text-align:center;margin-top:10px;">
+      Dos redes que se entrenan juntas. El Actor actúa. El Crítico evalúa.
+    </p>
+  </div>
+</section>
+
+<!-- ── La analogía ── -->
+<section>
+  <span class="slide-tag">6.2 · La Analogía</span>
+  <h2>La analogía del videojuego con un amigo 🎮</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:14px;">La forma más intuitiva de entender Actor-Critic es con una analogía que usa el curso original de HuggingFace:</p>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:18px 22px;margin-bottom:14px;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent-blue),var(--accent-gold));"></div>
+    <div class="cols2" style="gap:20px;">
+      <div style="text-align:center;">
+        <div style="font-size:3em;margin-bottom:8px;">🧑‍💻</div>
+        <div style="font-family:var(--font-mono);font-size:0.62em;color:var(--accent-blue);font-weight:700;margin-bottom:6px;">TÚ = El Actor</div>
+        <div style="font-size:0.56em;color:var(--text-muted);line-height:1.6;">No sabes jugar al principio. Pruebas acciones al azar. Eres el que actúa — la política π<sub>θ</sub>.</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:3em;margin-bottom:8px;">🧑‍🏫</div>
+        <div style="font-family:var(--font-mono);font-size:0.62em;color:var(--accent-gold);font-weight:700;margin-bottom:6px;">TU AMIGO = El Crítico</div>
+        <div style="font-size:0.56em;color:var(--text-muted);line-height:1.6;">Observa tus acciones y te da retroalimentación: "eso estuvo bien" o "eso estuvo mal". Es la función de valor Q̂<sub>w</sub>(s,a).</div>
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--border);margin-top:14px;padding-top:12px;">
+      <div style="font-size:0.58em;color:var(--text-muted);text-align:center;line-height:1.7;">
+        <strong style="color:var(--text-primary);">El ciclo:</strong> tú juegas → tu amigo evalúa tu jugada → tú ajustas tu estrategia → tu amigo también mejora su evaluación → vuelves a jugar
+      </div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">🔑 Lo que cambia respecto a REINFORCE</span>
+    <p>En REINFORCE no hay amigo — esperas al final del juego (episodio completo) para saber si lo hiciste bien. Con Actor-Critic, el amigo (Crítico) te dice <strong>en cada paso</strong> qué tan buena fue tu jugada. Sin esperar al final. Mucho menos varianza.</p>
+  </div>
+</section>
+
+<!-- ── Las dos redes ── -->
+<section>
+  <span class="slide-tag">6.2 · Las Dos Redes</span>
+  <h2>Las dos funciones que aprende A2C 🧠🧠</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Actor-Critic aprende simultáneamente <strong>dos funciones con parámetros distintos</strong>:</p>
+
+  <div style="display:flex;gap:16px;align-items:stretch;margin-bottom:14px;">
+    <div class="actor-box" style="flex:1;">
+      <div class="ac-icon">🧑‍💻</div>
+      <div class="ac-title" style="color:var(--accent-blue);">Actor — π<sub>θ</sub>(a|s)</div>
+      <div class="ac-body">
+        <strong style="color:var(--text-primary);">Función de política.</strong><br>
+        Toma el estado s y devuelve la probabilidad de cada acción.<br><br>
+        Se actualiza para maximizar las acciones que el Crítico evalúa bien.<br><br>
+        <span style="font-family:var(--font-mono);font-size:0.9em;color:var(--accent-blue);">Parámetros: θ</span>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
+      <div class="signal-arrow">
+        <div class="sa-line"></div>
+        <span class="sa-label">estado s</span>
+        <div class="sa-line"></div>
+      </div>
+      <div style="font-size:0.5em;color:var(--text-muted);text-align:center;max-width:60px;">comparten la entrada</div>
+      <div class="signal-arrow">
+        <div class="sa-line"></div>
+        <span class="sa-label">Q(s,a)</span>
+        <div class="sa-line"></div>
+      </div>
+    </div>
+
+    <div class="critic-box" style="flex:1;">
+      <div class="ac-icon">🧑‍🏫</div>
+      <div class="ac-title" style="color:var(--accent-gold);">Crítico — Q̂<sub>w</sub>(s,a)</div>
+      <div class="ac-body">
+        <strong style="color:var(--text-primary);">Función de valor de acción.</strong><br>
+        Toma el estado s y la acción a y devuelve qué tan buena es esa acción.<br><br>
+        Se actualiza con el error TD para ser más preciso.<br><br>
+        <span style="font-family:var(--font-mono);font-size:0.9em;color:var(--accent-gold);">Parámetros: w</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-gold" style="padding:12px 14px;">
+    <p>📐 <strong>Implementación práctica:</strong> Aunque son conceptualmente dos redes, en la práctica a menudo comparten las primeras capas (el "tronco" que extrae características del estado) y tienen cabezas separadas para la política y el valor. Esto es más eficiente computacionalmente.</p>
+  </div>
+</section>
+
+<!-- ── El proceso A2C paso a paso ── -->
+<section>
+  <span class="slide-tag">6.2 · El Proceso</span>
+  <h2>Cómo se entrenan Actor y Crítico juntos 🔄</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">A diferencia de REINFORCE (que espera al final del episodio), Actor-Critic actualiza <strong>en cada paso</strong>:</p>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent-blue),var(--accent-gold));"></div>
+
+    <div class="ac-step">
+      <div class="ac-step-num" style="background:linear-gradient(135deg,var(--accent-blue),rgba(59,130,246,0.5));">1</div>
+      <div>El entorno devuelve el estado S<sub>t</sub>. <strong style="color:var(--accent-blue);">El Actor</strong> recibe S<sub>t</sub> y produce la distribución de acciones. Se muestrea la acción A<sub>t</sub>.</div>
+    </div>
+    <div class="ac-step">
+      <div class="ac-step-num" style="background:linear-gradient(135deg,var(--accent-gold),rgba(251,191,36,0.5));">2</div>
+      <div><strong style="color:var(--accent-gold);">El Crítico</strong> recibe S<sub>t</sub> y A<sub>t</sub> y calcula el valor Q̂<sub>w</sub>(S<sub>t</sub>, A<sub>t</sub>) — qué tan buena es esta acción en este estado.</div>
+    </div>
+    <div class="ac-step">
+      <div class="ac-step-num" style="background:linear-gradient(135deg,var(--accent-cyan),rgba(34,211,238,0.5));">3</div>
+      <div>El entorno ejecuta A<sub>t</sub> y devuelve la recompensa R<sub>t+1</sub> y el nuevo estado S<sub>t+1</sub>.</div>
+    </div>
+    <div class="ac-step">
+      <div class="ac-step-num" style="background:linear-gradient(135deg,var(--accent-blue),rgba(59,130,246,0.5));">4</div>
+      <div><strong style="color:var(--accent-blue);">El Actor</strong> actualiza θ usando el Q-value del Crítico: sube la probabilidad de A<sub>t</sub> si Q̂ es alto, la baja si es bajo.</div>
+    </div>
+    <div class="ac-step">
+      <div class="ac-step-num" style="background:linear-gradient(135deg,var(--accent-gold),rgba(251,191,36,0.5));">5</div>
+      <div><strong style="color:var(--accent-gold);">El Crítico</strong> actualiza w con el error TD: Q̂(S<sub>t</sub>,A<sub>t</sub>) ← R<sub>t+1</sub> + γ·Q̂(S<sub>t+1</sub>, A<sub>t+1</sub>).</div>
+    </div>
+    <div class="ac-step">
+      <div class="ac-step-num" style="background:linear-gradient(135deg,#22c55e,rgba(34,197,94,0.5));">∞</div>
+      <div>S<sub>t+1</sub> se convierte en el nuevo S<sub>t</sub>. Volver al paso 1.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── La función de ventaja ── -->
+<section>
+  <span class="slide-tag">6.2 · Función de Ventaja</span>
+  <h2>Advantage Actor-Critic: el paso extra que estabiliza todo 🚀</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Actor-Critic básico usa Q̂(s,a) para guiar el Actor. A2C va un paso más allá — usa la <strong>función de ventaja A(s,a)</strong>:</p>
+
+  <div class="eq-highlight" style="margin-bottom:14px;">
+    <div class="math-block" style="border:none;background:none;padding:8px;font-size:0.95em;">
+      \[ A(s,a) = Q(s,a) - V(s) \]
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:8px;">
+      <div style="background:rgba(34,211,238,0.1);border:1px solid rgba(34,211,238,0.3);border-radius:6px;padding:5px 12px;font-family:var(--font-mono);font-size:0.5em;color:var(--accent-cyan);text-align:center;">A(s,a)<br><span style="font-weight:400;color:var(--text-muted);">ventaja de la acción</span></div>
+      <div style="font-family:var(--font-mono);font-size:0.5em;color:var(--text-muted);align-self:center;">=</div>
+      <div style="background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);border-radius:6px;padding:5px 12px;font-family:var(--font-mono);font-size:0.5em;color:var(--accent-blue);text-align:center;">Q(s,a)<br><span style="font-weight:400;color:var(--text-muted);">valor de esta acción</span></div>
+      <div style="font-family:var(--font-mono);font-size:0.5em;color:var(--text-muted);align-self:center;">−</div>
+      <div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);border-radius:6px;padding:5px 12px;font-family:var(--font-mono);font-size:0.5em;color:var(--accent-gold);text-align:center;">V(s)<br><span style="font-weight:400;color:var(--text-muted);">valor promedio del estado</span></div>
+    </div>
+  </div>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:12px;">
+    <p style="font-size:0.5em;color:var(--text-muted);margin-bottom:10px;"><strong style="color:var(--text-primary);">¿Qué nos dice A(s,a)?</strong> Cuánto mejor es esta acción específica respecto al promedio de lo que haríamos en este estado.</p>
+    <div class="adv-bar-wrap">
+      <span class="adv-label">A(s,disparar) = +3.5</span>
+      <div class="adv-track">
+        <div class="adv-center"></div>
+        <div class="adv-pos" style="width:35%;"></div>
+      </div>
+      <span class="adv-val" style="color:#22c55e;">+3.5 ↑ subir π</span>
+    </div>
+    <div class="adv-bar-wrap">
+      <span class="adv-label">A(s,moverse) = +0.8</span>
+      <div class="adv-track">
+        <div class="adv-center"></div>
+        <div class="adv-pos" style="width:8%;"></div>
+      </div>
+      <span class="adv-val" style="color:#22c55e;">+0.8 ↑ poco</span>
+    </div>
+    <div class="adv-bar-wrap">
+      <span class="adv-label">A(s,esperar) = −2.1</span>
+      <div class="adv-track">
+        <div class="adv-center"></div>
+        <div class="adv-neg" style="width:21%;"></div>
+      </div>
+      <span class="adv-val" style="color:#ef4444;">−2.1 ↓ bajar π</span>
+    </div>
+    <p style="font-size:0.46em;color:var(--text-muted);margin-top:8px;text-align:center;">V(s) actúa como línea base — las acciones se evalúan relativas al "promedio esperado", no en términos absolutos.</p>
+  </div>
+</section>
+
+<!-- ── TD error como ventaja ── -->
+<section>
+  <span class="slide-tag">6.2 · Error TD como Ventaja</span>
+  <h2>El truco práctico: el error TD estima la ventaja 🎯</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Para calcular A(s,a) necesitamos Q(s,a) y V(s) — dos funciones distintas. Pero hay un truco elegante: <strong>el error TD ya es una buena estimación de la ventaja</strong>.</p>
+
+  <div class="eq-highlight" style="margin-bottom:14px;">
+    <div class="math-block" style="border:none;background:none;padding:8px;font-size:0.92em;">
+      \[ \underbrace{R_{t+1} + \gamma V(S_{t+1}) - V(S_t)}_{\text{error TD}} \approx A(S_t, A_t) \]
+    </div>
+  </div>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:12px;">
+    <p style="font-size:0.5em;color:var(--text-muted);margin-bottom:10px;"><strong style="color:var(--text-primary);">¿Por qué funciona esto?</strong></p>
+    <div style="font-size:0.56em;line-height:1.8;color:var(--text-muted);">
+      <div style="margin-bottom:4px;">• R<sub>t+1</sub> + γV(S<sub>t+1</sub>) es el "objetivo TD" — lo que el Crítico piensa que debería valer</div>
+      <div style="margin-bottom:4px;">• V(S<sub>t</sub>) es la estimación actual — el promedio esperado de ese estado</div>
+      <div>• La diferencia entre ambos es exactamente <strong style="color:var(--accent-cyan);">"cuánto mejor fue la acción que lo esperado"</strong> — la ventaja</div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">🎯 El resultado práctico</span>
+    <p>Solo necesitamos <strong>una red neuronal Crítica que aprenda V(s)</strong> (no Q(s,a)). El error TD calcula automáticamente la estimación de la ventaja en cada paso. Esto simplifica mucho la implementación: el Crítico aprende V con TD, y el Actor usa ese error como guía.</p>
+  </div>
+</section>
+
+<!-- ── A2C vs REINFORCE comparativa ── -->
+<section>
+  <span class="slide-tag">6.2 · Comparativa</span>
+  <h2>REINFORCE vs. A2C — el resumen definitivo 📊</h2>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:14px;">
+    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;background:var(--bg-panel);">
+      <div style="padding:10px 14px;font-family:var(--font-mono);font-size:0.5em;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;">Aspecto</div>
+      <div style="padding:10px 14px;text-align:center;font-family:var(--font-mono);font-size:0.5em;color:var(--accent-violet);">REINFORCE</div>
+      <div style="padding:10px 14px;text-align:center;font-family:var(--font-mono);font-size:0.5em;color:var(--accent-gold);">A2C</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">¿Qué aprende?</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-violet);text-align:center;">Solo π<sub>θ</sub></div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-gold);text-align:center;">π<sub>θ</sub> + V<sub>w</sub>(s)</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">¿Cuándo actualiza?</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-violet);text-align:center;">Al final del episodio (MC)</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-gold);text-align:center;">En cada paso (TD)</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Señal para el Actor</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-violet);text-align:center;">G real (ruidoso)</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-gold);text-align:center;">A(s,a) — error TD</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Varianza</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#ef4444;text-align:center;">Alta ❌</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#22c55e;text-align:center;">Baja ✅</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Sesgo</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#22c55e;text-align:center;">Ninguno ✅</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-gold);text-align:center;">Algo (del TD) ≈</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Eficiencia de muestra</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#ef4444;text-align:center;">Baja ❌</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#22c55e;text-align:center;">Alta ✅</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);background:rgba(255,255,255,0.02);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">¿Funciona en tasks continuas?</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#ef4444;text-align:center;">No ❌</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#22c55e;text-align:center;">Sí ✅</div>
+    </div>
+  </div>
+
+  <div class="card card-gold" style="padding:12px 14px;">
+    <p>🔮 <strong>El camino hacia PPO:</strong> A2C es la base sobre la que se construye PPO (Módulo 8). PPO añade una restricción que evita que el Actor cambie demasiado en un solo paso — resolviendo otro problema de estabilidad. Si entiendes A2C, PPO es solo un paso más.</p>
+  </div>
+</section>
+
+<!-- ══ SECCIÓN 6.3 ═══════════════════════ -->
+<section>
+  <div class="section-slide" style="background:linear-gradient(160deg,#04060f,#060a14);">
+    <span class="big-emoji">🦾</span>
+    <div class="chapter-badge" style="font-size:0.38em;border-color:var(--accent-cyan);color:var(--accent-cyan);background:rgba(34,211,238,0.06);margin-top:8px;">Capítulo 6.3</div>
+    <h1>¡Manos a la obra!<br>A2C con el Brazo<br>Robótico Panda</h1>
+    <p style="font-size:0.6em;color:var(--text-muted);max-width:520px;text-align:center;margin-top:10px;">
+      Stable-Baselines3 · PandaReachDense-v3 · Acciones continuas en 3D
+    </p>
+  </div>
+</section>
+
+<!-- ── El entorno Panda ── -->
+<section>
+  <span class="slide-tag">6.3 · El Entorno</span>
+  <h2>PandaReachDense: el brazo robótico que aprende a alcanzar 🦾</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">El entorno del hands-on es un brazo robótico Panda que debe mover su punta hasta una posición objetivo marcada en 3D. Es un entorno de robótica simulada con acciones continuas.</p>
+
+  <div style="display:flex;gap:16px;align-items:flex-start;">
+    <!-- Scene visual -->
+    <div style="flex:1;">
+      <div class="panda-scene">
+        <div class="robot-base"></div>
+        <div class="robot-arm1"></div>
+        <div class="robot-arm2"></div>
+        <div class="robot-target">🎯</div>
+        <div class="robot-gripper">✊</div>
+        <div style="position:absolute;bottom:6px;left:0;right:0;font-family:var(--font-mono);font-size:0.4em;color:rgba(34,211,238,0.5);text-align:center;">SIMULACIÓN PANDA 3D</div>
+      </div>
+    </div>
+
+    <!-- Details -->
+    <div style="flex:1.4;display:flex;flex-direction:column;gap:8px;">
+      <div class="card card-cyan" style="padding:12px 14px;">
+        <h3 style="font-size:0.75em;">Espacio de observaciones (25 variables)</h3>
+        <div style="font-size:0.54em;color:var(--text-muted);margin-top:6px;line-height:1.7;">
+          <div>• Posición y velocidad de las articulaciones del brazo (q, dq)</div>
+          <div>• Posición y orientación del efector final (gripper)</div>
+          <div>• Posición del objetivo en el espacio 3D</div>
+          <div>• Distancia relativa entre gripper y objetivo</div>
+        </div>
+      </div>
+      <div class="card card-violet" style="padding:12px 14px;">
+        <h3 style="font-size:0.75em;">Espacio de acciones (3 continuas)</h3>
+        <div style="font-size:0.54em;color:var(--text-muted);margin-top:6px;">Velocidades en los ejes X, Y, Z del efector final. Cada valor en [−1, +1].</div>
+      </div>
+      <div class="card card-gold" style="padding:12px 14px;">
+        <h3 style="font-size:0.75em;">Sistema de recompensas</h3>
+        <div style="font-size:0.54em;color:var(--text-muted);margin-top:6px;">
+          <div>✅ <strong>Dense:</strong> −distancia al objetivo en cada paso</div>
+          <div style="margin-top:3px;color:var(--text-muted);font-size:0.9em;">"Dense" = recompensa continua en cada paso — ideal para aprender</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Recompensas densas vs escasas ── -->
+<section>
+  <span class="slide-tag">6.3 · Dense vs Sparse</span>
+  <h2>PandaReachDense vs PandaReach: ¿qué significa "dense"? 🔍</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">El entorno existe en dos versiones. Usamos la versión <em>dense</em> porque facilita el aprendizaje — recuerdas el mismo concepto de los Capítulos 5.1 y 5.3 con Pirámides:</p>
+
+  <div class="env-mini">
+    <div class="env-mini-icon">🏆</div>
+    <div>
+      <div style="font-family:var(--font-mono);color:var(--accent-gold);font-size:0.9em;font-weight:700;margin-bottom:3px;">PandaReachDense-v3</div>
+      <div>Recompensa en <em>cada paso</em> proporcional a la distancia al objetivo: R = −‖gripper − objetivo‖. El agente siempre sabe si se está acercando o alejando.</div>
+    </div>
+  </div>
+  <div class="env-mini" style="margin-top:8px;opacity:0.7;">
+    <div class="env-mini-icon">⚠️</div>
+    <div>
+      <div style="font-family:var(--font-mono);color:var(--text-muted);font-size:0.9em;font-weight:700;margin-bottom:3px;">PandaReach-v3 (sparse)</div>
+      <div>Solo recompensa al llegar al objetivo (+1) o nada. Sin RND, el brazo raramente llega por casualidad — el aprendizaje es muy lento o imposible.</div>
+    </div>
+  </div>
+
+  <div class="key-idea" style="margin-top:12px;">
+    <span class="ki-label">🔗 Conexión con lo visto</span>
+    <p>En Pirámides usamos RND para resolver el problema de recompensa escasa. Aquí elegimos directamente la versión densa para simplificar. Con A2C + recompensas densas el brazo aprende en minutos.</p>
+  </div>
+</section>
+
+<!-- ── Setup y código ── -->
+<section>
+  <span class="slide-tag">6.3 · Código</span>
+  <h2>Entrenar A2C con Stable-Baselines3 en 3 pasos 💻</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">A2C ya está implementado en Stable-Baselines3. El código es casi idéntico al de LunarLander (Unit 1) — solo cambia el algoritmo y el entorno:</p>
+
+  <div class="terminal" style="margin-bottom:12px;">
+    <div class="tb">
+      <span class="t-c"># Instalar panda-gym (entornos de robótica basados en PyBullet)</span><br>
+      <span class="t-k">!</span>pip install -q stable-baselines3 panda-gym gymnasium<br><br>
+      <span class="t-c"># 1. Crear el entorno</span><br>
+      <span class="t-k">import</span> <span class="t-v">gymnasium</span> <span class="t-k">as</span> <span class="t-v">gym</span><br>
+      <span class="t-k">from</span> <span class="t-v">stable_baselines3</span> <span class="t-k">import</span> <span class="t-f">A2C</span><br>
+      <span class="t-k">from</span> <span class="t-v">stable_baselines3.common.env_util</span> <span class="t-k">import</span> <span class="t-f">make_vec_env</span><br><br>
+      <span class="t-v">env</span> = <span class="t-f">make_vec_env</span>(<span class="t-s">"PandaReachDense-v3"</span>, n_envs=<span class="t-n">4</span>)<br><br>
+      <span class="t-c"># 2. Definir el modelo A2C</span><br>
+      <span class="t-v">model</span> = <span class="t-f">A2C</span>(<br>
+      &nbsp;&nbsp;policy=<span class="t-s">"MultiInputPolicy"</span>,   <span class="t-c"># obs es un dict {obs, achieved_goal, goal}</span><br>
+      &nbsp;&nbsp;env=<span class="t-v">env</span>,<br>
+      &nbsp;&nbsp;verbose=<span class="t-n">1</span><br>
+      )<br><br>
+      <span class="t-c"># 3. Entrenar (~10 min con GPU)</span><br>
+      <span class="t-v">model</span>.<span class="t-f">learn</span>(total_timesteps=<span class="t-n">1_000_000</span>)
+    </div>
+  </div>
+
+  <div class="cols2">
+    <div class="card card-violet" style="padding:12px 14px;">
+      <h3 style="font-size:0.75em;">¿Por qué MultiInputPolicy?</h3>
+      <p>PandaReach devuelve las observaciones como un <em>diccionario</em> con tres claves: <code>observation</code>, <code>achieved_goal</code> y <code>desired_goal</code>. <code>MultiInputPolicy</code> maneja automáticamente este tipo de observación compuesta.</p>
+    </div>
+    <div class="card card-gold" style="padding:12px 14px;">
+      <h3 style="font-size:0.75em;">A2C vs PPO para robótica</h3>
+      <p>A2C es más rápido de entrenar que PPO pero menos estable. Para tareas de robótica con acciones continuas, PPO suele dar mejores resultados finales. A2C es ideal para aprender los conceptos antes de PPO.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Evaluar y comparar ── -->
+<section>
+  <span class="slide-tag">6.3 · Evaluación</span>
+  <h2>Evaluar el brazo y publicar en el Hub 📊🤗</h2>
+
+  <div class="terminal" style="margin-bottom:12px;">
+    <div class="tb">
+      <span class="t-c"># Evaluar el agente entrenado</span><br>
+      <span class="t-k">from</span> <span class="t-v">stable_baselines3.common.evaluation</span> <span class="t-k">import</span> <span class="t-f">evaluate_policy</span><br>
+      <span class="t-k">from</span> <span class="t-v">stable_baselines3.common.monitor</span> <span class="t-k">import</span> <span class="t-f">Monitor</span><br><br>
+      <span class="t-v">eval_env</span> = <span class="t-f">Monitor</span>(<span class="t-v">gym</span>.<span class="t-f">make</span>(<span class="t-s">"PandaReachDense-v3"</span>))<br>
+      <span class="t-v">mean_reward</span>, <span class="t-v">std_reward</span> = <span class="t-f">evaluate_policy</span>(<br>
+      &nbsp;&nbsp;<span class="t-v">model</span>, <span class="t-v">eval_env</span>,<br>
+      &nbsp;&nbsp;n_eval_episodes=<span class="t-n">10</span>, deterministic=<span class="t-k">True</span><br>
+      )<br>
+      <span class="t-f">print</span>(<span class="t-s">f"Recompensa media: {mean_reward:.2f} ± {std_reward:.2f}"</span>)<br><br>
+      <span class="t-c"># Publicar en el Hub (requiere notebook_login() antes)</span><br>
+      <span class="t-k">from</span> <span class="t-v">huggingface_sb3</span> <span class="t-k">import</span> <span class="t-f">package_to_hub</span><br>
+      <span class="t-f">package_to_hub</span>(<br>
+      &nbsp;&nbsp;model=<span class="t-v">model</span>,<br>
+      &nbsp;&nbsp;model_name=<span class="t-s">"a2c-PandaReachDense-v3"</span>,<br>
+      &nbsp;&nbsp;model_architecture=<span class="t-s">"A2C"</span>,<br>
+      &nbsp;&nbsp;env_id=<span class="t-s">"PandaReachDense-v3"</span>,<br>
+      &nbsp;&nbsp;eval_env=<span class="t-v">eval_env</span>,<br>
+      &nbsp;&nbsp;repo_id=<span class="t-s">"TU_USUARIO/a2c-PandaReachDense-v3"</span><br>
+      )
+    </div>
+  </div>
+
+  <div class="card card-cyan" style="padding:12px 14px;">
+    <p>🏆 <strong>Meta de certificación HF:</strong> Recompensa media ≥ −3.5. Un brazo que nunca se mueve obtiene ~−7 (siempre lejos del objetivo). Un brazo bien entrenado obtiene ~−1.5 a −0.5 (llega consistentemente).</p>
+  </div>
+</section>
+
+<!-- ── Glosario ── -->
+<section>
+  <span class="slide-tag">Glosario</span>
+  <h2>Glosario del Módulo 6</h2>
+  <div style="margin-top:10px;">
+    <div class="gloss-row">
+      <span class="gloss-term">Alta varianza</span>
+      <span class="gloss-def">El mismo estado puede dar retornos muy distintos en distintos episodios. REINFORCE sufre de esto por usar Monte Carlo — una sola trayectoria como estimador.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Actor-Critic</span>
+      <span class="gloss-def">Arquitectura híbrida con dos redes: el Actor (política π<sub>θ</sub>) que decide qué hacer, y el Crítico (función de valor V<sub>w</sub> o Q<sub>w</sub>) que evalúa qué tan buena fue la acción.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Función de Ventaja A(s,a)</span>
+      <span class="gloss-def">A(s,a) = Q(s,a) − V(s). Mide cuánto mejor es la acción a respecto al promedio de acciones posibles en el estado s. Si A > 0, la acción es mejor que el promedio.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">A2C</span>
+      <span class="gloss-def">Advantage Actor-Critic. Variante de Actor-Critic que usa la función de ventaja (estimada con el error TD) en lugar de Q(s,a) directamente. Más estable que Actor-Critic básico.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Error TD como estimador de ventaja</span>
+      <span class="gloss-def">R_{t+1} + γV(S_{t+1}) − V(S_t) ≈ A(S_t, A_t). Permite estimar la ventaja usando solo una red V(s), sin necesitar también Q(s,a).</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Línea base (baseline)</span>
+      <span class="gloss-def">V(s) en A2C actúa como línea base: las acciones se evalúan relativas al valor promedio del estado, no en términos absolutos. Reduce la varianza del gradiente.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Recompensa densa (dense reward)</span>
+      <span class="gloss-def">Sistema de recompensas donde el agente recibe señal en cada paso (ej: −distancia al objetivo). Contrasta con recompensa escasa donde solo hay señal al final.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">MultiInputPolicy</span>
+      <span class="gloss-def">Tipo de política en SB3 para entornos cuya observación es un diccionario de múltiples tensores (ej: observation + goal). Usado en PandaReach.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── Quiz ── -->
+<section>
+  <span class="slide-tag">Quiz</span>
+  <h2>🧠 Mini Quiz — Módulo 6</h2>
+  <p style="font-size:0.58em;color:var(--text-muted);margin-bottom:14px;">Sin ver las diapositivas anteriores:</p>
+
+  <div class="step-row">
+    <div class="step-num">Q1</div>
+    <div class="step-text">REINFORCE entrenado en 1000 episodios a veces obtiene 450 puntos y a veces 80. ¿Qué causa esa inconsistencia? ¿Cómo la reduce A2C?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q2</div>
+    <div class="step-text">A(s, girar_derecha) = +2.3 y A(s, no_hacer_nada) = −1.8. ¿Qué le pasa a la probabilidad de cada acción después de la actualización del Actor?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q3</div>
+    <div class="step-text">¿Por qué el error TD (R + γV(s') − V(s)) es una buena estimación de la ventaja A(s,a)? ¿Qué representan V(s) y R + γV(s') respectivamente?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q4</div>
+    <div class="step-text">El brazo Panda usa PandaReachDense (recompensa densa) en lugar de PandaReach (escasa). ¿Qué alternativa al diseño de recompensas aprendimos en el Módulo 5 para entornos con recompensas escasas?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q5</div>
+    <div class="step-text">A2C y REINFORCE usan ascenso de gradiente sobre la política. ¿Cuál es la diferencia principal en <em>qué multiplica</em> al log π(a|s) en la actualización del Actor?</div>
+  </div>
+</section>
+
+<!-- ── Slide final ── -->
+<section>
+  <div class="title-slide" style="align-items:center;text-align:center;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-50px;right:-50px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(59,130,246,0.1) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-40px;left:-40px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(251,191,36,0.08) 0%,transparent 70%);pointer-events:none;"></div>
+
+    <div style="font-size:2.8em;margin-bottom:8px;">📉 🎭 🦾</div>
+    <div class="chapter-badge" style="font-size:0.36em;">Capítulos 6.1–6.3 completados · Módulo 6 finalizado</div>
+    <h1 style="text-align:center;font-size:1.7em;">
+      ¡Ya entiendes<br>Actor-Critic de punta a punta!<br>
+      <span class="gradient-text-cyan" style="font-size:0.85em;">La base de todos los algoritmos modernos 🎓</span>
+    </h1>
+    <div class="divider" style="margin:14px auto;"></div>
+    <div style="display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin-top:4px;font-size:0.54em;color:var(--text-muted);">
+      <span>✅ Alta varianza en REINFORCE</span><span style="color:var(--border);">·</span>
+      <span>✅ Actor y Crítico</span><span style="color:var(--border);">·</span>
+      <span>✅ Función de Ventaja</span><span style="color:var(--border);">·</span>
+      <span>✅ Error TD como estimador</span><span style="color:var(--border);">·</span>
+      <span>✅ A2C con Panda 🦾</span>
+    </div>
+    <div style="margin-top:18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <span class="pill">Próximo: Módulo 7 — Multi-Agent RL 🌐</span>
+    </div>
+    <p style="font-size:0.5em;color:var(--text-muted);margin-top:14px;max-width:540px;">En el Módulo 7 varios agentes aprenden en el mismo entorno — cooperando o compitiendo. Self-play, SoccerTwos y cómo entrenar cuando el "entorno" son otros agentes que también mejoran.</p>
+  </div>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+<script src="../assets/js/reveal-config.js"></script>
+</body>
+</html>

@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capítulos 7.1 – 7.3 — MARL · Self-Play · ELO · SoccerTwos</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/black.min.css">
+<link rel="stylesheet" href="../assets/css/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"></script>
+
+<style>
+/* ── Animaciones ── */
+@keyframes robot-wander {
+  0%,100% { transform: translateX(0) translateY(0); }
+  25%      { transform: translateX(16px) translateY(-4px); }
+  50%      { transform: translateX(6px) translateY(8px); }
+  75%      { transform: translateX(-10px) translateY(-6px); }
+}
+@keyframes robot-wander2 {
+  0%,100% { transform: translateX(0) translateY(0); }
+  30%      { transform: translateX(-12px) translateY(6px); }
+  60%      { transform: translateX(10px) translateY(-8px); }
+  80%      { transform: translateX(4px) translateY(4px); }
+}
+@keyframes car-move {
+  0%,100% { transform: translateX(0); }
+  50%      { transform: translateX(20px); }
+}
+@keyframes player-kick {
+  0%,100% { transform: rotate(0deg); transform-origin: bottom center; }
+  40%      { transform: rotate(-20deg); transform-origin: bottom center; }
+  60%      { transform: rotate(10deg); transform-origin: bottom center; }
+}
+@keyframes ball-roll {
+  0%   { transform: translateX(0) rotate(0deg); }
+  100% { transform: translateX(60px) rotate(360deg); }
+}
+@keyframes ball-roll-back {
+  0%   { transform: translateX(60px) rotate(360deg); }
+  100% { transform: translateX(0) rotate(0deg); }
+}
+@keyframes elo-climb {
+  0%   { height: 20%; }
+  30%  { height: 45%; }
+  60%  { height: 38%; }
+  80%  { height: 65%; }
+  100% { height: 72%; }
+}
+@keyframes self-copy-fade {
+  0%,100% { opacity: 0.4; transform: scale(0.9); }
+  50%      { opacity: 0.8; transform: scale(1); }
+}
+@keyframes env-nonstationary {
+  0%,100% { background: rgba(59,130,246,0.08); }
+  33%      { background: rgba(168,85,247,0.12); }
+  66%      { background: rgba(34,211,238,0.08); }
+}
+@keyframes team-pulse-blue {
+  0%,100% { box-shadow: 0 0 6px rgba(59,130,246,0.3); }
+  50%      { box-shadow: 0 0 18px rgba(59,130,246,0.7); }
+}
+@keyframes team-pulse-violet {
+  0%,100% { box-shadow: 0 0 6px rgba(168,85,247,0.3); }
+  50%      { box-shadow: 0 0 18px rgba(168,85,247,0.7); }
+}
+
+/* ── Soccer field ── */
+.soccer-field {
+  background: linear-gradient(
+    90deg,
+    rgba(22,101,52,0.3) 0%, rgba(20,83,45,0.4) 10%,
+    rgba(22,101,52,0.3) 20%, rgba(20,83,45,0.4) 30%,
+    rgba(22,101,52,0.3) 40%, rgba(20,83,45,0.4) 50%,
+    rgba(22,101,52,0.3) 60%, rgba(20,83,45,0.4) 70%,
+    rgba(22,101,52,0.3) 80%, rgba(20,83,45,0.4) 90%,
+    rgba(22,101,52,0.3) 100%
+  );
+  border: 2px solid rgba(255,255,255,0.2);
+  border-radius: 10px;
+  position: relative;
+  overflow: hidden;
+}
+.field-center-line {
+  position: absolute;
+  left: 50%; top: 10%; bottom: 10%;
+  width: 1px;
+  background: rgba(255,255,255,0.3);
+}
+.field-center-circle {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.25);
+  transform: translate(-50%, -50%);
+}
+.goal-left {
+  position: absolute;
+  left: 0; top: 35%; bottom: 35%;
+  width: 8px;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3);
+  border-left: none;
+  border-radius: 0 3px 3px 0;
+}
+.goal-right {
+  position: absolute;
+  right: 0; top: 35%; bottom: 35%;
+  width: 8px;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3);
+  border-right: none;
+  border-radius: 3px 0 0 3px;
+}
+.soccer-player {
+  position: absolute;
+  font-size: 1em;
+  animation: player-kick 2s ease-in-out infinite;
+}
+.soccer-ball {
+  position: absolute;
+  font-size: 0.7em;
+}
+
+/* ── Environment type cards ── */
+.env-type-card {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 14px 16px;
+  position: relative;
+  overflow: hidden;
+}
+.env-type-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+}
+.env-coop::before { background: linear-gradient(90deg,#22c55e,#22d3ee); }
+.env-comp::before { background: linear-gradient(90deg,#ef4444,#f97316); }
+.env-mix::before  { background: linear-gradient(90deg,#a855f7,#22d3ee); }
+.env-type-icon { font-size: 2em; margin-bottom: 6px; }
+
+/* ── Agent mini in warehouse ── */
+.warehouse-scene {
+  background: #060a14;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 12px;
+  position: relative;
+  min-height: 100px;
+  overflow: hidden;
+}
+.wh-shelf {
+  position: absolute;
+  height: 6px;
+  background: rgba(139,90,43,0.4);
+  border: 1px solid rgba(139,90,43,0.5);
+  border-radius: 1px;
+}
+.wh-robot {
+  position: absolute;
+  font-size: 0.9em;
+}
+
+/* ── Decentralized vs Centralized diagram ── */
+.agent-node {
+  background: rgba(59,130,246,0.1);
+  border: 1px solid rgba(59,130,246,0.35);
+  border-radius: 8px;
+  padding: 8px 10px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.5em;
+  font-weight: 700;
+  color: var(--accent-blue);
+  flex-shrink: 0;
+  animation: env-nonstationary 4s ease-in-out infinite;
+}
+.central-node {
+  background: rgba(251,191,36,0.1);
+  border: 2px solid rgba(251,191,36,0.4);
+  border-radius: 10px;
+  padding: 10px 14px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.54em;
+  font-weight: 700;
+  color: var(--accent-gold);
+  min-width: 120px;
+}
+.conn-line {
+  width: 20px; height: 1px;
+  background: var(--border);
+  align-self: center;
+  flex-shrink: 0;
+}
+
+/* ── Self-play timeline ── */
+.selfplay-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.56em;
+  margin: 5px 0;
+}
+.sp-num {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex; align-items:center; justify-content:center;
+  font-weight: 700; font-size:0.85em;
+  flex-shrink: 0; color: white;
+}
+
+/* ── ELO bar chart ── */
+.elo-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 90px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px 0;
+}
+.elo-bar {
+  flex: 1;
+  border-radius: 3px 3px 0 0;
+  min-width: 8px;
+  transition: height 0.5s ease;
+}
+.elo-axis-label {
+  font-family: var(--font-mono);
+  font-size: 0.38em;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 4px;
+}
+
+/* ── YAML block ── */
+.yaml-block {
+  background: #06090f;
+  border: 1px solid rgba(168,85,247,0.3);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.46em;
+  color: #c8d0f0;
+  line-height: 1.9;
+  position: relative;
+}
+.yaml-block::before {
+  content: "YAML · SoccerTwos.yaml";
+  position: absolute;
+  top: 6px; right: 10px;
+  font-size: 0.75em;
+  color: var(--accent-violet);
+}
+.y-key  { color: var(--accent-cyan); }
+.y-val  { color: #98c379; }
+.y-num  { color: #d19a66; }
+.y-type { color: var(--accent-violet); }
+.y-comm { color: #4a5568; }
+.y-hi   { color: var(--accent-gold); font-weight: 700; }
+
+/* ── SoccerTwos team tags ── */
+.team-blue {
+  background: rgba(59,130,246,0.15);
+  border: 1px solid rgba(59,130,246,0.5);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.5em;
+  color: var(--accent-blue);
+  animation: team-pulse-blue 2s ease-in-out infinite;
+}
+.team-violet {
+  background: rgba(168,85,247,0.15);
+  border: 1px solid rgba(168,85,247,0.5);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.5em;
+  color: var(--accent-violet);
+  animation: team-pulse-violet 2.3s ease-in-out infinite;
+}
+</style>
+</head>
+
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ══ PORTADA ══════════════════════════════ -->
+<section>
+  <div class="title-slide" style="position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-60px;right:-60px;width:380px;height:380px;border-radius:50%;background:radial-gradient(circle,rgba(34,197,94,0.1) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-50px;left:-50px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(168,85,247,0.08) 0%,transparent 70%);pointer-events:none;"></div>
+    <div class="chapter-badge">Capítulos 7.1 – 7.3 · Módulo 7</div>
+    <h1>Multi-Agent RL:<br>
+      <span class="gradient-text">Varios Agentes</span><br>
+      en el Mismo Mundo 🌐</h1>
+    <div class="divider"></div>
+    <p style="font-size:0.62em;color:var(--text-muted);max-width:640px;margin-top:8px;line-height:1.7;">
+      Cooperación, competición y entornos mixtos ·<br>
+      Aprendizaje descentralizado vs. centralizado (CTDE) ·<br>
+      Self-Play · ELO Score · SoccerTwos ⚽ 2v2
+    </p>
+    <div style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;">
+      <span class="pill">Unit 7 — HuggingFace 🤗</span>
+      <span class="pill">Jose Miguel Lara Rangel</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SECCIÓN 7.1 ═══════════════════════ -->
+<section>
+  <div class="section-slide" style="background:linear-gradient(160deg,#04060f,#060a10);">
+    <span class="big-emoji">🌐</span>
+    <div class="chapter-badge" style="font-size:0.38em;margin-top:8px;">Capítulo 7.1</div>
+    <h1>Introducción<br>a MARL</h1>
+    <p style="font-size:0.6em;color:var(--text-muted);max-width:520px;text-align:center;margin-top:10px;">
+      Del agente solitario a múltiples agentes que interactúan en el mismo entorno.
+    </p>
+  </div>
+</section>
+
+<!-- ── De un agente a muchos ── -->
+<section>
+  <span class="slide-tag">7.1 · El Salto</span>
+  <h2>De un agente a múltiples: el nuevo desafío 🔄</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">En todos los módulos anteriores siempre hubo <strong>un solo agente</strong> en el entorno. En MARL (Multi-Agent Reinforcement Learning), múltiples agentes comparten e interactúan en el mismo mundo:</p>
+
+  <div class="cols2" style="margin-bottom:14px;">
+    <div class="card card-cyan" style="padding:16px;">
+      <span class="card-icon">🤖</span>
+      <h3>RL con un agente — lo que aprendimos</h3>
+      <p>Un agente · Un entorno · Una política · El agente aprende a maximizar su propia recompensa acumulada sin competir ni cooperar con nadie.</p>
+      <div style="font-family:var(--font-mono);font-size:0.5em;color:var(--accent-cyan);margin-top:8px;">LunarLander · CartPole · Huggy · SnowballTarget</div>
+    </div>
+    <div class="card card-violet" style="padding:16px;">
+      <span class="card-icon">🌐</span>
+      <h3>MARL — el nuevo paradigma</h3>
+      <p>Múltiples agentes · Entorno compartido · Cada agente tiene su propia política · Las acciones de un agente cambian el entorno que perciben los demás.</p>
+      <div style="font-family:var(--font-mono);font-size:0.5em;color:var(--accent-violet);margin-top:8px;">SoccerTwos · AlphaStar · OpenAI Five</div>
+    </div>
+  </div>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px 18px;">
+    <p style="font-size:0.5em;color:var(--text-muted);margin-bottom:8px;"><strong style="color:var(--text-primary);">Ejemplos del mundo real que ya son MARL:</strong></p>
+    <div class="cols3" style="gap:8px;">
+      <div style="text-align:center;font-size:0.54em;color:var(--text-muted);">
+        <div style="font-size:1.8em;margin-bottom:4px;">🏭</div>
+        <strong style="color:var(--accent-cyan);">Almacén automatizado</strong><br>Varios robots navegando y cargando paquetes simultáneamente sin chocarse
+      </div>
+      <div style="text-align:center;font-size:0.54em;color:var(--text-muted);">
+        <div style="font-size:1.8em;margin-bottom:4px;">🚗</div>
+        <strong style="color:var(--accent-gold);">Coches autónomos</strong><br>Múltiples vehículos en la misma carretera tomando decisiones en tiempo real
+      </div>
+      <div style="text-align:center;font-size:0.54em;color:var(--text-muted);">
+        <div style="font-size:1.8em;margin-bottom:4px;">⚽</div>
+        <strong style="color:var(--accent-violet);">Fútbol de robots</strong><br>Equipos que cooperan internamente y compiten entre sí al mismo tiempo
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Tipos de entornos ── -->
+<section>
+  <span class="slide-tag">7.1 · Tipos de Entornos</span>
+  <h2>Tres tipos de entornos multi-agente 🗂️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Según cómo interactúan los agentes entre sí, los entornos MARL se clasifican en tres categorías:</p>
+
+  <div class="cols3" style="margin-bottom:14px;">
+    <div class="env-type-card env-coop">
+      <div class="env-type-icon">🤝</div>
+      <h3 style="font-size:0.82em;color:#22c55e;margin-bottom:6px;">Cooperativo</h3>
+      <p style="font-size:0.56em;">Los agentes <strong>maximizan un beneficio común</strong>. Todos ganan o pierden juntos.</p>
+      <div style="font-family:var(--font-mono);font-size:0.46em;color:var(--text-muted);margin-top:8px;border-top:1px solid var(--border);padding-top:6px;">
+        Robots en almacén 🏭<br>
+        Formaciones militares<br>
+        Colonias de hormigas virtuales
+      </div>
+    </div>
+    <div class="env-type-card env-comp">
+      <div class="env-type-icon">⚔️</div>
+      <h3 style="font-size:0.82em;color:#ef4444;margin-bottom:6px;">Competitivo</h3>
+      <p style="font-size:0.56em;">Los agentes <strong>maximizan su beneficio minimizando el del oponente</strong>. Suma cero.</p>
+      <div style="font-family:var(--font-mono);font-size:0.46em;color:var(--text-muted);margin-top:8px;border-top:1px solid var(--border);padding-top:6px;">
+        Tenis 🎾<br>
+        Ajedrez (Deep Blue, AlphaZero)<br>
+        Juegos de pelea 1v1
+      </div>
+    </div>
+    <div class="env-type-card env-mix">
+      <div class="env-type-icon">🔀</div>
+      <h3 style="font-size:0.82em;color:var(--accent-violet);margin-bottom:6px;">Mixto</h3>
+      <p style="font-size:0.56em;">Cooperación <strong>dentro del equipo</strong> + competición <strong>contra el equipo rival</strong>.</p>
+      <div style="font-family:var(--font-mono);font-size:0.46em;color:var(--text-muted);margin-top:8px;border-top:1px solid var(--border);padding-top:6px;">
+        <strong style="color:var(--accent-violet);">SoccerTwos ⚽ ← nuestro entorno</strong><br>
+        Starcraft II<br>
+        Dota 2 (OpenAI Five)
+      </div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">⚽ SoccerTwos: el caso perfecto</span>
+    <p>SoccerTwos es un partido 2v2. Dentro de cada equipo (azul vs violeta), los dos jugadores <strong>cooperan</strong> para anotar. Entre equipos, <strong>compiten</strong> por ganar. Es el ejemplo más rico del módulo porque combina los tres desafíos a la vez.</p>
+  </div>
+</section>
+
+<!-- ── El problema del entorno no estacionario ── -->
+<section>
+  <span class="slide-tag">7.1 · El Problema Central</span>
+  <h2>El problema fundamental de MARL: el entorno cambia 🌊</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">En RL con un agente, el entorno es estacionario — las reglas no cambian mientras el agente aprende. En MARL aparece un problema nuevo: <strong>el entorno no es estacionario</strong> porque otros agentes también están aprendiendo.</p>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:14px;animation:env-nonstationary 4s ease-in-out infinite;">
+    <p style="font-size:0.5em;color:var(--text-muted);margin-bottom:10px;"><strong style="color:var(--text-primary);">Escenario:</strong> Dos robots aprendiendo a limpiar un almacén.</p>
+    <div class="cols2" style="gap:14px;">
+      <div style="font-size:0.56em;">
+        <div style="font-family:var(--font-mono);color:var(--accent-cyan);margin-bottom:6px;">Robot A ve:</div>
+        <div style="color:var(--text-muted);line-height:1.7;">
+          "Cada vez que voy al sector 3, robot B también va al sector 3. Esto no pasaba antes."<br><br>
+          El entorno que percibe robot A <strong>cambia constantemente</strong> porque robot B también está aprendiendo y modificando su política.
+        </div>
+      </div>
+      <div style="font-size:0.56em;">
+        <div style="font-family:var(--font-mono);color:var(--accent-violet);margin-bottom:6px;">El problema técnico:</div>
+        <div style="color:var(--text-muted);line-height:1.7;">
+          Los algoritmos de RL clásicos <strong>asumen que el entorno es estacionario</strong> — que su distribución no cambia. En MARL, esa suposición se rompe porque los demás agentes son parte del entorno y cambian su política constantemente.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cols2">
+    <div class="card card-pink" style="padding:12px 14px;">
+      <h3 style="font-size:0.78em;">Consecuencia para el aprendizaje</h3>
+      <p>Las experiencias pasadas pueden volverse irrelevantes rápidamente. Lo que funcionaba hace 10,000 pasos puede ser subóptimo ahora que el oponente aprendió a contra-jugarlo.</p>
+    </div>
+    <div class="card card-gold" style="padding:12px 14px;">
+      <h3 style="font-size:0.78em;">La solución de este módulo</h3>
+      <p>Self-play resuelve este problema de forma elegante: el oponente es siempre una copia del propio agente — garantizando que siempre tenga el nivel correcto de dificultad.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SECCIÓN 7.2 ═══════════════════════ -->
+<section>
+  <div class="section-slide" style="background:linear-gradient(160deg,#04060f,#0a0614);">
+    <span class="big-emoji">🏗️</span>
+    <div class="chapter-badge" style="font-size:0.38em;border-color:var(--accent-gold);color:var(--accent-gold);background:rgba(251,191,36,0.07);margin-top:8px;">Capítulo 7.2</div>
+    <h1>Diseño de Sistemas<br>Multi-Agente:<br>Descentralizado vs. CTDE</h1>
+    <p style="font-size:0.6em;color:var(--text-muted);max-width:520px;text-align:center;margin-top:10px;">
+      ¿Cómo coordinamos a los agentes para que aprendan juntos?
+    </p>
+  </div>
+</section>
+
+<!-- ── Dos enfoques ── -->
+<section>
+  <span class="slide-tag">7.2 · Dos Enfoques</span>
+  <h2>Dos formas de diseñar el entrenamiento multi-agente ⚙️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Ante el problema de no estacionariedad, existen dos filosofías de diseño con ventajas y desventajas distintas:</p>
+
+  <div class="compare-grid" style="margin-bottom:14px;">
+    <div>
+      <div class="compare-head blue">Aprendizaje Descentralizado</div>
+      <div class="compare-body">
+        <!-- Diagram -->
+        <div style="display:flex;gap:6px;justify-content:center;margin:8px 0 12px;">
+          <div class="agent-node">🤖 A</div>
+          <div style="width:20px;"></div>
+          <div class="agent-node">🤖 B</div>
+          <div style="width:20px;"></div>
+          <div class="agent-node">🤖 C</div>
+        </div>
+        <p>Cada agente se entrena <strong>de forma independiente</strong>, ignorando la existencia de los demás. Cada uno trata a los otros como parte del entorno.</p>
+        <p style="margin-top:8px;color:#22c55e;font-size:0.9em;">✅ Simple · Sin comunicación · Fácil de escalar</p>
+        <p style="color:#ef4444;font-size:0.9em;">❌ El entorno es no estacionario para cada agente · Convergencia no garantizada</p>
+      </div>
+    </div>
+    <div>
+      <div class="compare-head violet">Aprendizaje Centralizado (CTDE)</div>
+      <div class="compare-body">
+        <!-- Diagram -->
+        <div style="display:flex;gap:4px;align-items:center;justify-content:center;margin:8px 0 12px;">
+          <div class="agent-node">🤖 A</div>
+          <div class="conn-line"></div>
+          <div class="central-node">📦 Buffer<br>compartido</div>
+          <div class="conn-line"></div>
+          <div class="agent-node">🤖 B</div>
+        </div>
+        <p>Un proceso central <strong>recolecta las experiencias de todos los agentes</strong> y aprende una política común (o coordina las individuales).</p>
+        <p style="margin-top:8px;color:#22c55e;font-size:0.9em;">✅ Entorno estacionario · Mejor coordinación · Más estable</p>
+        <p style="color:#ef4444;font-size:0.9em;">❌ Más complejo · La ejecución sigue siendo descentralizada</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CTDE explicado ── -->
+<section>
+  <span class="slide-tag">7.2 · CTDE</span>
+  <h2>Entrenamiento Centralizado, Ejecución Descentralizada (CTDE) 🎯</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">CTDE es el paradigma dominante en MARL moderno. La intuición es elegante: <strong>entrenamos con información global, pero en producción cada agente actúa solo</strong>:</p>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:14px;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent-gold),var(--accent-violet));"></div>
+
+    <div class="cols2" style="gap:20px;">
+      <div>
+        <div style="font-family:var(--font-mono);font-size:0.56em;color:var(--accent-gold);font-weight:700;margin-bottom:8px;">🏫 Durante el entrenamiento:</div>
+        <div style="font-size:0.56em;color:var(--text-muted);line-height:1.7;">
+          <div>• Se puede usar <strong>información global</strong>: observaciones de <em>todos</em> los agentes</div>
+          <div>• Los agentes comparten un búfer de experiencias</div>
+          <div>• Se aprende una política o crítico centralizado</div>
+          <div>• El entorno es estacionario desde la perspectiva del sistema</div>
+        </div>
+      </div>
+      <div>
+        <div style="font-family:var(--font-mono);font-size:0.56em;color:var(--accent-cyan);font-weight:700;margin-bottom:8px;">🌍 Durante la ejecución:</div>
+        <div style="font-size:0.56em;color:var(--text-muted);line-height:1.7;">
+          <div>• Cada agente actúa con <strong>solo sus propias observaciones</strong></div>
+          <div>• No hay comunicación entre agentes</div>
+          <div>• La política es individual — no depende del estado global</div>
+          <div>• Funciona en el mundo real donde no hay observación global</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">🧹 La analogía del almacén</span>
+    <p>Durante el entrenamiento, los robots pueden ver el mapa completo del almacén y las posiciones de todos. Al momento de actuar en el mundo real, cada robot solo usa su cámara local — como siempre lo hará en producción. <strong>Aprender con más información, actuar con la información disponible.</strong></p>
+  </div>
+</section>
+
+<!-- ── SoccerTwos preview ── -->
+<section>
+  <span class="slide-tag">7.2 → 7.3</span>
+  <h2>SoccerTwos: cooperación y competición en 2v2 ⚽</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Nuestro entorno de hands-on combina los dos desafíos: cooperación dentro del equipo y competición entre equipos, en un campo de fútbol 3D:</p>
+
+  <div style="display:flex;gap:16px;align-items:flex-start;">
+    <!-- Soccer field visual -->
+    <div style="flex:1;">
+      <div class="soccer-field" style="height:140px;">
+        <div class="field-center-line"></div>
+        <div class="field-center-circle"></div>
+        <div class="goal-left"></div>
+        <div class="goal-right"></div>
+        <!-- Blue team -->
+        <div class="soccer-player" style="left:20%;top:25%;color:#3b82f6;animation-delay:0s;">⚽</div>
+        <div class="soccer-player" style="left:28%;top:60%;color:#3b82f6;animation-delay:0.6s;">🦵</div>
+        <!-- Ball -->
+        <div class="soccer-ball" style="left:48%;top:45%;animation:ball-roll 2s ease-in-out infinite alternate;">⚽</div>
+        <!-- Violet team -->
+        <div class="soccer-player" style="right:22%;top:30%;color:#a855f7;animation-delay:0.3s;">🦵</div>
+        <div class="soccer-player" style="right:30%;top:62%;color:#a855f7;animation-delay:0.9s;">🦵</div>
+        <!-- Labels -->
+        <div style="position:absolute;top:6px;left:8px;font-family:var(--font-mono);font-size:0.38em;color:rgba(59,130,246,0.8);">EQUIPO AZUL</div>
+        <div style="position:absolute;top:6px;right:8px;font-family:var(--font-mono);font-size:0.38em;color:rgba(168,85,247,0.8);">EQUIPO VIOLETA</div>
+      </div>
+    </div>
+
+    <!-- Details -->
+    <div style="flex:1.3;display:flex;flex-direction:column;gap:8px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+        <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.3);border-radius:8px;padding:8px 10px;font-size:0.52em;text-align:center;">
+          <div class="team-blue" style="display:inline-block;margin-bottom:4px;">Equipo Azul</div>
+          <div style="color:var(--text-muted);">2 agentes que cooperan</div>
+        </div>
+        <div style="background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.3);border-radius:8px;padding:8px 10px;font-size:0.52em;text-align:center;">
+          <div class="team-violet" style="display:inline-block;margin-bottom:4px;">Equipo Violeta</div>
+          <div style="color:var(--text-muted);">2 agentes que cooperan</div>
+        </div>
+      </div>
+      <div class="card card-gold" style="padding:12px 14px;">
+        <h3 style="font-size:0.75em;">Sistema de recompensas SoccerTwos</h3>
+        <div style="font-size:0.54em;color:var(--text-muted);margin-top:6px;line-height:1.8;">
+          <div>⚽ Anotar gol → <span style="color:#22c55e;">+1 para el equipo que anotó</span></div>
+          <div>🥅 Recibir gol → <span style="color:#ef4444;">−1 para el equipo que recibió</span></div>
+          <div>⏱️ Sin gol → episodio termina después de N pasos</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:0.5em;">
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:6px 8px;text-align:center;color:var(--text-muted);">
+          <div style="color:var(--accent-cyan);font-weight:700;">4 agentes</div>
+          2 por equipo
+        </div>
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:6px 8px;text-align:center;color:var(--text-muted);">
+          <div style="color:var(--accent-violet);font-weight:700;">Continuas</div>
+          Tipo de acciones
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SECCIÓN 7.3 ═══════════════════════ -->
+<section>
+  <div class="section-slide" style="background:linear-gradient(160deg,#04060f,#060a14);position:relative;overflow:hidden;">
+    <div style="position:absolute;font-size:2em;top:12%;left:10%;opacity:0.3;">⚽</div>
+    <div style="position:absolute;font-size:1.5em;top:18%;right:12%;opacity:0.3;">⚽</div>
+    <span class="big-emoji">🪞</span>
+    <div class="chapter-badge" style="font-size:0.38em;border-color:var(--accent-cyan);color:var(--accent-cyan);background:rgba(34,211,238,0.06);margin-top:8px;">Capítulo 7.3</div>
+    <h1>Self-Play, ELO<br>y SoccerTwos</h1>
+    <p style="font-size:0.6em;color:var(--text-muted);max-width:520px;text-align:center;margin-top:10px;">
+      Aprender compitiendo contra versiones anteriores de uno mismo.
+    </p>
+  </div>
+</section>
+
+<!-- ── Self-Play: el problema del oponente ── -->
+<section>
+  <span class="slide-tag">7.3 · Self-Play</span>
+  <h2>El problema del oponente en entornos competitivos 🎯</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Para entrenar un agente competitivo necesitamos un oponente contra quien jugar. Pero elegirlo bien es difícil:</p>
+
+  <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
+    <div class="card card-pink" style="padding:12px 16px;">
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        <span style="font-size:1.6em;flex-shrink:0;">💀</span>
+        <div>
+          <h3 style="font-size:0.8em;">Oponente demasiado fuerte</h3>
+          <p>El agente nunca gana. No recibe señal positiva. El gradiente es casi siempre negativo. No aprende — pierde la motivación por así decirlo. Es como poner a un niño a jugar fútbol contra Messi el primer día.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card card-pink" style="padding:12px 16px;">
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        <span style="font-size:1.6em;flex-shrink:0;">😴</span>
+        <div>
+          <h3 style="font-size:0.8em;">Oponente demasiado débil</h3>
+          <p>El agente siempre gana con la misma estrategia simple. Aprende comportamientos que funcionan solo contra ese oponente específico — no generalizan cuando enfrenta rivales más fuertes.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">💡 La solución: Self-Play</span>
+    <p>El agente <strong>juega contra copias anteriores de sí mismo</strong>. Así el oponente siempre tiene el nivel correcto: empieza tan mal como el agente y mejora junto con él. A medida que el agente aprende, sus "yos del pasado" se vuelven el escalonamiento natural de dificultad.</p>
+  </div>
+</section>
+
+<!-- ── Self-Play: cómo funciona ── -->
+<section>
+  <span class="slide-tag">7.3 · Self-Play</span>
+  <h2>Cómo funciona Self-Play en la práctica 🔄</h2>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:14px;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent-cyan),var(--accent-violet));"></div>
+    <div class="selfplay-step">
+      <div class="sp-num" style="background:linear-gradient(135deg,var(--accent-cyan),rgba(34,211,238,0.5));">1</div>
+      <div>Al inicio, el agente es aleatorio. Lo usamos como oponente de sí mismo. Ambos "jugadores" son la misma política.</div>
+    </div>
+    <div class="selfplay-step">
+      <div class="sp-num" style="background:linear-gradient(135deg,var(--accent-blue),rgba(59,130,246,0.5));">2</div>
+      <div>Después de <strong style="color:var(--accent-gold);">swap_steps</strong> pasos de entrenamiento, guardamos una copia de la política actual como nuevo oponente.</div>
+    </div>
+    <div class="selfplay-step">
+      <div class="sp-num" style="background:linear-gradient(135deg,var(--accent-violet),rgba(168,85,247,0.5));">3</div>
+      <div>El agente en entrenamiento juega contra este oponente congelado. La diversidad del oponente depende de <strong style="color:var(--accent-gold);">window</strong> (cuántas versiones antiguas guardamos).</div>
+    </div>
+    <div class="selfplay-step">
+      <div class="sp-num" style="background:linear-gradient(135deg,#22c55e,rgba(34,197,94,0.5));">4</div>
+      <div>Con <strong style="color:var(--accent-gold);">play_against_latest_model_ratio</strong> controlamos qué fracción del tiempo jugamos contra la versión más reciente vs. versiones más antiguas.</div>
+    </div>
+    <div class="selfplay-step">
+      <div class="sp-num" style="background:linear-gradient(135deg,var(--accent-gold),rgba(251,191,36,0.5));">∞</div>
+      <div>El ciclo se repite: mejora → guarda copia → juega contra la copia → mejora más. Un currículo automático y siempre actualizado.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Hiperparámetros Self-Play ── -->
+<section>
+  <span class="slide-tag">7.3 · Hiperparámetros</span>
+  <h2>Los parámetros de Self-Play en ML-Agents ⚙️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">ML-Agents expone estos parámetros en el YAML para controlar la dinámica del self-play:</p>
+
+  <div class="cols2" style="margin-bottom:12px;">
+    <div class="yaml-block">
+      <div style="margin-top:18px;">
+        self_play:<br>
+        &nbsp;&nbsp;<span class="y-key">save_steps</span>: <span class="y-num">20000</span><br>
+        &nbsp;&nbsp;<span class="y-key">team_change</span>: <span class="y-num">100000</span><br>
+        &nbsp;&nbsp;<span class="y-key">swap_steps</span>: <span class="y-num">10000</span><br>
+        &nbsp;&nbsp;<span class="y-key">window</span>: <span class="y-num">10</span><br>
+        &nbsp;&nbsp;<span class="y-key">play_against_latest_model_ratio</span>: <span class="y-num">0.5</span>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;font-size:0.54em;">
+      <div class="card" style="padding:8px 12px;">
+        <strong style="color:var(--accent-cyan);">save_steps</strong><br>
+        <span style="color:var(--text-muted);">Cada cuántos pasos se guarda una nueva versión del oponente. Valores grandes → oponentes con niveles de habilidad muy separados.</span>
+      </div>
+      <div class="card" style="padding:8px 12px;">
+        <strong style="color:var(--accent-cyan);">window</strong><br>
+        <span style="color:var(--text-muted);">Cuántas versiones antiguas mantenemos en el pool. Más window → mayor diversidad de estilos de juego del oponente.</span>
+      </div>
+      <div class="card" style="padding:8px 12px;">
+        <strong style="color:var(--accent-cyan);">play_against_latest_model_ratio</strong><br>
+        <span style="color:var(--text-muted);">0.5 = 50% del tiempo contra la versión más reciente, 50% contra versiones del pool. Balance entre estabilidad y diversidad.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-gold" style="padding:12px 14px;">
+    <p>⚖️ <strong>El balance clave:</strong> Si swap_steps es muy bajo (cambias oponente muy rápido), el entrenamiento es inestable. Si es muy alto, el agente se especializa demasiado contra un oponente y no generaliza. Los valores por defecto de ML-Agents son un buen punto de partida.</p>
+  </div>
+</section>
+
+<!-- ── ELO Score ── -->
+<section>
+  <span class="slide-tag">7.3 · ELO</span>
+  <h2>El sistema ELO: medir el nivel relativo del agente 📊</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">En entornos competitivos, la recompensa media no es una buena métrica — depende completamente del nivel del oponente. En cambio usamos el <strong>sistema ELO</strong> (inventado por Arpad Elo para el ajedrez):</p>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:14px 18px;margin-bottom:12px;">
+    <div class="cols2" style="gap:16px;">
+      <div>
+        <p style="font-size:0.5em;color:var(--text-muted);margin-bottom:8px;"><strong style="color:var(--text-primary);">¿Qué es el ELO?</strong></p>
+        <div style="font-size:0.56em;color:var(--text-muted);line-height:1.7;">
+          <div>• Empieza en <strong style="color:var(--accent-cyan);">1200 puntos</strong></div>
+          <div>• Ganar contra un rival más fuerte → <strong style="color:#22c55e;">ganas muchos puntos</strong></div>
+          <div>• Ganar contra un rival más débil → <strong style="color:#22c55e;">ganas pocos puntos</strong></div>
+          <div>• Perder contra un rival más fuerte → <strong style="color:#ef4444;">pierdes pocos puntos</strong></div>
+          <div>• Perder contra un rival más débil → <strong style="color:#ef4444;">pierdes muchos puntos</strong></div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:0.5em;color:var(--text-muted);margin-bottom:6px;">ELO típico durante entrenamiento Self-Play:</div>
+        <div class="elo-chart">
+          <div class="elo-bar" style="height:15%;background:rgba(239,68,68,0.5);"></div>
+          <div class="elo-bar" style="height:18%;background:rgba(239,68,68,0.4);"></div>
+          <div class="elo-bar" style="height:22%;background:rgba(251,191,36,0.4);"></div>
+          <div class="elo-bar" style="height:20%;background:rgba(251,191,36,0.4);"></div>
+          <div class="elo-bar" style="height:35%;background:rgba(34,211,238,0.5);"></div>
+          <div class="elo-bar" style="height:42%;background:rgba(34,211,238,0.5);"></div>
+          <div class="elo-bar" style="height:38%;background:rgba(34,211,238,0.5);"></div>
+          <div class="elo-bar" style="height:55%;background:rgba(34,197,94,0.6);"></div>
+          <div class="elo-bar" style="height:60%;background:rgba(34,197,94,0.6);"></div>
+          <div class="elo-bar" style="height:70%;background:rgba(34,197,94,0.7);"></div>
+          <div class="elo-bar" style="height:65%;background:rgba(34,197,94,0.6);"></div>
+          <div class="elo-bar" style="height:75%;background:rgba(34,197,94,0.8);"></div>
+        </div>
+        <div class="elo-axis-label" style="margin-top:4px;">→ pasos de entrenamiento (puede bajar y subir al inicio)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-cyan" style="padding:12px 14px;">
+    <p>📐 <strong>Las fórmulas del ELO:</strong><br>
+    Probabilidad esperada de ganar: E<sub>A</sub> = 1 / (1 + 10<sup>(R<sub>B</sub>−R<sub>A</sub>)/400</sup>)<br>
+    Actualización: R<sub>A</sub> ← R<sub>A</sub> + K × (S<sub>A</sub> − E<sub>A</sub>)  donde K=32 es el factor de ajuste máximo.</p>
+  </div>
+</section>
+
+<!-- ── ELO ejemplo numérico ── -->
+<section>
+  <span class="slide-tag">7.3 · ELO Ejemplo</span>
+  <h2>ELO en acción — ejemplo numérico ✏️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:14px;">El agente A tiene ELO = 1500. El agente B tiene ELO = 1200. K = 32.</p>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:14px;">
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;"></div>
+    <div class="cols2" style="gap:20px;">
+      <!-- Calcular expectativas -->
+      <div>
+        <div style="font-family:var(--font-mono);font-size:0.54em;color:var(--accent-cyan);font-weight:700;margin-bottom:10px;">Paso 1: Calcular expectativas</div>
+        <div class="math-block" style="padding:8px 12px;font-size:0.8em;">
+          \[ E_A = \frac{1}{1+10^{(1200-1500)/400}} = 0.849 \]
+        </div>
+        <div class="math-block" style="padding:8px 12px;font-size:0.8em;">
+          \[ E_B = \frac{1}{1+10^{(1500-1200)/400}} = 0.151 \]
+        </div>
+        <p style="font-size:0.52em;color:var(--text-muted);margin-top:6px;">A tiene 84.9% de probabilidad esperada de ganar (es mucho más fuerte).</p>
+      </div>
+      <!-- Dos escenarios -->
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="font-family:var(--font-mono);font-size:0.54em;color:var(--accent-violet);font-weight:700;margin-bottom:4px;">Paso 2: Actualizar según resultado</div>
+        <div class="card card-cyan" style="padding:10px 12px;">
+          <div style="font-size:0.56em;font-weight:700;margin-bottom:4px;">Si A gana (esperado):</div>
+          <div style="font-size:0.52em;color:var(--text-muted);">
+            R'<sub>A</sub> = 1500 + 32×(1 − 0.849) = <strong style="color:#22c55e;">1504.8</strong><br>
+            R'<sub>B</sub> = 1200 + 32×(0 − 0.151) = <strong style="color:#ef4444;">1195.2</strong><br>
+            <em style="font-size:0.9em;">A gana pocos puntos — era el favorito.</em>
+          </div>
+        </div>
+        <div class="card card-pink" style="padding:10px 12px;">
+          <div style="font-size:0.56em;font-weight:700;margin-bottom:4px;">Si B gana (sorpresa):</div>
+          <div style="font-size:0.52em;color:var(--text-muted);">
+            R'<sub>A</sub> = 1500 + 32×(0 − 0.849) = <strong style="color:#ef4444;">1472.8</strong><br>
+            R'<sub>B</sub> = 1200 + 32×(1 − 0.151) = <strong style="color:#22c55e;">1227.2</strong><br>
+            <em style="font-size:0.9em;">B gana muchos puntos — era el desfavorecido.</em>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── ELO ventajas y desventajas ── -->
+<section>
+  <span class="slide-tag">7.3 · ELO</span>
+  <h2>¿Por qué ELO es mejor que la recompensa media? ⚖️</h2>
+
+  <div class="cols2" style="margin-bottom:14px;">
+    <div>
+      <div style="font-family:var(--font-mono);font-size:0.54em;color:#22c55e;font-weight:700;margin-bottom:8px;">✅ Ventajas del ELO</div>
+      <div class="card card-cyan" style="padding:12px 14px;margin-bottom:6px;">
+        <h3 style="font-size:0.75em;">Siempre balanceado</h3>
+        <p>Los puntos que gana un jugador son exactamente los que pierde el otro. El sistema es de suma cero — no se infla ni desinfla.</p>
+      </div>
+      <div class="card card-cyan" style="padding:12px 14px;margin-bottom:6px;">
+        <h3 style="font-size:0.75em;">Auto-correctivo</h3>
+        <p>Si ganas contra alguien débil, ganas pocos puntos. No puedes inflar tu ELO ganando torneos de novatos.</p>
+      </div>
+      <div class="card card-cyan" style="padding:12px 14px;">
+        <h3 style="font-size:0.75em;">Funciona con equipos</h3>
+        <p>En SoccerTwos calculamos el ELO promedio del equipo — la puntuación refleja el nivel colectivo.</p>
+      </div>
+    </div>
+    <div>
+      <div style="font-family:var(--font-mono);font-size:0.54em;color:#ef4444;font-weight:700;margin-bottom:8px;">❌ Desventajas del ELO</div>
+      <div class="card card-pink" style="padding:12px 14px;margin-bottom:6px;">
+        <h3 style="font-size:0.75em;">No mide contribución individual</h3>
+        <p>En un equipo, no distingue quién jugó mejor. Si gana el equipo, ambos jugadores suben por igual.</p>
+      </div>
+      <div class="card card-pink" style="padding:12px 14px;margin-bottom:6px;">
+        <h3 style="font-size:0.75em;">Deflación de rating</h3>
+        <p>Mantener un ELO alto requiere seguir ganando. Si el agente deja de mejorar, eventualmente baja.</p>
+      </div>
+      <div class="card card-pink" style="padding:12px 14px;">
+        <h3 style="font-size:0.75em;">No comparable históricamente</h3>
+        <p>El ELO de una versión temprana del entrenamiento no es directamente comparable con el de semanas después.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── SoccerTwos hands-on ── -->
+<section>
+  <span class="slide-tag">7.3 · SoccerTwos Hands-on</span>
+  <h2>Entrenando SoccerTwos con Self-Play 🏆</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">El proceso es el mismo que en SnowballTarget y Pirámides (Módulo 5), con la sección <code>self_play</code> añadida al YAML:</p>
+
+  <div class="yaml-block" style="margin-bottom:12px;">
+    <div style="margin-top:18px;">
+      behaviors:<br>
+      &nbsp;&nbsp;<span class="y-key">SoccerTwos</span>:<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;trainer_type: <span class="y-type">ppo</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;max_steps: <span class="y-num">5000000</span>  <span class="y-comm"># 5M pasos (~2-3h en GPU)</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;summary_freq: <span class="y-num">10000</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;hyperparameters:<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;learning_rate: <span class="y-num">0.0003</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;batch_size: <span class="y-num">2048</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer_size: <span class="y-num">20480</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;reward_signals:<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;extrinsic:<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;gamma: <span class="y-num">0.99</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;strength: <span class="y-num">1.0</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="y-hi">self_play</span>:   <span class="y-comm"># ← la sección nueva</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="y-key">save_steps</span>: <span class="y-num">20000</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="y-key">team_change</span>: <span class="y-num">100000</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="y-key">swap_steps</span>: <span class="y-num">10000</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="y-key">window</span>: <span class="y-num">10</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="y-key">play_against_latest_model_ratio</span>: <span class="y-num">0.5</span>
+    </div>
+  </div>
+
+  <div class="cols2">
+    <div class="card card-violet" style="padding:12px 14px;">
+      <p>🕐 <strong>Tiempo estimado:</strong> 5M pasos tarda ~2–3 horas en GPU T4. La meta de certificación HF es ELO ≥ 1100 (por encima del valor inicial de 1200 es ya bueno).</p>
+    </div>
+    <div class="card card-gold" style="padding:12px 14px;">
+      <p>🎮 <strong>Ver tu equipo jugando:</strong> Publica en el Hub y abre el Space <a href="https://huggingface.co/spaces/unity/ML-Agents-SoccerTwos" style="color:var(--accent-gold);">spaces/unity/ML-Agents-SoccerTwos</a> para ver a tus agentes en un partido real.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Conexiones con el mundo real ── -->
+<section>
+  <span class="slide-tag">7.3 · Más Allá del Curso</span>
+  <h2>MARL y Self-Play en el mundo real 🌍</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Las técnicas de este módulo no son solo para fútbol virtual. Son la base de algunos de los sistemas de IA más potentes jamás creados:</p>
+
+  <div class="cols2" style="gap:10px;margin-bottom:12px;">
+    <div class="card card-violet" style="padding:14px;">
+      <span class="card-icon">♟️</span>
+      <h3>AlphaGo y AlphaZero</h3>
+      <p>DeepMind usó self-play para crear el mejor jugador de Go y Ajedrez de la historia. AlphaZero aprendió sin datos humanos — solo jugando contra sí mismo millones de veces.</p>
+    </div>
+    <div class="card card-cyan" style="padding:14px;">
+      <span class="card-icon">🎮</span>
+      <h3>OpenAI Five (Dota 2)</h3>
+      <p>5 agentes cooperando para ganar partidas de Dota 2 contra humanos profesionales. Entrenado con self-play en miles de GPUs. MARL cooperativo + competitivo.</p>
+    </div>
+    <div class="card card-gold" style="padding:14px;">
+      <span class="card-icon">🤖</span>
+      <h3>AlphaStar (StarCraft II)</h3>
+      <p>Agente que superó a los mejores jugadores humanos de StarCraft II usando una liga de self-play con diferentes estilos de juego.</p>
+    </div>
+    <div class="card" style="padding:14px;">
+      <span class="card-icon">🏭</span>
+      <h3>Robots cooperativos</h3>
+      <p>Almacenes de Amazon, líneas de ensamblaje de Tesla — múltiples robots con MARL cooperativo coordinando en tiempo real sin comunicación explícita.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Glosario ── -->
+<section>
+  <span class="slide-tag">Glosario</span>
+  <h2>Glosario del Módulo 7</h2>
+  <div style="margin-top:10px;">
+    <div class="gloss-row">
+      <span class="gloss-term">MARL</span>
+      <span class="gloss-def">Multi-Agent Reinforcement Learning. Paradigma donde múltiples agentes aprenden simultáneamente en un entorno compartido, pudiendo cooperar, competir o ambas.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Entorno no estacionario</span>
+      <span class="gloss-def">En MARL, el entorno cambia constantemente porque los demás agentes también modifican su política. Esto viola la suposición de estacionariedad de los algoritmos clásicos de RL.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Aprendizaje descentralizado</span>
+      <span class="gloss-def">Cada agente se entrena independientemente tratando a los demás como parte del entorno. Simple pero potencialmente inestable.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">CTDE</span>
+      <span class="gloss-def">Centralised Training Decentralised Execution. Entrenar con información global compartida, pero ejecutar con observaciones individuales. Paradigma dominante en MARL.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Self-Play</span>
+      <span class="gloss-def">Técnica donde el agente usa copias anteriores de sí mismo como oponente. Garantiza un oponente del nivel correcto en todo momento y crea un currículo automático de dificultad creciente.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">ELO</span>
+      <span class="gloss-def">Sistema de rating relativo para juegos de suma cero. Mide el nivel de habilidad relativo entre jugadores. Más apropiado que la recompensa media en entornos competitivos. Empieza en 1200.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">SoccerTwos</span>
+      <span class="gloss-def">Entorno Unity ML-Agents de fútbol 2v2. Ejemplo de entorno mixto: cooperación dentro del equipo + competición entre equipos. El hands-on del Módulo 7.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">swap_steps / window</span>
+      <span class="gloss-def">Hiperparámetros de self-play. swap_steps: cada cuántos pasos se cambia el oponente. window: cuántas versiones pasadas del agente forman el pool de oponentes.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── Quiz ── -->
+<section>
+  <span class="slide-tag">Quiz</span>
+  <h2>🧠 Mini Quiz — Módulo 7</h2>
+  <p style="font-size:0.58em;color:var(--text-muted);margin-bottom:14px;">Sin ver las diapositivas anteriores:</p>
+
+  <div class="step-row">
+    <div class="step-num">Q1</div>
+    <div class="step-text">¿Por qué el entorno es "no estacionario" en MARL? Da un ejemplo concreto con dos robots en un almacén.</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q2</div>
+    <div class="step-text">¿Cuál es la diferencia entre aprendizaje descentralizado y CTDE? ¿Por qué CTDE es más estable?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q3</div>
+    <div class="step-text">Explica con tus palabras por qué un oponente demasiado fuerte o demasiado débil impide aprender. ¿Cómo resuelve self-play este problema?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q4</div>
+    <div class="step-text">Agente A (ELO 1500) vs Agente B (ELO 1100). Si B gana sorprendentemente, ¿A gana o pierde muchos puntos ELO? ¿Y si A gana como esperado?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q5</div>
+    <div class="step-text">SoccerTwos es un entorno mixto. Dentro del equipo es cooperativo. Entre equipos es competitivo. ¿Qué tipo de función de recompensa refleja eso? ¿Cada agente tiene su propia recompensa o el equipo comparte una sola?</div>
+  </div>
+</section>
+
+<!-- ── Slide final ── -->
+<section>
+  <div class="title-slide" style="align-items:center;text-align:center;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-50px;right:-50px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(34,197,94,0.1) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="position:absolute;font-size:2em;top:5%;left:5%;opacity:0.2;animation:robot-wander 5s ease-in-out infinite;">⚽</div>
+    <div style="position:absolute;font-size:1.5em;top:8%;right:8%;opacity:0.2;animation:robot-wander2 4s ease-in-out infinite;">⚽</div>
+
+    <div style="font-size:2.8em;margin-bottom:8px;">🌐 🪞 ⚽</div>
+    <div class="chapter-badge" style="font-size:0.36em;">Capítulos 7.1–7.3 completados · Módulo 7 finalizado</div>
+    <h1 style="text-align:center;font-size:1.7em;">
+      ¡Ahora los agentes<br>no están solos!<br>
+      <span class="gradient-text-cyan" style="font-size:0.85em;">MARL: la frontera del RL moderno 🎓</span>
+    </h1>
+    <div class="divider" style="margin:14px auto;"></div>
+    <div style="display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin-top:4px;font-size:0.54em;color:var(--text-muted);">
+      <span>✅ Tipos de entornos MARL</span><span style="color:var(--border);">·</span>
+      <span>✅ No estacionariedad</span><span style="color:var(--border);">·</span>
+      <span>✅ CTDE</span><span style="color:var(--border);">·</span>
+      <span>✅ Self-Play</span><span style="color:var(--border);">·</span>
+      <span>✅ ELO Score</span><span style="color:var(--border);">·</span>
+      <span>✅ SoccerTwos ⚽</span>
+    </div>
+    <div style="margin-top:18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <span class="pill">Próximo: Módulo 8 — PPO completo desde cero 🛡️</span>
+    </div>
+    <p style="font-size:0.5em;color:var(--text-muted);margin-top:14px;max-width:540px;">En el Módulo 8 estudiaremos PPO (Proximal Policy Optimization) — el algoritmo que usa OpenAI para entrenar ChatGPT y los mejores agentes de juegos del mundo. Es la evolución directa de A2C.</p>
+  </div>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+<script src="../assets/js/reveal-config.js"></script>
+</body>
+</html>

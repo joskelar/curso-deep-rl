@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aprendizaje por Refuerzo Profundo — Índice del Curso</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens (mismo sistema que theme.css) ── */
+  :root {
+    --bg-deep:       #04060f;
+    --bg-panel:      #090d1a;
+    --bg-card:       #0d1226;
+    --accent-blue:   #3b82f6;
+    --accent-cyan:   #22d3ee;
+    --accent-violet: #a855f7;
+    --accent-gold:   #fbbf24;
+    --accent-green:  #22c55e;
+    --text-primary:  #e8eaf2;
+    --text-muted:    #7b83a6;
+    --border:        rgba(59,130,246,0.22);
+    --font-display:  'Outfit', sans-serif;
+    --font-mono:     'JetBrains Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: var(--font-display);
+    min-height: 100vh;
+    /* Malla sutil de fondo */
+    background-image:
+      linear-gradient(rgba(59,130,246,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59,130,246,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* ── Barra superior ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 28px 60px 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Luz ambiental en la cabecera */
+  header::after {
+    content: "";
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 400px; height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(168,85,247,0.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .header-badge {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent-cyan);
+    border: 1px solid rgba(34,211,238,0.4);
+    padding: 3px 10px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 14px;
+    background: rgba(34,211,238,0.06);
+  }
+
+  header h1 {
+    font-size: 2.4rem;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    margin-bottom: 10px;
+  }
+
+  .gradient-text {
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-violet));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  header p {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    max-width: 640px;
+    line-height: 1.6;
+    margin-top: 8px;
+  }
+
+  /* Barra de progreso del curso */
+  .progress-bar-wrap {
+    margin-top: 20px;
+    max-width: 500px;
+  }
+
+  .progress-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .progress-track {
+    background: rgba(255,255,255,0.06);
+    border-radius: 4px;
+    height: 6px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-violet));
+    /* Actualiza este valor a medida que se completan capítulos */
+    width: 6%;
+    transition: width 0.4s ease;
+  }
+
+  /* ── Contenido principal ── */
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 60px 80px;
+  }
+
+  /* ── Título de etapa ── */
+  .stage-title {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent-violet);
+    margin-bottom: 18px;
+    margin-top: 48px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .stage-title::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── Grid de capítulos ── */
+  .chapters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+    gap: 14px;
+  }
+
+  /* ── Tarjeta de capítulo ── */
+  .chapter-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 22px;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  }
+
+  .chapter-card:hover {
+    border-color: var(--accent-blue);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(59,130,246,0.2);
+  }
+
+  /* Borde superior de color por estado */
+  .chapter-card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+
+  .status-ready::before    { background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan)); }
+  .status-progress::before { background: linear-gradient(90deg, var(--accent-gold), #f59e0b); }
+  .status-pending::before  { background: rgba(255,255,255,0.08); }
+
+  /* Encabezado de la tarjeta */
+  .card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    gap: 10px;
+  }
+
+  .card-emoji {
+    font-size: 1.6rem;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  /* Badge de estado */
+  .status-badge {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+
+  .badge-ready    { background: rgba(34,211,238,0.12); color: var(--accent-cyan);   border: 1px solid rgba(34,211,238,0.3); }
+  .badge-progress { background: rgba(251,191,36,0.12);  color: var(--accent-gold);   border: 1px solid rgba(251,191,36,0.3); }
+  .badge-pending  { background: rgba(255,255,255,0.04); color: var(--text-muted);    border: 1px solid rgba(255,255,255,0.1); }
+
+  /* Número y título del capítulo */
+  .card-num {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    margin-bottom: 4px;
+  }
+
+  .card-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    line-height: 1.3;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+  }
+
+  .chapter-card:hover .card-title {
+    color: var(--accent-cyan);
+  }
+
+  .card-desc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+
+  /* Footer de la tarjeta (unidad HF correspondiente) */
+  .card-footer {
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* ── Tarjeta de notebook ── */
+  .notebooks-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+  }
+
+  .notebook-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    transition: border-color 0.2s;
+  }
+
+  .notebook-card:hover { border-color: var(--accent-violet); }
+
+  .notebook-card .nb-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--accent-violet);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .notebook-card .nb-title {
+    font-weight: 600;
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+  }
+
+  .notebook-card .nb-desc {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  .colab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    background: rgba(251,191,36,0.1);
+    border: 1px solid rgba(251,191,36,0.3);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 0.7rem;
+    color: var(--accent-gold);
+    text-decoration: none;
+    font-family: var(--font-mono);
+  }
+
+  .colab-btn:hover { background: rgba(251,191,36,0.18); }
+
+  /* ── Footer de la página ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 24px 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: gap;
+    gap: 12px;
+  }
+
+  footer p {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  footer a {
+    color: var(--accent-cyan);
+    text-decoration: none;
+  }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  HEADER                                    -->
+<!-- ══════════════════════════════════════════ -->
+<header>
+  <div class="header-badge">Deep Reinforcement Learning · Curso en Español</div>
+  <h1>Aprendizaje por<br><span class="gradient-text">Refuerzo Profundo</span></h1>
+  <p>Adaptación del curso de Hugging Face al español para estudiantes de 13–16 años.<br>
+     De cero absoluto hasta algoritmos del estado del arte.</p>
+
+  <div class="progress-bar-wrap">
+    <div class="progress-label">
+      <span>PROGRESO DEL CURSO</span>
+      <!-- Actualiza este número manualmente: capítulos listos / total -->
+      <span id="progress-text">1 / 17 capítulos</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  MAIN                                      -->
+<!-- ══════════════════════════════════════════ -->
+<main>
+
+  <!-- ─── ETAPA 1: NÚCLEO ─────────────────── -->
+  <div class="stage-title">Etapa 1 — Núcleo del Aprendizaje por Refuerzo</div>
+
+  <div class="chapters-grid">
+
+    <!-- Cap 1.1 + 1.2 — LISTO -->
+    <a href="slides/capitulo_1_1_1_2.html" class="chapter-card status-ready">
+      <div class="card-header">
+        <span class="card-emoji">🤖</span>
+        <span class="status-badge badge-ready">Listo</span>
+      </div>
+      <div class="card-num">Capítulos 1.1 + 1.2</div>
+      <div class="card-title">¿Qué es el Aprendizaje por Refuerzo? · Recompensas y el Objetivo del Agente</div>
+      <div class="card-desc">El framework de RL, el ciclo agente↔entorno, estado vs. observación, espacios de acción, recompensas, retorno acumulado y el factor de descuento γ.</div>
+      <div class="card-footer">🤗 Unit 1 — HuggingFace</div>
+    </a>
+
+    <!-- Cap 1.3 + 1.4 — LISTO -->
+    <a href="slides/capitulo_1_3_1_4.html" class="chapter-card status-ready">
+      <div class="card-header">
+        <span class="card-emoji">⚖️🧠</span>
+        <span class="status-badge badge-ready">Listo</span>
+      </div>
+      <div class="card-num">Capítulos 1.3 + 1.4</div>
+      <div class="card-title">Exploración vs. Explotación · Políticas y Valores</div>
+      <div class="card-desc">El dilema central del RL, la estrategia ε-greedy, la política como cerebro del agente (determinista y aleatoria), V(s), Q(s,a), y los dos grandes enfoques: por valor y por política.</div>
+      <div class="card-footer">🤗 Unit 1 — HuggingFace</div>
+    </a>
+
+    <!-- Cap 1.5 + 1.6 — LISTO -->
+    <a href="slides/capitulo_1_5_1_6.html" class="chapter-card status-ready">
+      <div class="card-header">
+        <span class="card-emoji">🌕🐶</span>
+        <span class="status-badge badge-ready">Listo</span>
+      </div>
+      <div class="card-num">Capítulos 1.5 + 1.6</div>
+      <div class="card-title">¡Manos a la obra! LunarLander · Huggy el Perro en 3D</div>
+      <div class="card-desc">Guía paso a paso en Colab: Gymnasium, Stable-Baselines3, PPO, evaluar y subir al Hub. Luego: Unity ML-Agents, acciones continuas de Huggy y su función de recompensa compuesta.</div>
+      <div class="card-footer">🤗 Unit 1 Hands-on + Bonus Unit 1 — HuggingFace</div>
+    </a>
+
+    <!-- Cap 2.1–2.4 — LISTO -->
+    <a href="slides/capitulo_2_1_2_4.html" class="chapter-card status-ready">
+      <div class="card-header">
+        <span class="card-emoji">📊🔮🔁🧩</span>
+        <span class="status-badge badge-ready">Listo</span>
+      </div>
+      <div class="card-num">Capítulos 2.1 + 2.2 + 2.3 + 2.4</div>
+      <div class="card-title">Q-table · Bellman · MC vs TD · Q-Learning Completo</div>
+      <div class="card-desc">La Q-table como hoja de cálculo, la ecuación de Bellman con ejemplo numérico, Monte Carlo vs. Diferencias Temporales con analogía del semáforo, y el pseudocódigo completo de Q-Learning con todos sus parámetros.</div>
+      <div class="card-footer">🤗 Unit 2 — HuggingFace</div>
+    </a>
+
+    <!-- Cap 2.5 + 2.6 — LISTO -->
+    <a href="slides/capitulo_2_5_2_6.html" class="chapter-card status-ready">
+      <div class="card-header">
+        <span class="card-emoji">❄️🚖</span>
+        <span class="status-badge badge-ready">Listo</span>
+      </div>
+      <div class="card-num">Capítulos 2.5 + 2.6</div>
+      <div class="card-title">¡Manos a la obra! Q-Learning en FrozenLake y Taxi</div>
+      <div class="card-desc">Implementar Q-Learning desde cero con NumPy: Q-table, ε-greedy, bucle de entrenamiento completo. FrozenLake (16 estados) y el reto Taxi-v3 (500 estados) con el mismo código.</div>
+      <div class="card-footer">🤗 Unit 2 Hands-on — HuggingFace</div>
+    </a>
+
+  </div><!-- /chapters-grid etapa 1 -->
+
+
+  <!-- ─── ETAPA 2: INTERMEDIO ──────────────── -->
+  <div class="stage-title">Etapa 2 — Intermedio: Redes Neuronales al Rescate</div>
+
+  <div class="chapters-grid">
+
+    <!-- Cap 3.1 + 3.2 — LISTO -->
+    <a href="slides/capitulo_3_1_3_2.html" class="chapter-card status-ready">
+      <div class="card-header"><span class="card-emoji">📈🧠</span><span class="status-badge badge-ready">Listo</span></div>
+      <div class="card-num">Capítulos 3.1 + 3.2</div>
+      <div class="card-title">El Problema de Escala · Deep Q-Network (DQN) completo</div>
+      <div class="card-desc">Por qué la Q-table no escala a Atari (10²⁴¹·⁹²⁰ estados), arquitectura CNN de DQN, función de pérdida, búfer de repetición, red objetivo fija y Double DQN.</div>
+      <div class="card-footer">🤗 Unit 3 — HuggingFace</div>
+    </a>
+
+    <!-- Cap 3.3 + 3.4 — LISTO -->
+    <a href="slides/capitulo_3_3_3_4.html" class="chapter-card status-ready">
+      <div class="card-header"><span class="card-emoji">🖼️👾</span><span class="status-badge badge-ready">Listo</span></div>
+      <div class="card-num">Capítulos 3.3 + 3.4</div>
+      <div class="card-title">Preprocesamiento y Frame Stacking · Demo Space Invaders</div>
+      <div class="card-desc">Escala de grises, recorte a 84×84, limitación temporal y apilado de 4 frames. Demo guiada con RL-Baselines3-Zoo: cargar agente, analizar Q-values y comportamientos emergentes.</div>
+      <div class="card-footer">🤗 Unit 3 — HuggingFace</div>
+    </a>
+
+    <!-- Cap 4.1 + 4.2 — LISTO -->
+    <a href="slides/capitulo_4_1_4_2.html" class="chapter-card status-ready">
+      <div class="card-header"><span class="card-emoji">🎯⛰️</span><span class="status-badge badge-ready">Listo</span></div>
+      <div class="card-num">Capítulos 4.1 + 4.2</div>
+      <div class="card-title">Métodos de Política · La Intuición de REINFORCE</div>
+      <div class="card-desc">Política parametrizada π<sub>θ</sub>, ventajas (acciones continuas, aliasing, exploración automática), función objetivo J(θ), ascenso de gradiente, e intuición de REINFORCE sin derivaciones.</div>
+      <div class="card-footer">🤗 Unit 4 — HuggingFace</div>
+    </a>
+
+    <!-- Cap 4.3 — LISTO -->
+    <a href="slides/capitulo_4_3.html" class="chapter-card status-ready">
+      <div class="card-header"><span class="card-emoji">🏋️🚁</span><span class="status-badge badge-ready">Listo</span></div>
+      <div class="card-num">Capítulo 4.3</div>
+      <div class="card-title">¡Manos a la obra! REINFORCE en CartPole y PixelCopter</div>
+      <div class="card-desc">Implementar REINFORCE desde cero en PyTorch: clase Policy, bug educativo del método act, retornos calculados hacia atrás, función de pérdida negativa, y entrenar en CartPole (≥350) y PixelCopter (≥5).</div>
+      <div class="card-footer">🤗 Unit 4 Hands-on — HuggingFace</div>
+    </a>
+
+    <!-- Cap 5.1 — LISTO -->
+    <a href="slides/capitulo_5_1.html" class="chapter-card status-ready">
+      <div class="card-header"><span class="card-emoji">🎮🐻</span><span class="status-badge badge-ready">Listo</span></div>
+      <div class="card-num">Capítulo 5.1</div>
+      <div class="card-title">Unity ML-Agents: RL en Entornos 3D</div>
+      <div class="card-desc">Academia · Agente · Cerebro, rayos de detección, SnowballTarget, Pirámides con curiosidad intrínseca, YAML de configuración y flujo completo de entrenamiento y publicación.</div>
+      <div class="card-footer">🤗 Unit 5 — HuggingFace</div>
+    </a>
+
+    <!-- Cap 5.2 — LISTO -->
+    <a href="slides/capitulo_5_2.html" class="chapter-card status-ready">
+      <div class="card-header"><span class="card-emoji">🐻❄️</span><span class="status-badge badge-ready">Listo</span></div>
+      <div class="card-num">Capítulo 5.2</div>
+      <div class="card-title">¡Manos a la obra! SnowballTarget 🐻</div>
+      <div class="card-desc">Setup ML-Agents con Miniconda, descargar ejecutable Unity Linux, archivo YAML con hiperparámetros PPO, lanzar entrenamiento 200k pasos, checkpoints y publicar en el Hub para visualizar al oso en el navegador.</div>
+      <div class="card-footer">🤗 Unit 5 Hands-on — HuggingFace</div>
+    </a>
+
+    <!-- Cap 5.3 — LISTO -->
+    <a href="slides/capitulo_5_3.html" class="chapter-card status-ready">
+      <div class="card-header"><span class="card-emoji">🏛️🎓</span><span class="status-badge badge-ready">Listo</span></div>
+      <div class="card-num">Capítulo 5.3</div>
+      <div class="card-title">Pirámides con Curiosidad RND + Cierre del Curso 🎓</div>
+      <div class="card-desc">Random Network Distillation técnicamente, recompensa intrínseca vs extrínseca, PyramidsRND.yaml, entrenar con PPO+RND 1M pasos, publicar en el Hub, y cierre completo del curso con todo lo aprendido y el mapa de lo que sigue.</div>
+      <div class="card-footer">🤗 Unit 5 + Cierre — HuggingFace</div>
+    </a>
+
+  </div><!-- /chapters-grid etapa 2 -->
+
+
+  <!-- ─── ETAPA 3: AVANZADO ────────────────── -->
+  <div class="stage-title">Etapa 3 — Avanzado: Algoritmos de Estado del Arte</div>
+
+  <div class="chapters-grid">
+
+    <!-- Cap 6.1 + 6.2 + 6.3 — LISTO -->
+    <a href="slides/capitulo_6_1_6_3.html" class="chapter-card status-ready">
+      <div class="card-header"><span class="card-emoji">📉🎭🦾</span><span class="status-badge badge-ready">Listo</span></div>
+      <div class="card-num">Capítulos 6.1 + 6.2 + 6.3</div>
+      <div class="card-title">Varianza en REINFORCE · Actor-Critic · A2C con Panda 🦾</div>
+      <div class="card-desc">Alta varianza en Monte Carlo, el tradeoff varianza-sesgo, arquitectura Actor-Critic, función de ventaja A(s,a), error TD como estimador de ventaja, comparativa REINFORCE vs A2C, y hands-on con PandaReachDense usando SB3.</div>
+      <div class="card-footer">🤗 Unit 6 — HuggingFace</div>
+    </a>
+
+    <!-- Cap 7.1 + 7.2 + 7.3 — LISTO -->
+    <a href="slides/capitulo_7_1_7_3.html" class="chapter-card status-ready">
+      <div class="card-header"><span class="card-emoji">🌐🪞⚽</span><span class="status-badge badge-ready">Listo</span></div>
+      <div class="card-num">Capítulos 7.1 + 7.2 + 7.3</div>
+      <div class="card-title">MARL · CTDE · Self-Play · ELO · SoccerTwos ⚽</div>
+      <div class="card-desc">Tipos de entornos (cooperativo, competitivo, mixto), no estacionariedad, CTDE, self-play con hiperparámetros ML-Agents, sistema ELO con ejemplo numérico completo, y hands-on SoccerTwos 2v2.</div>
+      <div class="card-footer">🤗 Unit 7 — HuggingFace</div>
+    </a>
+
+    <!-- Cap 8.1 + 8.2 + 8.3 — LISTO -->
+    <a href="slides/capitulo_8_1_8_3.html" class="chapter-card status-ready">
+      <div class="card-header"><span class="card-emoji">💣🛡️🛠️</span><span class="status-badge badge-ready">Listo</span></div>
+      <div class="card-num">Capítulos 8.1 + 8.2 + 8.3</div>
+      <div class="card-title">El Problema de Pasos Grandes · PPO · CleanRL 🛡️</div>
+      <div class="card-desc">Inestabilidad en A2C, ratio r(θ), función objetivo recortada L_CLIP, los 6 casos del clipping, función de pérdida completa (actor + crítico + entropía), comparativa A2C vs PPO, y hands-on CleanRL con LunarLander-v2.</div>
+      <div class="card-footer">🤗 Unit 8 — HuggingFace</div>
+    </a>
+
+    <a href="#" class="chapter-card status-pending" style="cursor:default; pointer-events:none;">
+      <div class="card-header"><span class="card-emoji">💀</span><span class="status-badge badge-pending">Pendiente</span></div>
+      <div class="card-num">Capítulo 8.4</div>
+      <div class="card-title">PPO Escalado: Entrenando en VizDoom</div>
+      <div class="card-footer">🤗 Unit 8 Part 2 — HuggingFace</div>
+    </a>
+
+    <a href="#" class="chapter-card status-pending" style="cursor:default; pointer-events:none;">
+      <div class="card-header"><span class="card-emoji">👁️</span><span class="status-badge badge-pending">Pendiente</span></div>
+      <div class="card-num">Capítulo 9.1</div>
+      <div class="card-title">Aprendizaje por Imitación: Aprender Viendo a un Experto</div>
+      <div class="card-footer">🤗 Bonus Unit 5 — HuggingFace</div>
+    </a>
+
+    <a href="#" class="chapter-card status-pending" style="cursor:default; pointer-events:none;">
+      <div class="card-header"><span class="card-emoji">🗺️</span><span class="status-badge badge-pending">Pendiente</span></div>
+      <div class="card-num">Capítulo 9.2</div>
+      <div class="card-title">Tópicos Avanzados: Lo que Viene Después</div>
+      <div class="card-footer">🤗 Bonus Unit 3 — HuggingFace</div>
+    </a>
+
+    <a href="#" class="chapter-card status-pending" style="cursor:default; pointer-events:none;">
+      <div class="card-header"><span class="card-emoji">🏁</span><span class="status-badge badge-pending">Pendiente</span></div>
+      <div class="card-num">Capítulo 9.3</div>
+      <div class="card-title">Proyecto Final: Tu Propio Agente, Tu Propio Entorno</div>
+      <div class="card-footer">🤗 Material original del curso</div>
+    </a>
+
+  </div><!-- /chapters-grid etapa 3 -->
+
+
+  <!-- ─── NOTEBOOKS ────────────────────────── -->
+  <div class="stage-title">Notebooks de Práctica (Google Colab)</div>
+
+  <div class="notebooks-grid">
+
+    <div class="notebook-card" style="opacity:0.5;">
+      <div class="nb-label">📒 Notebook 1</div>
+      <div class="nb-title">LunarLander con PPO</div>
+      <div class="nb-desc">Entrenar tu primer agente de RL y subirlo al Hugging Face Hub.</div>
+      <a href="#" class="colab-btn">⚡ Abrir en Colab (próximamente)</a>
+    </div>
+
+    <div class="notebook-card" style="opacity:0.5;">
+      <div class="nb-label">📒 Notebook 2</div>
+      <div class="nb-title">Q-Learning en FrozenLake y Taxi</div>
+      <div class="nb-desc">Implementar Q-Learning con NumPy desde cero.</div>
+      <a href="#" class="colab-btn">⚡ Abrir en Colab (próximamente)</a>
+    </div>
+
+    <div class="notebook-card" style="opacity:0.5;">
+      <div class="nb-label">📒 Notebook 3</div>
+      <div class="nb-title">REINFORCE en CartPole</div>
+      <div class="nb-desc">Policy gradient con PyTorch, código pre-estructurado.</div>
+      <a href="#" class="colab-btn">⚡ Abrir en Colab (próximamente)</a>
+    </div>
+
+  </div><!-- /notebooks-grid -->
+
+</main>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  FOOTER                                    -->
+<!-- ══════════════════════════════════════════ -->
+<footer>
+  <p>
+    Curso diseñado por <strong>Jose Miguel Lara Rangel</strong><br>
+    Basado en el <a href="https://huggingface.co/learn/deep-rl-course" target="_blank">Deep RL Course de Hugging Face 🤗</a> (Thomas Simonini)
+  </p>
+  <p style="text-align:right;">
+    <a href="https://github.com" target="_blank">GitHub →</a><br>
+    <span style="font-size:10px;">Actualizado: Mayo 2026</span>
+  </p>
+</footer>
+
+<script>
+  // Actualiza dinámicamente el porcentaje de progreso.
+  // Para actualizar: cambia el valor de `done` y `total`.
+  const done  = 31;  // capítulos terminados
+  const total = 17;  // total de capítulos en el índice
+  const pct   = Math.round((done / total) * 100);
+
+  document.getElementById('progress-text').textContent = done + ' / ' + total + ' capítulos (' + pct + '%)';
+  document.getElementById('progress-fill').style.width = pct + '%';
+</script>
+
+</body>
+</html>

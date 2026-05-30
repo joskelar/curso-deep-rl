@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capítulos 3.3 & 3.4 — Preprocesamiento · Demo Space Invaders</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/black.min.css">
+<link rel="stylesheet" href="../assets/css/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"></script>
+
+<style>
+/* ── Animaciones ── */
+@keyframes ball-right {
+  0%   { left: 10%; }
+  100% { left: 70%; }
+}
+@keyframes ball-left {
+  0%   { left: 70%; }
+  100% { left: 10%; }
+}
+@keyframes greyscale-fade {
+  0%, 100% { filter: saturate(1); }
+  50%       { filter: saturate(0); }
+}
+@keyframes scan-line {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(400%); }
+}
+@keyframes crop-reveal {
+  0%   { clip-path: inset(0 100% 0 0); }
+  100% { clip-path: inset(0 0% 0 0); }
+}
+@keyframes frame-slide-in {
+  0%   { opacity: 0; transform: translateX(-12px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+@keyframes invader-move {
+  0%, 100% { transform: translateX(0); }
+  50%       { transform: translateX(12px); }
+}
+@keyframes shot-fly {
+  0%   { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(-60px); opacity: 0; }
+}
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+/* ── Pong simulation ── */
+.pong-court {
+  background: #050814;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  position: relative;
+  overflow: hidden;
+  height: 100px;
+}
+.pong-ball {
+  width: 8px; height: 8px;
+  background: white;
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  box-shadow: 0 0 6px white;
+}
+.pong-paddle-l {
+  width: 6px; height: 28px;
+  background: var(--accent-cyan);
+  border-radius: 3px;
+  position: absolute;
+  left: 8px; top: 50%;
+  transform: translateY(-50%);
+  box-shadow: 0 0 8px var(--accent-cyan);
+}
+.pong-paddle-r {
+  width: 6px; height: 28px;
+  background: var(--accent-violet);
+  border-radius: 3px;
+  position: absolute;
+  right: 8px; top: 50%;
+  transform: translateY(-50%);
+  box-shadow: 0 0 8px var(--accent-violet);
+}
+.pong-net {
+  position: absolute;
+  left: 50%; top: 0; bottom: 0;
+  width: 1px;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255,255,255,0.2) 0px, rgba(255,255,255,0.2) 6px,
+    transparent 6px, transparent 12px
+  );
+}
+
+/* ── Frame pipeline visual ── */
+.frame-pipeline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 8px 4px;
+}
+.fp-frame {
+  flex-shrink: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+.fp-label {
+  font-family: var(--font-mono);
+  font-size: 0.38em;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 4px;
+}
+.fp-arrow {
+  color: var(--accent-cyan);
+  font-size: 1.1em;
+  flex-shrink: 0;
+  align-self: center;
+  padding-bottom: 18px;
+}
+
+/* ── Pixel frame (Pong simulation) ── */
+.pf-pixels {
+  display: grid;
+  gap: 0;
+  background: #050814;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.pf-px { aspect-ratio: 1; }
+/* Colors for Pong-like frames */
+.pf-bg  { background: #0a0e1a; }
+.pf-wh  { background: #dde; }
+.pf-cy  { background: #22d3ee; }
+.pf-vio { background: #a855f7; }
+.pf-gr  { background: #888; }   /* greyscale version */
+.pf-lgy { background: #555; }
+.pf-dgy { background: #333; }
+.pf-bgy { background: #222; }
+
+/* ── Size comparison ── */
+.size-bar {
+  height: 18px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  padding-left: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.44em;
+  font-weight: 700;
+  margin: 4px 0;
+  transition: width 0.6s ease-out;
+}
+
+/* ── Terminal ── */
+.terminal {
+  background: #020812;
+  border: 1px solid rgba(34,211,238,0.3);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.49em;
+  color: #a8c8e8;
+  line-height: 1.85;
+  position: relative;
+}
+.terminal::before {
+  content: "● ● ●";
+  position: absolute;
+  top: 7px; left: 10px;
+  font-size: 0.75em;
+  color: var(--text-muted);
+  letter-spacing: 4px;
+}
+.terminal .t-body { margin-top: 14px; }
+.t-c { color: #4a5568; }
+.t-k { color: #c678dd; }
+.t-s { color: #98c379; }
+.t-n { color: #d19a66; }
+.t-f { color: #61afef; }
+.t-v { color: #e5c07b; }
+.t-o { color: #22c55e; }
+
+/* ── Space Invaders full scene ── */
+.si-scene {
+  background: #050814;
+  border: 2px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 14px 16px;
+  position: relative;
+  font-family: var(--font-mono);
+  overflow: hidden;
+}
+.si-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 4px 0;
+  font-size: 0.8em;
+}
+.si-inv { animation: invader-move 1.2s ease-in-out infinite; display: inline-block; }
+.si-shot { animation: shot-fly 0.8s linear infinite; display: inline-block; }
+.si-score {
+  font-family: var(--font-mono);
+  font-size: 0.46em;
+  color: var(--accent-cyan);
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+/* ── Q-value bar chart ── */
+.qbar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 80px;
+  padding: 0 4px;
+}
+.qbar {
+  flex: 1;
+  border-radius: 4px 4px 0 0;
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  transition: height 0.3s;
+}
+.qbar-label {
+  font-family: var(--font-mono);
+  font-size: 0.38em;
+  text-align: center;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.qbar-val {
+  font-family: var(--font-mono);
+  font-size: 0.38em;
+  font-weight: 700;
+  padding-bottom: 3px;
+  color: white;
+}
+
+/* ── Behaviour analysis card ── */
+.behaviour-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin: 6px 0;
+  font-size: 0.56em;
+}
+.bi-icon { font-size: 1.6em; flex-shrink: 0; }
+.bi-text { line-height: 1.55; }
+.bi-text strong { color: var(--accent-cyan); }
+
+/* ── Training log ── */
+.train-log {
+  background: #020812;
+  border: 1px solid rgba(34,211,238,0.2);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-family: var(--font-mono);
+  font-size: 0.46em;
+  color: #a8c8e8;
+  line-height: 1.9;
+}
+.tl-time { color: var(--text-muted); }
+.tl-ep   { color: var(--accent-cyan); }
+.tl-rew  { color: #22c55e; }
+.tl-loss { color: #ef4444; }
+.tl-eps  { color: var(--accent-gold); }
+
+/* ── Image transform pipeline ── */
+.img-transform {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  overflow-x: auto;
+}
+.it-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.it-box {
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+.it-label {
+  font-family: var(--font-mono);
+  font-size: 0.4em;
+  color: var(--text-muted);
+  text-align: center;
+  max-width: 80px;
+  line-height: 1.4;
+}
+.it-arrow {
+  color: var(--accent-cyan);
+  font-size: 1.2em;
+  align-self: center;
+  margin-bottom: 20px;
+}
+
+/* ── Stacked frames visual ── */
+.stack-container {
+  position: relative;
+  width: 90px;
+  height: 90px;
+}
+.stacked-frame {
+  position: absolute;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: #0a0e1a;
+}
+</style>
+</head>
+
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ══ PORTADA ══════════════════════════════ -->
+<section>
+  <div class="title-slide" style="position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-60px;right:-60px;width:380px;height:380px;border-radius:50%;background:radial-gradient(circle,rgba(34,211,238,0.1) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-40px;left:-40px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(168,85,247,0.08) 0%,transparent 70%);pointer-events:none;"></div>
+    <div class="chapter-badge">Capítulos 3.3 + 3.4 · Módulo 3</div>
+    <h1>Lo Que Ve<br>la Red:<br><span class="gradient-text">Preprocesamiento</span><br>
+    <span style="font-size:0.7em;color:var(--text-muted);">+ Demo Space Invaders 👾</span></h1>
+    <div class="divider"></div>
+    <p style="font-size:0.62em;color:var(--text-muted);max-width:640px;margin-top:8px;line-height:1.7;">
+      Por qué escala de grises · Por qué 84×84 ·<br>
+      El problema de la limitación temporal · Frame stacking ·<br>
+      Demo guiada: analizar un agente DQN entrenado
+    </p>
+    <div style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;">
+      <span class="pill">Unit 3 — HuggingFace 🤗</span>
+      <span class="pill">Jose Miguel Lara Rangel</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SECCIÓN 3.3 ══════════════════════════ -->
+<section>
+  <div class="section-slide" style="background:linear-gradient(160deg,#04060f,#060a14);">
+    <span class="big-emoji">🖼️</span>
+    <div class="chapter-badge" style="font-size:0.38em;margin-top:8px;">Capítulo 3.3</div>
+    <h1>Preprocesamiento<br>y Frame Stacking</h1>
+    <p style="font-size:0.6em;color:var(--text-muted);max-width:520px;text-align:center;margin-top:10px;">
+      Una imagen cruda de Atari tiene demasiada información. Aprende a reducirla sin perder lo importante.
+    </p>
+  </div>
+</section>
+
+<!-- ── El problema: imagen cruda = demasiado ruido ── -->
+<section>
+  <span class="slide-tag">3.3 · El Problema</span>
+  <h2>El problema: demasiada información innecesaria 🗑️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Una pantalla de Atari en su estado original tiene <strong>210 × 160 píxeles × 3 canales de color</strong>. Eso es mucho dato para procesar en cada paso de la simulación. La mayoría es redundante.</p>
+
+  <div style="display:flex;gap:16px;align-items:flex-start;">
+    <!-- Original frame mock -->
+    <div style="flex:1;text-align:center;">
+      <div style="background:#050814;border:2px solid rgba(255,255,255,0.15);border-radius:10px;padding:12px;display:inline-block;width:100%;">
+        <div style="font-family:var(--font-mono);font-size:0.4em;color:#ef4444;margin-bottom:8px;letter-spacing:0.08em;">IMAGEN ORIGINAL</div>
+        <!-- Coloured mock of Space Invaders -->
+        <div style="display:grid;grid-template-columns:repeat(20,1fr);gap:1px;max-width:180px;margin:0 auto;border-radius:4px;overflow:hidden;">
+          <!-- Score bar (blue/black) -->
+          <div style="background:#000033;grid-column:1/-1;height:6px;"></div>
+          <!-- Invaders row 1 (green) -->
+          <div style="height:6px;background:#003300;grid-column:1/-1;"></div>
+          <div style="height:6px;background:#00cc44;grid-column:3/6;border-radius:1px;"></div>
+          <div style="height:6px;background:#00cc44;grid-column:8/11;border-radius:1px;"></div>
+          <div style="height:6px;background:#00cc44;grid-column:13/16;border-radius:1px;"></div>
+          <div style="height:6px;background:#003300;grid-column:1/-1;"></div>
+          <!-- Sky -->
+          <div style="height:20px;background:#020614;grid-column:1/-1;"></div>
+          <!-- Shot (red/orange) -->
+          <div style="height:10px;background:#020614;grid-column:1/-1;"></div>
+          <div style="height:4px;background:#ff6600;grid-column:9/11;border-radius:2px;"></div>
+          <div style="height:16px;background:#020614;grid-column:1/-1;"></div>
+          <!-- Bunkers (green bricks) -->
+          <div style="height:5px;background:#006600;grid-column:2/5;border-radius:1px;"></div>
+          <div style="height:5px;background:#020614;grid-column:5/9;"></div>
+          <div style="height:5px;background:#006600;grid-column:9/12;border-radius:1px;"></div>
+          <div style="height:5px;background:#020614;grid-column:12/16;"></div>
+          <div style="height:5px;background:#006600;grid-column:16/19;border-radius:1px;"></div>
+          <!-- Cannon (yellow) -->
+          <div style="height:8px;background:#020614;grid-column:1/-1;"></div>
+          <div style="height:5px;background:#ccaa00;grid-column:9/12;border-radius:1px;"></div>
+          <div style="height:3px;background:#020614;grid-column:1/-1;"></div>
+          <!-- Lives bar (red) -->
+          <div style="height:4px;background:#cc0000;grid-column:2/4;border-radius:1px;"></div>
+          <div style="height:4px;background:#cc0000;grid-column:5/7;border-radius:1px;"></div>
+        </div>
+        <div style="margin-top:6px;font-family:var(--font-mono);font-size:0.36em;color:var(--text-muted);">210 × 160 × 3 = 100,800 valores<br>por cada frame</div>
+      </div>
+    </div>
+
+    <!-- Problems list -->
+    <div style="flex:1.3;display:flex;flex-direction:column;gap:8px;">
+      <div class="card card-pink" style="padding:12px 14px;">
+        <h3 style="font-size:0.78em;">Problema 1: El color no aporta información</h3>
+        <p>En Space Invaders, saber si un invasor es verde brillante o verde oscuro no cambia la estrategia del agente. <strong>El color es ruido</strong> que complica innecesariamente el aprendizaje.</p>
+      </div>
+      <div class="card card-pink" style="padding:12px 14px;">
+        <h3 style="font-size:0.78em;">Problema 2: La resolución es excesiva</h3>
+        <p>210×160 píxeles es mucho más detalle del necesario. El agente no necesita ver los detalles de textura — solo necesita saber <strong>dónde están los objetos</strong>.</p>
+      </div>
+      <div class="card card-pink" style="padding:12px 14px;">
+        <h3 style="font-size:0.78em;">Problema 3: Un solo frame no muestra movimiento</h3>
+        <p>Si ves una fotografía de una pelota, <strong>no puedes saber si va hacia la izquierda o la derecha</strong>. Sin sentido del tiempo, el agente no puede actuar bien.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Solución 1: Escala de grises ── -->
+<section>
+  <span class="slide-tag">3.3 · Escala de Grises</span>
+  <h2>Paso 1: Convertir a escala de grises 🔲</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">El primer paso del preprocesamiento elimina los canales de color. En lugar de 3 números por píxel (Rojo, Verde, Azul), solo guardamos <strong>1 número por píxel</strong> (intensidad de gris).</p>
+
+  <!-- Transform visual -->
+  <div class="img-transform" style="margin-bottom:14px;justify-content:center;">
+    <!-- Original -->
+    <div class="it-step">
+      <div class="it-box" style="width:100px;height:70px;background:linear-gradient(135deg,#020614 0%,#002200 40%,#00cc44 55%,#ccaa00 80%,#020614 100%);border:1px solid rgba(255,255,255,0.15);">
+        <div style="position:absolute;top:6px;left:8px;width:20px;height:5px;background:#00cc44;border-radius:2px;opacity:0.8;"></div>
+        <div style="position:absolute;top:6px;left:34px;width:20px;height:5px;background:#00cc44;border-radius:2px;opacity:0.8;"></div>
+        <div style="position:absolute;top:6px;left:60px;width:20px;height:5px;background:#00cc44;border-radius:2px;opacity:0.8;"></div>
+        <div style="position:absolute;bottom:10px;left:42px;width:16px;height:6px;background:#ccaa00;border-radius:2px;"></div>
+      </div>
+      <div class="it-label">Original<br>RGB color<br>3 canales</div>
+    </div>
+    <div class="it-arrow">→</div>
+    <!-- Greyscale -->
+    <div class="it-step">
+      <div class="it-box" style="width:100px;height:70px;background:linear-gradient(135deg,#111 0%,#222 40%,#666 55%,#888 80%,#111 100%);border:1px solid rgba(255,255,255,0.15);">
+        <div style="position:absolute;top:6px;left:8px;width:20px;height:5px;background:#666;border-radius:2px;opacity:0.8;"></div>
+        <div style="position:absolute;top:6px;left:34px;width:20px;height:5px;background:#666;border-radius:2px;opacity:0.8;"></div>
+        <div style="position:absolute;top:6px;left:60px;width:20px;height:5px;background:#666;border-radius:2px;opacity:0.8;"></div>
+        <div style="position:absolute;bottom:10px;left:42px;width:16px;height:6px;background:#888;border-radius:2px;"></div>
+      </div>
+      <div class="it-label">Escala de grises<br>1 canal<br>÷3 de datos</div>
+    </div>
+  </div>
+
+  <div class="cols2">
+    <div class="key-idea" style="margin:0;">
+      <span class="ki-label">📐 El cálculo</span>
+      <p>De <strong>3 valores por píxel</strong> (R, G, B) a <strong>1 solo valor</strong> — la luminosidad promedio. Reducimos los datos de entrada a un tercio sin perder información de posición o forma.</p>
+    </div>
+    <div class="card card-gold" style="margin:0;">
+      <p>💾 <strong>Ahorro real:</strong><br>
+      Original: 210 × 160 × 3 = <span style="color:#ef4444;">100,800 valores</span><br>
+      Grises: 210 × 160 × 1 = <span style="color:#22c55e;">33,600 valores</span><br>
+      Reducción del <strong style="color:#22c55e;">66%</strong> del tamaño del estado.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Solución 2: Recortar y reducir a 84×84 ── -->
+<section>
+  <span class="slide-tag">3.3 · Redimensionar</span>
+  <h2>Paso 2: Recortar y reducir a 84 × 84 píxeles ✂️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Con la imagen ya en escala de grises, la redimensionamos a <strong>84×84 píxeles</strong>. También se puede recortar la parte de la pantalla que no contiene información útil.</p>
+
+  <!-- Size comparison bars -->
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:14px;">
+    <p style="font-size:0.5em;color:var(--text-muted);margin-bottom:12px;">Comparación de tamaño de los estados:</p>
+
+    <div style="margin-bottom:10px;">
+      <div style="font-family:var(--font-mono);font-size:0.48em;color:var(--text-muted);margin-bottom:4px;">Con color, resolución original:</div>
+      <div class="size-bar" style="width:100%;background:rgba(239,68,68,0.3);color:#ef4444;border:1px solid rgba(239,68,68,0.4);">
+        210 × 160 × 3 = 100,800 valores
+      </div>
+    </div>
+    <div style="margin-bottom:10px;">
+      <div style="font-family:var(--font-mono);font-size:0.48em;color:var(--text-muted);margin-bottom:4px;">Escala de grises:</div>
+      <div class="size-bar" style="width:66%;background:rgba(251,191,36,0.2);color:var(--accent-gold);border:1px solid rgba(251,191,36,0.3);">
+        210 × 160 × 1 = 33,600 valores
+      </div>
+    </div>
+    <div>
+      <div style="font-family:var(--font-mono);font-size:0.48em;color:var(--text-muted);margin-bottom:4px;">Escala de grises + redimensionado 84×84:</div>
+      <div class="size-bar" style="width:22%;background:rgba(34,197,94,0.2);color:#22c55e;border:1px solid rgba(34,197,94,0.3);">
+        84 × 84 = 7,056 valores ✅
+      </div>
+    </div>
+    <p style="font-size:0.44em;color:var(--text-muted);margin-top:10px;">Reducción total: de 100,800 a 7,056 valores = <strong style="color:#22c55e;">el estado es 14× más pequeño</strong>, con toda la información de posición intacta.</p>
+  </div>
+
+  <div class="card card-cyan">
+    <p>🎮 <strong>¿Se pierde información importante?</strong> No. Los objetos del juego — invasores, cañón, disparos — siguen siendo perfectamente visibles en 84×84 píxeles en escala de grises. Lo que se pierde son detalles de textura irrelevantes para decidir qué acción tomar.</p>
+  </div>
+</section>
+
+<!-- ── El problema temporal ── -->
+<section>
+  <span class="slide-tag">3.3 · Limitación Temporal</span>
+  <h2>El problema temporal: ¿hacia dónde va la pelota? 🎾</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Incluso con el preprocesamiento de color y tamaño resuelto, queda un problema más fundamental: <strong>una sola imagen es una fotografía estática</strong>. No muestra movimiento.</p>
+
+  <!-- Pong demonstration -->
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:14px;">
+    <p style="font-size:0.5em;color:var(--text-muted);text-align:center;margin-bottom:10px;">Ejemplo con Pong — el juego de la pelota: si ves solo UN frame, ¿puedes decir hacia dónde va la pelota?</p>
+    <div class="cols2" style="gap:14px;">
+      <!-- Single frame - can't tell direction -->
+      <div>
+        <div class="pong-court" style="margin-bottom:6px;">
+          <div class="pong-net"></div>
+          <div class="pong-paddle-l"></div>
+          <div class="pong-paddle-r" style="top:35%;"></div>
+          <div class="pong-ball" style="left:45%;top:42%;"></div>
+        </div>
+        <div style="text-align:center;font-size:0.48em;color:#ef4444;">❌ 1 solo frame → No sabes hacia dónde va</div>
+      </div>
+      <!-- Four frames - can tell direction -->
+      <div>
+        <div style="display:flex;gap:4px;">
+          <div class="pong-court" style="flex:1;height:60px;">
+            <div class="pong-net"></div>
+            <div class="pong-paddle-l" style="height:18px;"></div>
+            <div class="pong-paddle-r" style="top:40%;height:18px;"></div>
+            <div class="pong-ball" style="left:20%;top:35%;width:6px;height:6px;opacity:0.4;"></div>
+          </div>
+          <div class="pong-court" style="flex:1;height:60px;">
+            <div class="pong-net"></div>
+            <div class="pong-paddle-l" style="height:18px;top:40%;"></div>
+            <div class="pong-paddle-r" style="top:38%;height:18px;"></div>
+            <div class="pong-ball" style="left:33%;top:38%;width:6px;height:6px;opacity:0.6;"></div>
+          </div>
+          <div class="pong-court" style="flex:1;height:60px;">
+            <div class="pong-net"></div>
+            <div class="pong-paddle-l" style="height:18px;top:44%;"></div>
+            <div class="pong-paddle-r" style="top:36%;height:18px;"></div>
+            <div class="pong-ball" style="left:45%;top:42%;width:6px;height:6px;opacity:0.8;"></div>
+          </div>
+          <div class="pong-court" style="flex:1;height:60px;">
+            <div class="pong-net"></div>
+            <div class="pong-paddle-l" style="height:18px;top:48%;"></div>
+            <div class="pong-paddle-r" style="top:35%;height:18px;"></div>
+            <div class="pong-ball" style="left:58%;top:46%;width:6px;height:6px;opacity:1;"></div>
+          </div>
+        </div>
+        <div style="text-align:center;font-size:0.48em;color:#22c55e;margin-top:6px;">✅ 4 frames seguidos → La pelota va hacia la derecha ↘</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">🎯 La solución: frame stacking</span>
+    <p>En lugar de pasar un solo frame a la red, apilamos <strong>4 frames consecutivos</strong> como un solo estado. Así la red "ve" el movimiento: dónde estaba la pelota hace 3 pasos, hace 2, hace 1, y ahora.</p>
+  </div>
+</section>
+
+<!-- ── Frame stacking visual completo ── -->
+<section>
+  <span class="slide-tag">3.3 · Frame Stacking</span>
+  <h2>Paso 3: Apilar 4 frames — capturar el tiempo 📚</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">El estado final que recibe la red no es una imagen — son <strong>4 imágenes de 84×84 apiladas</strong>, cada una de un momento diferente:</p>
+
+  <!-- Stack visual -->
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:14px;">
+    <div style="display:flex;gap:16px;align-items:center;justify-content:center;">
+
+      <!-- 4 individual frames -->
+      <div style="display:flex;gap:6px;align-items:center;">
+        <div style="text-align:center;">
+          <div style="width:52px;height:52px;background:#0a0e1a;border:1px solid rgba(255,255,255,0.08);border-radius:6px;display:flex;align-items:center;justify-content:center;opacity:0.4;position:relative;">
+            <div style="font-size:0.5em;color:var(--text-muted);">t-3</div>
+            <div style="position:absolute;bottom:12px;left:10px;width:4px;height:4px;background:#888;border-radius:50%;"></div>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:0.38em;color:var(--text-muted);margin-top:3px;">hace 3</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:52px;height:52px;background:#0a0e1a;border:1px solid rgba(255,255,255,0.1);border-radius:6px;display:flex;align-items:center;justify-content:center;opacity:0.6;position:relative;">
+            <div style="font-size:0.5em;color:var(--text-muted);">t-2</div>
+            <div style="position:absolute;bottom:16px;left:16px;width:4px;height:4px;background:#aaa;border-radius:50%;"></div>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:0.38em;color:var(--text-muted);margin-top:3px;">hace 2</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:52px;height:52px;background:#0a0e1a;border:1px solid rgba(255,255,255,0.15);border-radius:6px;display:flex;align-items:center;justify-content:center;opacity:0.8;position:relative;">
+            <div style="font-size:0.5em;color:var(--text-muted);">t-1</div>
+            <div style="position:absolute;bottom:20px;left:22px;width:4px;height:4px;background:#ccc;border-radius:50%;"></div>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:0.38em;color:var(--text-muted);margin-top:3px;">hace 1</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:52px;height:52px;background:#0a0e1a;border:1px solid rgba(34,211,238,0.4);border-radius:6px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 10px rgba(34,211,238,0.2);position:relative;">
+            <div style="font-size:0.5em;color:var(--accent-cyan);font-weight:700;">ahora</div>
+            <div style="position:absolute;bottom:24px;left:28px;width:5px;height:5px;background:var(--accent-cyan);border-radius:50%;box-shadow:0 0 6px var(--accent-cyan);"></div>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:0.38em;color:var(--accent-cyan);margin-top:3px;">actual</div>
+        </div>
+      </div>
+
+      <div style="font-size:1.4em;color:var(--accent-cyan);">→</div>
+
+      <!-- Stacked result -->
+      <div style="text-align:center;">
+        <div style="position:relative;width:76px;height:76px;margin:0 auto;">
+          <div style="position:absolute;left:18px;top:18px;width:52px;height:52px;background:#0a0e1a;border:1px solid rgba(255,255,255,0.06);border-radius:6px;"></div>
+          <div style="position:absolute;left:12px;top:12px;width:52px;height:52px;background:#0a0e1a;border:1px solid rgba(255,255,255,0.08);border-radius:6px;"></div>
+          <div style="position:absolute;left:6px;top:6px;width:52px;height:52px;background:#0a0e1a;border:1px solid rgba(255,255,255,0.1);border-radius:6px;"></div>
+          <div style="position:absolute;left:0;top:0;width:52px;height:52px;background:#0a0e1a;border:1px solid rgba(34,211,238,0.4);border-radius:6px;box-shadow:0 0 10px rgba(34,211,238,0.2);display:flex;align-items:center;justify-content:center;">
+            <div style="font-size:0.6em;color:var(--accent-cyan);font-family:var(--font-mono);">4×</div>
+          </div>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:0.42em;color:var(--accent-cyan);margin-top:8px;">Estado final:<br>4 × 84 × 84</div>
+      </div>
+
+      <div style="font-size:1.4em;color:var(--accent-cyan);">→</div>
+
+      <!-- Network input -->
+      <div style="text-align:center;">
+        <div style="width:52px;height:52px;background:rgba(168,85,247,0.15);border:1px solid var(--accent-violet);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.6em;box-shadow:var(--glow-violet);">🧠</div>
+        <div style="font-family:var(--font-mono);font-size:0.42em;color:var(--accent-violet);margin-top:8px;">Red DQN<br>→ valores Q</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="cols2">
+    <div class="card card-violet" style="padding:12px 14px;">
+      <h3 style="font-size:0.78em;">¿Por qué exactamente 4 frames?</h3>
+      <p>4 frames es suficiente para capturar el movimiento de cualquier objeto en la pantalla. Más de 4 aumentaría el tamaño del estado sin añadir información nueva útil. Fue determinado empíricamente por los autores del paper original de DQN (DeepMind, 2013).</p>
+    </div>
+    <div class="card card-gold" style="padding:12px 14px;">
+      <h3 style="font-size:0.78em;">Información temporal en las capas CNN</h3>
+      <p>Las capas convolucionales de DQN no solo detectan patrones en cada frame — al recibir 4 frames apilados, también pueden aprender a <strong>comparar posiciones</strong> entre frames y detectar velocidad y dirección de los objetos.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Pipeline completo ── -->
+<section>
+  <span class="slide-tag">3.3 · Pipeline Completo</span>
+  <h2>El pipeline completo de preprocesamiento 🏭</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Cada vez que el agente recibe un frame del entorno, pasa por estas etapas antes de llegar a la red:</p>
+
+  <!-- Full pipeline -->
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:14px;overflow-x:auto;">
+    <div style="display:flex;gap:8px;align-items:center;min-width:660px;justify-content:center;">
+
+      <div style="text-align:center;flex-shrink:0;">
+        <div style="width:80px;height:56px;background:linear-gradient(135deg,#020614,#002200,#00cc44,#ccaa00);border:1px solid rgba(255,255,255,0.1);border-radius:6px;"></div>
+        <div style="font-family:var(--font-mono);font-size:0.38em;color:var(--text-muted);margin-top:4px;">Atari raw<br>210×160×3<br><span style="color:#ef4444;">100,800 vals</span></div>
+      </div>
+
+      <div style="color:var(--accent-cyan);font-size:0.9em;flex-shrink:0;">→</div>
+
+      <div style="text-align:center;flex-shrink:0;">
+        <div style="width:80px;height:56px;background:linear-gradient(135deg,#111,#333,#666,#888);border:1px solid rgba(255,255,255,0.12);border-radius:6px;"></div>
+        <div style="font-family:var(--font-mono);font-size:0.38em;color:var(--text-muted);margin-top:4px;">Escala grises<br>210×160×1<br><span style="color:var(--accent-gold);">33,600 vals</span></div>
+      </div>
+
+      <div style="color:var(--accent-cyan);font-size:0.9em;flex-shrink:0;">→</div>
+
+      <div style="text-align:center;flex-shrink:0;">
+        <div style="width:52px;height:52px;background:linear-gradient(135deg,#111,#333,#555,#777);border:1px solid rgba(255,255,255,0.15);border-radius:6px;"></div>
+        <div style="font-family:var(--font-mono);font-size:0.38em;color:var(--text-muted);margin-top:4px;">Recorte +<br>84×84×1<br><span style="color:#22c55e;">7,056 vals</span></div>
+      </div>
+
+      <div style="color:var(--accent-cyan);font-size:0.9em;flex-shrink:0;">→</div>
+
+      <div style="text-align:center;flex-shrink:0;">
+        <div style="position:relative;width:68px;height:68px;">
+          <div style="position:absolute;left:12px;top:12px;width:48px;height:48px;background:#111;border:1px solid rgba(255,255,255,0.05);border-radius:5px;"></div>
+          <div style="position:absolute;left:8px;top:8px;width:48px;height:48px;background:#151515;border:1px solid rgba(255,255,255,0.07);border-radius:5px;"></div>
+          <div style="position:absolute;left:4px;top:4px;width:48px;height:48px;background:#1a1a1a;border:1px solid rgba(255,255,255,0.09);border-radius:5px;"></div>
+          <div style="position:absolute;left:0;top:0;width:48px;height:48px;background:#1f1f1f;border:1px solid rgba(34,211,238,0.35);border-radius:5px;"></div>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:0.38em;color:var(--text-muted);margin-top:4px;">Apilar 4<br>4×84×84<br><span style="color:var(--accent-cyan);">28,224 vals</span></div>
+      </div>
+
+      <div style="color:var(--accent-cyan);font-size:0.9em;flex-shrink:0;">→</div>
+
+      <div style="text-align:center;flex-shrink:0;">
+        <div style="width:64px;height:64px;background:rgba(168,85,247,0.15);border:1px solid var(--accent-violet);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.8em;box-shadow:var(--glow-violet);">🧠</div>
+        <div style="font-family:var(--font-mono);font-size:0.38em;color:var(--accent-violet);margin-top:4px;">DQN<br>→ Q values</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">📝 Resumen del preprocesamiento</span>
+    <p>Con tres operaciones — escala de grises, redimensionar a 84×84, y apilar 4 frames — el estado pasa de <strong>100,800 valores</strong> a solo <strong>28,224 valores</strong>, manteniendo toda la información relevante y añadiendo percepción del movimiento.</p>
+  </div>
+</section>
+
+<!-- ══ SECCIÓN 3.4 ══════════════════════════ -->
+<section>
+  <div class="section-slide" style="background:linear-gradient(160deg,#04060f,#0a0612);position:relative;overflow:hidden;">
+    <div style="position:absolute;top:10%;left:8%;font-size:2em;animation:invader-move 1.5s ease-in-out infinite;display:inline-block;">👾</div>
+    <div style="position:absolute;top:15%;right:10%;font-size:1.5em;animation:invader-move 1.8s ease-in-out infinite;animation-delay:0.4s;display:inline-block;">👾</div>
+    <div style="position:absolute;top:22%;left:25%;font-size:1.3em;animation:invader-move 1.6s ease-in-out infinite;animation-delay:0.8s;display:inline-block;">👾</div>
+    <span class="big-emoji">🎮</span>
+    <div class="chapter-badge" style="font-size:0.38em;border-color:var(--accent-violet);color:var(--accent-violet);background:rgba(168,85,247,0.07);margin-top:8px;">Capítulo 3.4</div>
+    <h1>Demo: DQN<br>Jugando Space Invaders</h1>
+    <p style="font-size:0.6em;color:var(--text-muted);max-width:520px;text-align:center;margin-top:10px;">
+      Sin código. Solo analizamos qué aprendió el agente y por qué se comporta como lo hace.
+    </p>
+  </div>
+</section>
+
+<!-- ── Configuración del hands-on ── -->
+<section>
+  <span class="slide-tag">3.4 · Objetivo</span>
+  <h2>¿Qué haremos en esta sesión? 🎯</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">A diferencia de capítulos anteriores, <strong>no entrenamos desde cero</strong> (DQN tarda horas de GPU). En cambio, cargamos un agente ya entrenado y lo analizamos:</p>
+
+  <div class="cols2" style="margin-bottom:14px;">
+    <div class="card card-cyan" style="padding:16px;">
+      <span class="card-icon">📥</span>
+      <h3>Lo que hacemos</h3>
+      <p>Descargar un modelo DQN pre-entrenado desde el Hub, ejecutar partidas, grabar el video del agente jugando, y analizar su comportamiento paso a paso.</p>
+    </div>
+    <div class="card card-violet" style="padding:16px;">
+      <span class="card-icon">🔍</span>
+      <h3>Lo que aprendemos</h3>
+      <p>Cómo leer los Q-values que produce la red en cada frame, qué estrategias emerge<br>sin haberlas programado explícitamente, y cómo evaluar si un agente es bueno.</p>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">⚠️ Nota importante sobre el entorno</span>
+    <p>El entorno oficial se llama <strong>SpaceInvadersNoFrameskip-v4</strong> (con "NoFrameskip" en el nombre). Esta versión no salta frames automáticamente — la red ve <strong>todos los frames</strong> del juego, lo que le da más información de movimiento. Las versiones con "v0" o "Frameskip" son diferentes.</p>
+  </div>
+</section>
+
+<!-- ── Setup rápido ── -->
+<section>
+  <span class="slide-tag">3.4 · Código Setup</span>
+  <h2>Cargar el agente desde el Hub 📦</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">RL-Baselines3-Zoo es la herramienta que usa el curso para entrenar y cargar agentes de Atari. Con tres comandos tenemos el agente listo:</p>
+
+  <div class="terminal" style="margin-bottom:12px;">
+    <div class="t-body">
+      <span class="t-c"># 1. Instalar RL-Baselines3-Zoo y ROMs de Atari</span><br>
+      <span class="t-f">!</span>pip install rl_zoo3 gymnasium[atari,accept-rom-license] autorom<br>
+      <span class="t-f">!</span>AutoROM --accept-license<br><br>
+      <span class="t-c"># 2. Descargar un modelo DQN pre-entrenado del Hub</span><br>
+      <span class="t-f">!</span>python -m rl_zoo3.load_from_hub \<br>
+      &nbsp;&nbsp;--algo dqn \<br>
+      &nbsp;&nbsp;--env <span class="t-s">SpaceInvadersNoFrameskip-v4</span> \<br>
+      &nbsp;&nbsp;-orga sb3 \<br>
+      &nbsp;&nbsp;-f logs/<br><br>
+      <span class="t-c"># 3. Ejecutar el agente y grabarlo en video</span><br>
+      <span class="t-f">!</span>python -m rl_zoo3.enjoy \<br>
+      &nbsp;&nbsp;--algo dqn \<br>
+      &nbsp;&nbsp;--env <span class="t-s">SpaceInvadersNoFrameskip-v4</span> \<br>
+      &nbsp;&nbsp;-f logs/ \<br>
+      &nbsp;&nbsp;--no-render \<br>
+      &nbsp;&nbsp;-n <span class="t-n">5000</span>  <span class="t-c"># 5000 pasos de juego</span>
+    </div>
+  </div>
+
+  <div class="card card-gold">
+    <p>🎬 El video del agente jugando se guarda automáticamente como un archivo <code>.mp4</code>. También puedes subir tu propio modelo entrenado al Hub con <code>rl_zoo3.push_to_hub</code> — el criterio de certificación del curso es obtener una <strong>puntuación media ≥ 200</strong>.</p>
+  </div>
+</section>
+
+<!-- ── La escena de Space Invaders ── -->
+<section>
+  <span class="slide-tag">3.4 · El Entorno</span>
+  <h2>Space Invaders: el campo de batalla 🚀</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Antes de analizar el comportamiento del agente, recordemos las reglas del juego:</p>
+
+  <div style="display:flex;gap:16px;align-items:flex-start;">
+    <!-- Game scene -->
+    <div style="flex:1;">
+      <div class="si-scene">
+        <div class="si-score">
+          <span>PUNTOS: 0850</span>
+          <span>VIDAS: ❤️❤️❤️</span>
+          <span>NIVEL: 1</span>
+        </div>
+        <!-- Invaders -->
+        <div class="si-row">
+          <span class="si-inv">👾</span><span class="si-inv" style="animation-delay:0.2s;">👾</span>
+          <span class="si-inv" style="animation-delay:0.4s;">👾</span><span class="si-inv" style="animation-delay:0.6s;">👾</span>
+          <span class="si-inv" style="animation-delay:0.8s;">👾</span><span class="si-inv" style="animation-delay:1s;">👾</span>
+        </div>
+        <div class="si-row" style="opacity:0.85;">
+          <span class="si-inv" style="animation-delay:0.3s;">👾</span><span class="si-inv" style="animation-delay:0.5s;">👾</span>
+          <span class="si-inv" style="animation-delay:0.7s;">👾</span><span class="si-inv" style="animation-delay:0.9s;">👾</span>
+          <span class="si-inv" style="animation-delay:1.1s;">👾</span><span class="si-inv" style="animation-delay:1.3s;">👾</span>
+        </div>
+        <!-- Shot -->
+        <div style="text-align:center;height:30px;position:relative;">
+          <span class="si-shot" style="color:#ff4444;">│</span>
+        </div>
+        <!-- Bunkers -->
+        <div style="display:flex;justify-content:space-around;margin:4px 0;">
+          <div style="width:30px;height:12px;background:rgba(0,200,0,0.4);border-radius:4px 4px 0 0;border:1px solid rgba(0,255,0,0.3);"></div>
+          <div style="width:30px;height:12px;background:rgba(0,200,0,0.4);border-radius:4px 4px 0 0;border:1px solid rgba(0,255,0,0.3);"></div>
+          <div style="width:30px;height:12px;background:rgba(0,180,0,0.3);border-radius:4px 4px 0 0;border:1px solid rgba(0,255,0,0.2);"></div>
+        </div>
+        <!-- Cannon -->
+        <div style="display:flex;justify-content:center;margin-top:6px;font-size:0.9em;">🚀</div>
+      </div>
+    </div>
+
+    <!-- Game rules -->
+    <div style="flex:1.3;display:flex;flex-direction:column;gap:8px;">
+      <div class="card card-cyan" style="padding:12px 14px;">
+        <h3 style="font-size:0.75em;">Acciones disponibles: 6</h3>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+          <span style="font-family:var(--font-mono);font-size:0.5em;background:rgba(34,211,238,0.1);border:1px solid rgba(34,211,238,0.3);padding:3px 8px;border-radius:4px;color:var(--accent-cyan);">NO-OP</span>
+          <span style="font-family:var(--font-mono);font-size:0.5em;background:rgba(34,211,238,0.1);border:1px solid rgba(34,211,238,0.3);padding:3px 8px;border-radius:4px;color:var(--accent-cyan);">DISPARAR</span>
+          <span style="font-family:var(--font-mono);font-size:0.5em;background:rgba(34,211,238,0.1);border:1px solid rgba(34,211,238,0.3);padding:3px 8px;border-radius:4px;color:var(--accent-cyan);">← IZQ</span>
+          <span style="font-family:var(--font-mono);font-size:0.5em;background:rgba(34,211,238,0.1);border:1px solid rgba(34,211,238,0.3);padding:3px 8px;border-radius:4px;color:var(--accent-cyan);">→ DER</span>
+          <span style="font-family:var(--font-mono);font-size:0.5em;background:rgba(34,211,238,0.1);border:1px solid rgba(34,211,238,0.3);padding:3px 8px;border-radius:4px;color:var(--accent-cyan);">← + FUEGO</span>
+          <span style="font-family:var(--font-mono);font-size:0.5em;background:rgba(34,211,238,0.1);border:1px solid rgba(34,211,238,0.3);padding:3px 8px;border-radius:4px;color:var(--accent-cyan);">→ + FUEGO</span>
+        </div>
+      </div>
+      <div class="card card-gold" style="padding:12px 14px;">
+        <h3 style="font-size:0.75em;">Sistema de recompensas</h3>
+        <div style="font-size:0.56em;margin-top:6px;line-height:1.8;">
+          <div>👾 Destruir invasor → <span style="color:#22c55e;">+5 a +30 puntos</span> (según fila)</div>
+          <div>🚀 Morir → fin del episodio</div>
+          <div>❌ No hacer nada útil → <span style="color:var(--text-muted);">0</span></div>
+        </div>
+      </div>
+      <div class="card" style="padding:12px 14px;">
+        <h3 style="font-size:0.75em;">Observación del agente</h3>
+        <p>El agente recibe los 4 frames preprocesados (84×84 en escala de grises) — exactamente lo que aprendimos en el Cap. 3.3.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Cómo decide el agente ── -->
+<section>
+  <span class="slide-tag">3.4 · Analizando el Comportamiento</span>
+  <h2>¿Qué ve la red en cada frame? Los Q-values 📊</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">En cada paso, la red recibe los 4 frames y produce <strong>un valor Q por cada acción</strong>. El agente toma la acción con el valor más alto:</p>
+
+  <div style="display:flex;gap:16px;align-items:flex-start;">
+    <!-- Mini game state -->
+    <div style="flex:1;text-align:center;">
+      <div class="si-scene" style="padding:10px 12px;height:120px;display:flex;flex-direction:column;justify-content:space-between;">
+        <div class="si-row" style="font-size:0.7em;">
+          <span>👾</span><span style="opacity:0">👾</span><span>👾</span><span>👾</span>
+        </div>
+        <div style="height:16px;"></div>
+        <div style="display:flex;justify-content:center;font-size:0.9em;">🚀</div>
+      </div>
+      <div style="font-size:0.44em;color:var(--text-muted);margin-top:6px;">Estado actual del juego</div>
+    </div>
+
+    <!-- Q-value chart -->
+    <div style="flex:1.6;">
+      <div style="font-size:0.5em;color:var(--text-muted);margin-bottom:8px;">Valores Q que produce la red para este estado:</div>
+      <div class="qbar-chart">
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+          <div class="qbar" style="height:20%;background:rgba(34,211,238,0.2);border:1px solid rgba(34,211,238,0.3);width:100%;">
+            <span class="qbar-val">1.2</span>
+          </div>
+          <div class="qbar-label">NO-OP</div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+          <div class="qbar" style="height:85%;background:rgba(34,197,94,0.35);border:1px solid rgba(34,197,94,0.6);width:100%;box-shadow:0 0 10px rgba(34,197,94,0.3);">
+            <span class="qbar-val" style="color:#22c55e;">8.7 ★</span>
+          </div>
+          <div class="qbar-label" style="color:#22c55e;">DISPARAR ★</div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+          <div class="qbar" style="height:45%;background:rgba(59,130,246,0.25);border:1px solid rgba(59,130,246,0.4);width:100%;">
+            <span class="qbar-val">4.1</span>
+          </div>
+          <div class="qbar-label">← IZQ</div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+          <div class="qbar" style="height:30%;background:rgba(168,85,247,0.2);border:1px solid rgba(168,85,247,0.3);width:100%;">
+            <span class="qbar-val">2.8</span>
+          </div>
+          <div class="qbar-label">→ DER</div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+          <div class="qbar" style="height:70%;background:rgba(34,197,94,0.2);border:1px solid rgba(34,197,94,0.3);width:100%;">
+            <span class="qbar-val">6.3</span>
+          </div>
+          <div class="qbar-label">←+FU</div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+          <div class="qbar" style="height:55%;background:rgba(34,197,94,0.2);border:1px solid rgba(34,197,94,0.3);width:100%;">
+            <span class="qbar-val">5.1</span>
+          </div>
+          <div class="qbar-label">→+FU</div>
+        </div>
+      </div>
+      <div style="font-size:0.46em;color:#22c55e;text-align:center;margin-top:6px;">El agente elige: DISPARAR (Q=8.7, el más alto) 🎯</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Comportamientos emergentes ── -->
+<section>
+  <span class="slide-tag">3.4 · Comportamientos Emergentes</span>
+  <h2>Estrategias que el agente aprende solo 🤯</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Nadie programó estas estrategias. El agente las <strong>descubrió por sí mismo</strong> maximizando la recompensa:</p>
+
+  <div class="behaviour-item">
+    <span class="bi-icon">🎯</span>
+    <div class="bi-text">
+      <strong>Apunta antes de disparar.</strong> Aprende que disparar cuando el cañón no está alineado con un invasor desperdicia tiempo. Espera hasta estar en posición antes de apretar el gatillo.
+    </div>
+  </div>
+  <div class="behaviour-item">
+    <span class="bi-icon">🏃</span>
+    <div class="bi-text">
+      <strong>Evita los disparos enemigos.</strong> Con frame stacking ve la trayectoria de los proyectiles entrantes y aprende a moverse lateralmente para esquivarlos.
+    </div>
+  </div>
+  <div class="behaviour-item">
+    <span class="bi-icon">🧱</span>
+    <div class="bi-text">
+      <strong>Usa los bunkers como escudo.</strong> Aprende a posicionarse detrás de los bunkers cuando hay muchos disparos simultáneos, aunque nadie le explicó para qué sirven los bunkers.
+    </div>
+  </div>
+  <div class="behaviour-item">
+    <span class="bi-icon">⬆️</span>
+    <div class="bi-text">
+      <strong>Prioriza las filas superiores.</strong> Los invasores de arriba valen más puntos (+30) y el agente aprende a atacarlos primero para maximizar la recompensa acumulada.
+    </div>
+  </div>
+</section>
+
+<!-- ── Log de entrenamiento ── -->
+<section>
+  <span class="slide-tag">3.4 · Progreso del Entrenamiento</span>
+  <h2>Cómo mejoró el agente durante el entrenamiento 📈</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Un log real del entrenamiento muestra cómo la puntuación sube gradualmente a lo largo de millones de pasos:</p>
+
+  <div class="train-log" style="margin-bottom:14px;">
+    <span class="tl-time">[  50k pasos]</span> ε=<span class="tl-eps">0.98</span> · ep_rew=<span class="tl-loss">120</span> · loss=<span class="tl-loss">0.087</span> · el agente dispara al azar<br>
+    <span class="tl-time">[ 200k pasos]</span> ε=<span class="tl-eps">0.75</span> · ep_rew=<span class="tl-rew">285</span> · loss=<span class="tl-loss">0.064</span> · empieza a apuntar<br>
+    <span class="tl-time">[ 500k pasos]</span> ε=<span class="tl-eps">0.42</span> · ep_rew=<span class="tl-rew">520</span> · loss=<span class="tl-loss">0.041</span> · esquiva algunos disparos<br>
+    <span class="tl-time">[   1M pasos]</span> ε=<span class="tl-eps">0.18</span> · ep_rew=<span class="tl-rew">890</span> · loss=0.028 · usa los bunkers<br>
+    <span class="tl-time">[   3M pasos]</span> ε=<span class="tl-eps">0.08</span> · ep_rew=<span class="tl-rew">1,450</span> · loss=0.019 · estrategia consistente<br>
+    <span class="tl-time">[  10M pasos]</span> ε=<span class="tl-eps">0.05</span> · ep_rew=<span class="tl-rew" style="font-weight:700;">~1,800</span> · loss=0.012 · <span style="color:var(--accent-gold);">✅ certificación lograda</span>
+  </div>
+
+  <div class="cols2">
+    <div class="card card-gold">
+      <p>⏱️ <strong>Tiempo real de entrenamiento:</strong> Con GPU T4 de Google Colab (~6 TFLOPS), entrenar 10M de pasos tarda aproximadamente <strong>8–12 horas</strong>. Por eso en este capítulo usamos un modelo pre-entrenado.</p>
+    </div>
+    <div class="card card-cyan">
+      <p>🏆 <strong>Criterio de certificación HF:</strong> Obtener una puntuación media ≥ 200 en evaluación. Los modelos pre-entrenados del Hub superan los 1,000 puntos — muy por encima del umbral.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Retos opcionales ── -->
+<section>
+  <span class="slide-tag">3.4 · Retos</span>
+  <h2>Retos opcionales para los más curiosos 🔥</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Si quieres ir más allá del demo guiado, el curso de HuggingFace propone estos desafíos:</p>
+
+  <div class="cols2">
+    <div class="card card-cyan" style="padding:14px;">
+      <span class="card-icon">🎮</span>
+      <h3>Otro juego de Atari</h3>
+      <p>Cambia <code>SpaceInvadersNoFrameskip-v4</code> por <code>PongNoFrameskip-v4</code>, <code>BreakoutNoFrameskip-v4</code> o cualquier otro. El mismo código, diferente entorno — observa cómo la estrategia cambia radicalmente.</p>
+    </div>
+    <div class="card card-violet" style="padding:14px;">
+      <span class="card-icon">⏱️</span>
+      <h3>Entrenar tu propio DQN</h3>
+      <p>Si tienes acceso a Colab Pro o Kaggle Notebooks (ambos dan más GPU), entrena desde cero con <code>rl_zoo3.train --algo dqn</code>. Observa cómo sube la puntuación con el tiempo.</p>
+    </div>
+    <div class="card card-gold" style="padding:14px;">
+      <span class="card-icon">📊</span>
+      <h3>Comparar hiperparámetros</h3>
+      <p>RL-Zoo tiene hiperparámetros pre-tuneados para DQN. Experimenta modificando el tamaño del búfer (<code>buffer_size</code>) o la frecuencia de actualización de la red objetivo (<code>target_update_interval</code>).</p>
+    </div>
+    <div class="card" style="padding:14px;">
+      <span class="card-icon">🤗</span>
+      <h3>Subir al Hub y comparar</h3>
+      <p>Una vez que entrenes tu modelo, súbelo al Hub y compara tu puntuación con otros modelos disponibles. Busca <code>dqn-SpaceInvadersNoFrameskip-v4</code> en el Hub para ver los mejores modelos de la comunidad.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Quiz ── -->
+<section>
+  <span class="slide-tag">Quiz</span>
+  <h2>🧠 Mini Quiz — Capítulos 3.3 y 3.4</h2>
+  <p style="font-size:0.58em;color:var(--text-muted);margin-bottom:14px;">Pon a prueba lo que aprendiste:</p>
+
+  <div class="step-row">
+    <div class="step-num">Q1</div>
+    <div class="step-text">Una pantalla de Atari tiene 210×160 píxeles en RGB. Después del preprocesamiento completo (escala de grises + 84×84 + 4 frames apilados), ¿cuántos valores tiene el estado? ¿Cuántas veces se redujo?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q2</div>
+    <div class="step-text">¿Por qué pasar el frame a escala de grises <em>antes</em> de redimensionarlo a 84×84 y no al revés? ¿Importa el orden?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q3</div>
+    <div class="step-text">Si el agente solo recibiera un frame en lugar de 4 apilados, ¿qué información crítica perdería? Pon un ejemplo concreto con Pong.</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q4</div>
+    <div class="step-text">El agente aprende a priorizar las filas superiores de Space Invaders porque valen más puntos. ¿Esto fue programado explícitamente? ¿De dónde viene ese comportamiento?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q5</div>
+    <div class="step-text">¿Por qué usamos <code>SpaceInvadersNoFrameskip-v4</code> y no <code>SpaceInvaders-v4</code>? ¿Qué diferencia hay entre las dos versiones?</div>
+  </div>
+</section>
+
+<!-- ── Slide final — Módulo 3 completo ── -->
+<section>
+  <div class="title-slide" style="align-items:center;text-align:center;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:5%;left:5%;font-size:2em;animation:invader-move 1.5s ease-in-out infinite;opacity:0.3;">👾</div>
+    <div style="position:absolute;top:8%;right:8%;font-size:1.6em;animation:invader-move 1.8s ease-in-out infinite;animation-delay:0.5s;opacity:0.3;">👾</div>
+    <div style="position:absolute;bottom:8%;left:12%;font-size:1.3em;animation:invader-move 1.6s ease-in-out infinite;animation-delay:1s;opacity:0.2;">👾</div>
+    <div style="position:absolute;top:-50px;right:-50px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(168,85,247,0.1) 0%,transparent 70%);pointer-events:none;"></div>
+
+    <div style="font-size:2.8em;margin-bottom:8px;">🖼️🧠👾</div>
+    <div class="chapter-badge" style="font-size:0.36em;">Capítulos 3.3 y 3.4 completados · Módulo 3 finalizado</div>
+    <h1 style="text-align:center;font-size:1.6em;">
+      ¡El Módulo 3<br>está completo!<br>
+      <span class="gradient-text-cyan" style="font-size:0.8em;">Ya entiendes Deep Q-Learning de punta a punta 🎓</span>
+    </h1>
+    <div class="divider" style="margin:14px auto;"></div>
+    <div style="display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin-top:4px;font-size:0.52em;color:var(--text-muted);">
+      <span>✅ Límite de la Q-table</span><span style="color:var(--border);">·</span>
+      <span>✅ Arquitectura DQN</span><span style="color:var(--border);">·</span>
+      <span>✅ Memoria de Repetición</span><span style="color:var(--border);">·</span>
+      <span>✅ Red Objetivo Fija</span><span style="color:var(--border);">·</span>
+      <span>✅ Double DQN</span><span style="color:var(--border);">·</span>
+      <span>✅ Preprocesamiento</span><span style="color:var(--border);">·</span>
+      <span>✅ Frame Stacking</span><span style="color:var(--border);">·</span>
+      <span>✅ Demo Space Invaders</span>
+    </div>
+    <div style="margin-top:18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <span class="pill">Próximo: Módulo 4 — Métodos de Política y REINFORCE 🎯</span>
+    </div>
+    <p style="font-size:0.5em;color:var(--text-muted);margin-top:14px;max-width:560px;">En el Módulo 4 cambiamos de enfoque completamente: en lugar de aprender el valor de los estados, aprenderemos directamente qué acciones tomar con el algoritmo REINFORCE y PyTorch.</p>
+  </div>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+<script src="../assets/js/reveal-config.js"></script>
+</body>
+</html>

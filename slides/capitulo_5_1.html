@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capítulo 5.1 — Unity ML-Agents: RL en Entornos 3D</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/black.min.css">
+<link rel="stylesheet" href="../assets/css/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"></script>
+
+<style>
+/* ── Animaciones ── */
+@keyframes snowball-fly {
+  0%   { transform: translateX(0) translateY(0) scale(1); opacity: 1; }
+  60%  { transform: translateX(60px) translateY(-10px) scale(0.8); opacity: 0.9; }
+  100% { transform: translateX(90px) translateY(0) scale(0.2); opacity: 0; }
+}
+@keyframes target-hit {
+  0%,80%,100% { transform: scale(1); opacity: 1; }
+  85%          { transform: scale(1.3); opacity: 0.7; }
+}
+@keyframes bear-aim {
+  0%,100% { transform: rotate(0deg); transform-origin: center; }
+  40%      { transform: rotate(8deg); transform-origin: center; }
+  70%      { transform: rotate(-5deg); transform-origin: center; }
+}
+@keyframes pyramid-glow {
+  0%,100% { box-shadow: 0 0 8px rgba(251,191,36,0.3); }
+  50%      { box-shadow: 0 0 20px rgba(251,191,36,0.7); }
+}
+@keyframes button-press {
+  0%,100% { transform: scale(1); }
+  50%      { transform: scale(0.9); }
+}
+@keyframes raycast-scan {
+  0%   { transform: rotate(-30deg); opacity: 0.8; }
+  50%  { transform: rotate(30deg); opacity: 0.4; }
+  100% { transform: rotate(-30deg); opacity: 0.8; }
+}
+@keyframes float-3d {
+  0%,100% { transform: translateY(0) rotateY(0deg); }
+  50%      { transform: translateY(-10px) rotateY(180deg); }
+}
+@keyframes academy-pulse {
+  0%,100% { border-color: rgba(34,211,238,0.3); }
+  50%      { border-color: rgba(34,211,238,0.8); box-shadow: 0 0 16px rgba(34,211,238,0.3); }
+}
+
+/* ── 3D scene con Unity style ── */
+.unity-scene {
+  background: linear-gradient(180deg, #060d1a 0%, #0a1220 40%, #0d1a10 100%);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 14px;
+  position: relative;
+  overflow: hidden;
+}
+.scene-ground {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 22px;
+  background: linear-gradient(180deg, rgba(30,80,30,0.3), rgba(20,60,20,0.5));
+  border-top: 1px solid rgba(34,197,94,0.2);
+}
+.scene-sky {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 30px;
+  background: linear-gradient(180deg, rgba(10,20,40,0.8), transparent);
+}
+
+/* ── Academy diagram ── */
+.academy-box {
+  background: rgba(34,211,238,0.06);
+  border: 2px solid rgba(34,211,238,0.3);
+  border-radius: 14px;
+  padding: 14px 18px;
+  text-align: center;
+  animation: academy-pulse 3s ease-in-out infinite;
+}
+.agent-box {
+  background: rgba(168,85,247,0.08);
+  border: 1px solid rgba(168,85,247,0.35);
+  border-radius: 10px;
+  padding: 10px 14px;
+  text-align: center;
+}
+.env-box {
+  background: rgba(59,130,246,0.08);
+  border: 1px solid rgba(59,130,246,0.35);
+  border-radius: 10px;
+  padding: 10px 14px;
+  text-align: center;
+}
+.brain-box {
+  background: rgba(251,191,36,0.08);
+  border: 1px solid rgba(251,191,36,0.35);
+  border-radius: 10px;
+  padding: 10px 14px;
+  text-align: center;
+}
+
+/* ── Raycast diagram ── */
+.raycast-container {
+  position: relative;
+  width: 160px;
+  height: 100px;
+  flex-shrink: 0;
+}
+.ray {
+  position: absolute;
+  height: 1px;
+  background: linear-gradient(90deg, var(--accent-cyan), transparent);
+  transform-origin: left center;
+  animation: raycast-scan 2s ease-in-out infinite;
+}
+
+/* ── SnowballTarget scene ── */
+.sbt-scene {
+  background: linear-gradient(180deg, #060d1a 0%, #0d1a0d 70%, #0a1505 100%);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+  min-height: 120px;
+}
+.sbt-bear {
+  display: inline-block;
+  font-size: 2em;
+  animation: bear-aim 3s ease-in-out infinite;
+}
+.sbt-snowball {
+  display: inline-block;
+  font-size: 0.9em;
+  animation: snowball-fly 1.5s ease-in-out infinite;
+  position: absolute;
+}
+.sbt-target {
+  display: inline-block;
+  font-size: 1.6em;
+  animation: target-hit 2s ease-in-out infinite;
+}
+
+/* ── Pyramid scene ── */
+.pyramid-scene {
+  background: linear-gradient(180deg, #060d1a 0%, #1a0d06 70%, #100a04 100%);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+  min-height: 120px;
+}
+.pyramid-shape {
+  width: 0; height: 0;
+  border-left: 20px solid transparent;
+  border-right: 20px solid transparent;
+  border-bottom: 36px solid rgba(251,191,36,0.6);
+  display: inline-block;
+  position: relative;
+  animation: pyramid-glow 2s ease-in-out infinite;
+}
+.gold-brick {
+  width: 18px; height: 10px;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  border-radius: 3px;
+  display: inline-block;
+  box-shadow: 0 0 8px rgba(251,191,36,0.5);
+}
+.pyramid-button {
+  width: 16px; height: 16px;
+  background: rgba(239,68,68,0.5);
+  border: 1px solid rgba(239,68,68,0.7);
+  border-radius: 50%;
+  display: inline-block;
+  animation: button-press 2s ease-in-out infinite;
+  box-shadow: 0 0 8px rgba(239,68,68,0.4);
+}
+
+/* ── Terminal ── */
+.terminal {
+  background: #020812;
+  border: 1px solid rgba(34,211,238,0.3);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.48em;
+  color: #a8c8e8;
+  line-height: 1.85;
+  position: relative;
+}
+.terminal::before {
+  content: "● ● ●";
+  position: absolute;
+  top: 7px; left: 10px;
+  font-size: 0.75em;
+  color: var(--text-muted);
+  letter-spacing: 4px;
+}
+.tb { margin-top: 14px; }
+.t-c { color: #4a5568; }
+.t-k { color: #c678dd; }
+.t-s { color: #98c379; }
+.t-n { color: #d19a66; }
+.t-f { color: #61afef; }
+.t-v { color: #e5c07b; }
+.t-o { color: #22c55e; }
+
+/* ── Curiosity block ── */
+.curiosity-box {
+  background: linear-gradient(135deg, rgba(168,85,247,0.08), rgba(34,211,238,0.06));
+  border: 1px solid rgba(168,85,247,0.4);
+  border-radius: 14px;
+  padding: 16px 20px;
+  position: relative;
+  overflow: hidden;
+}
+.curiosity-box::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--accent-violet), var(--accent-cyan));
+}
+</style>
+</head>
+
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ══ PORTADA ══════════════════════════════ -->
+<section>
+  <div class="title-slide" style="position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-60px;right:-60px;width:380px;height:380px;border-radius:50%;background:radial-gradient(circle,rgba(34,197,94,0.1) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-40px;left:-40px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(168,85,247,0.08) 0%,transparent 70%);pointer-events:none;"></div>
+    <div class="chapter-badge">Capítulo 5.1 · Módulo 5</div>
+    <h1>Unity ML-Agents:<br>
+      <span class="gradient-text">RL en Entornos</span><br>
+      <span style="font-size:0.85em;">3D</span> 🎮</h1>
+    <div class="divider"></div>
+    <p style="font-size:0.62em;color:var(--text-muted);max-width:640px;margin-top:8px;line-height:1.7;">
+      ¿Por qué usar un motor de videojuegos para RL? ·<br>
+      Academia, Agente y Cerebro · Observaciones por rayos ·<br>
+      SnowballTarget 🐻 · Pirámides con curiosidad 🏛️
+    </p>
+    <div style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;">
+      <span class="pill">Unit 5 — HuggingFace 🤗</span>
+      <span class="pill">Jose Miguel Lara Rangel</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── ¿Por qué Unity? ── -->
+<section>
+  <span class="slide-tag">5.1 · ¿Por qué Unity?</span>
+  <h2>¿Por qué un motor de videojuegos para entrenar agentes? 🎮</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Hasta ahora usamos entornos 2D muy simples (FrozenLake, CartPole, Atari). Unity nos abre la puerta a mundos 3D mucho más ricos y cercanos a aplicaciones del mundo real:</p>
+
+  <div class="cols3" style="margin-bottom:14px;">
+    <div class="card card-cyan" style="padding:14px;">
+      <span class="card-icon">🌍</span>
+      <h3>Física 3D realista</h3>
+      <p>Gravedad, colisiones, fricción, articulaciones. El agente puede aprender a correr, saltar, empujar objetos o lanzar proyectiles.</p>
+    </div>
+    <div class="card card-violet" style="padding:14px;">
+      <span class="card-icon">👁️</span>
+      <h3>Observaciones ricas</h3>
+      <p>Sensores de distancia (rayos), cámaras, vectores de velocidad. Mucho más información que los 4-8 números de entornos clásicos.</p>
+    </div>
+    <div class="card card-gold" style="padding:14px;">
+      <span class="card-icon">⚡</span>
+      <h3>Paralelización nativa</h3>
+      <p>Podemos correr decenas o cientos de copias del entorno en paralelo, acelerando el entrenamiento dramáticamente.</p>
+    </div>
+  </div>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px 18px;">
+    <p style="font-size:0.52em;color:var(--text-muted);margin-bottom:8px;"><strong style="color:var(--accent-cyan);">¿Qué es Unity?</strong></p>
+    <div class="cols2" style="gap:10px;">
+      <div style="font-size:0.54em;color:var(--text-primary);">Unity es uno de los motores de videojuegos más usados en el mundo. Detrás de él están juegos como <strong>Among Us, Hollow Knight, Cuphead</strong> y <strong>Pokémon GO</strong>. Con ML-Agents, Unity añade una capa de RL encima de su motor de física.</div>
+      <div style="font-size:0.54em;text-align:center;color:var(--text-muted);">
+        <div style="font-size:2em;margin-bottom:6px;">🎮</div>
+        <strong style="color:var(--accent-cyan);">Unity ML-Agents Toolkit</strong><br>
+        Librería open-source de Unity<br>
+        para entrenar agentes con RL
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Los tres componentes ── -->
+<section>
+  <span class="slide-tag">5.1 · Arquitectura ML-Agents</span>
+  <h2>Los tres componentes de ML-Agents 🏗️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">ML-Agents organiza el entrenamiento en tres piezas que se comunican entre sí:</p>
+
+  <!-- Main diagram -->
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:18px 22px;margin-bottom:14px;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent-cyan),var(--accent-violet));"></div>
+
+    <div style="display:flex;gap:16px;align-items:center;justify-content:center;flex-wrap:wrap;">
+      <!-- Academy -->
+      <div class="academy-box" style="flex:1;min-width:130px;">
+        <div style="font-size:1.6em;margin-bottom:4px;">🏫</div>
+        <div style="font-family:var(--font-mono);font-size:0.6em;color:var(--accent-cyan);font-weight:700;">Academia</div>
+        <div style="font-size:0.5em;color:var(--text-muted);margin-top:4px;">Coordina todo. Se comunica con Python via API. Controla el ritmo del entrenamiento.</div>
+      </div>
+
+      <div style="font-size:1.3em;color:var(--accent-cyan);">⇄</div>
+
+      <!-- Agent -->
+      <div class="agent-box" style="flex:1;min-width:130px;">
+        <div style="font-size:1.6em;margin-bottom:4px;">🐻</div>
+        <div style="font-family:var(--font-mono);font-size:0.6em;color:var(--accent-violet);font-weight:700;">Agente</div>
+        <div style="font-size:0.5em;color:var(--text-muted);margin-top:4px;">El actor de la escena Unity. Recibe observaciones, ejecuta acciones y genera recompensas.</div>
+      </div>
+
+      <div style="font-size:1.3em;color:var(--accent-cyan);">⇄</div>
+
+      <!-- Brain -->
+      <div class="brain-box" style="flex:1;min-width:130px;">
+        <div style="font-size:1.6em;margin-bottom:4px;">🧠</div>
+        <div style="font-family:var(--font-mono);font-size:0.6em;color:var(--accent-gold);font-weight:700;">Cerebro (Brain)</div>
+        <div style="font-size:0.5em;color:var(--text-muted);margin-top:4px;">La política del agente. Recibe observaciones y decide qué acción tomar.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cols2">
+    <div class="card card-cyan" style="padding:12px 14px;">
+      <h3 style="font-size:0.78em;">Academia = el "director" del entrenamiento</h3>
+      <p>Se encarga de inicializar el entorno, pasar los parámetros de entrenamiento a Python, y coordinar cuándo el agente toma decisiones. Es la "interfaz" entre Unity y el código de Python.</p>
+    </div>
+    <div class="card card-gold" style="padding:12px 14px;">
+      <h3 style="font-size:0.78em;">Cerebro = la política π<sub>θ</sub></h3>
+      <p>Es exactamente lo mismo que estudiamos en el Módulo 4: una red neuronal con parámetros θ que mapea observaciones a acciones. La diferencia es que ahora vive dentro de Unity.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Observaciones: los raycasts ── -->
+<section>
+  <span class="slide-tag">5.1 · Observaciones</span>
+  <h2>¿Cómo "ve" el agente en 3D? Los rayos de detección 👁️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">En lugar de ver con cámaras (que requieren CNNs costosas), los agentes de ML-Agents usan <strong>rayos de detección</strong> — haces de luz invisibles que detectan lo que hay alrededor:</p>
+
+  <div style="display:flex;gap:16px;align-items:flex-start;">
+    <!-- Raycast visual -->
+    <div style="flex:1;">
+      <div class="unity-scene" style="height:140px;">
+        <div class="scene-sky"></div>
+        <div class="scene-ground"></div>
+        <!-- Bear agent -->
+        <div style="position:absolute;bottom:22px;left:50%;transform:translateX(-50%);font-size:1.8em;">🐻</div>
+        <!-- Raycasts -->
+        <div style="position:absolute;bottom:36px;left:50%;width:70px;height:1px;background:linear-gradient(90deg,rgba(34,211,238,0.8),rgba(34,211,238,0));transform-origin:left center;transform:rotate(-40deg);"></div>
+        <div style="position:absolute;bottom:36px;left:50%;width:75px;height:1px;background:linear-gradient(90deg,rgba(34,211,238,0.8),rgba(34,211,238,0));transform-origin:left center;transform:rotate(-20deg);"></div>
+        <div style="position:absolute;bottom:36px;left:50%;width:80px;height:1px;background:linear-gradient(90deg,rgba(34,211,238,0.9),rgba(34,211,238,0));transform-origin:left center;transform:rotate(0deg);"></div>
+        <div style="position:absolute;bottom:36px;left:50%;width:75px;height:1px;background:linear-gradient(90deg,rgba(34,211,238,0.8),rgba(34,211,238,0));transform-origin:left center;transform:rotate(20deg);"></div>
+        <div style="position:absolute;bottom:36px;left:50%;width:70px;height:1px;background:linear-gradient(90deg,rgba(34,211,238,0.8),rgba(34,211,238,0));transform-origin:left center;transform:rotate(40deg);"></div>
+        <!-- Target -->
+        <div style="position:absolute;bottom:22px;right:18%;font-size:1.2em;">🎯</div>
+      </div>
+      <p style="font-size:0.42em;color:var(--text-muted);margin-top:6px;text-align:center;">Los rayos detectan objetos en el camino y devuelven su distancia y tipo</p>
+    </div>
+
+    <!-- Explanation -->
+    <div style="flex:1.3;display:flex;flex-direction:column;gap:8px;">
+      <div class="card card-cyan" style="padding:12px 14px;">
+        <h3 style="font-size:0.78em;">¿Cómo funciona un rayo?</h3>
+        <p>Cada rayo se dispara desde el agente en una dirección. Si golpea algo, devuelve: la <strong>distancia al objeto</strong> y el <strong>tipo de objeto</strong> (enemigo, pared, meta, etc.).</p>
+      </div>
+      <div class="card card-gold" style="padding:12px 14px;">
+        <h3 style="font-size:0.78em;">Ventaja vs. cámara RGB</h3>
+        <p>Una cámara 84×84 = 7,056 valores de entrada (como en Atari). Un conjunto de 5 rayos = solo 10 valores. El agente aprende mucho más rápido con rayos en entornos donde la visión no es necesaria.</p>
+      </div>
+      <div style="font-family:var(--font-mono);font-size:0.48em;color:var(--text-muted);background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:8px 12px;">
+        Observación de SnowballTarget:<br>
+        <span style="color:var(--accent-cyan);">[dist_target, tipo_target, orientación, vel_x, vel_z, …]</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── SnowballTarget ── -->
+<section>
+  <span class="slide-tag">5.1 · SnowballTarget</span>
+  <h2>SnowballTarget: el oso que aprende a disparar ❄️🐻</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">El primer entorno del módulo. Un oso 🐻 creado por HuggingFace que aprende a disparar bolas de nieve a objetivos que aparecen en posiciones aleatorias:</p>
+
+  <div style="display:flex;gap:16px;align-items:flex-start;">
+    <!-- Scene -->
+    <div style="flex:1;">
+      <div class="sbt-scene">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:0 10px;">
+          <div class="sbt-bear">🐻</div>
+          <div class="sbt-snowball" style="left:30%;top:35%;">❄️</div>
+          <div class="sbt-target">🎯</div>
+        </div>
+        <div style="position:absolute;bottom:6px;left:50%;transform:translateX(-50%);font-family:var(--font-mono);font-size:0.4em;color:rgba(34,211,238,0.5);">CAMPO DE ENTRENAMIENTO</div>
+      </div>
+    </div>
+
+    <!-- Details -->
+    <div style="flex:1.4;display:flex;flex-direction:column;gap:8px;">
+      <div class="card card-cyan" style="padding:12px 14px;">
+        <h3 style="font-size:0.75em;">La tarea del oso</h3>
+        <div style="font-size:0.56em;line-height:1.7;margin-top:4px;">
+          <div>🎯 Los objetivos aparecen aleatoriamente en el campo</div>
+          <div>❄️ El oso dispara bolas de nieve hacia ellos</div>
+          <div>✅ +1 punto por objetivo derribado</div>
+          <div>⏱️ −puntos pequeños por cada paso (incentiva la velocidad)</div>
+          <div>🔄 Al derribar un objetivo, aparece otro inmediatamente</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:0.5em;text-align:center;">
+          <div style="font-family:var(--font-mono);color:var(--accent-cyan);font-size:1.2em;font-weight:700;">Vector</div>
+          <div style="color:var(--text-muted);">Tipo de observación</div>
+        </div>
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:0.5em;text-align:center;">
+          <div style="font-family:var(--font-mono);color:var(--accent-violet);font-size:1.2em;font-weight:700;">Continuo</div>
+          <div style="color:var(--text-muted);">Tipo de acciones</div>
+        </div>
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:0.5em;text-align:center;">
+          <div style="font-family:var(--font-mono);color:var(--accent-gold);font-size:1.2em;font-weight:700;">PPO</div>
+          <div style="color:var(--text-muted);">Algoritmo de entrenamiento</div>
+        </div>
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:0.5em;text-align:center;">
+          <div style="font-family:var(--font-mono);color:#22c55e;font-size:1.2em;font-weight:700;">≥15</div>
+          <div style="color:var(--text-muted);">Meta de certificación</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Las Pirámides con Curiosidad ── -->
+<section>
+  <span class="slide-tag">5.1 · Pirámides</span>
+  <h2>Las Pirámides: aprender con curiosidad 🏛️🔍</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">El segundo entorno del módulo — más desafiante. El agente debe completar una <strong>secuencia de pasos no obvia</strong> para obtener la recompensa:</p>
+
+  <div style="display:flex;gap:16px;align-items:flex-start;">
+    <!-- Scene -->
+    <div style="flex:1;">
+      <div class="pyramid-scene">
+        <div style="display:flex;align-items:flex-end;justify-content:space-around;height:90px;padding:0 10px;">
+          <div style="text-align:center;">
+            <div class="pyramid-button"></div>
+            <div style="font-size:0.4em;color:var(--text-muted);margin-top:2px;">BOTÓN</div>
+          </div>
+          <div style="text-align:center;position:relative;">
+            <div class="pyramid-shape"></div>
+            <div style="font-size:0.4em;color:var(--accent-gold);margin-top:2px;">PIRÁMIDE</div>
+          </div>
+          <div style="text-align:center;">
+            <div class="gold-brick"></div>
+            <div style="font-size:0.4em;color:var(--accent-gold);margin-top:4px;">ORO 🏆</div>
+          </div>
+          <div style="text-align:center;font-size:1.3em;">🤖</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Steps -->
+    <div style="flex:1.3;">
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;">
+        <p style="font-size:0.5em;color:var(--text-muted);margin-bottom:10px;">El agente debe seguir esta secuencia — <strong>sin que nadie le explique el orden:</strong></p>
+        <div class="step-row">
+          <div class="step-num">1</div>
+          <div class="step-text">Encontrar y presionar el <strong style="color:#ef4444;">botón rojo</strong> → esto hace aparecer la pirámide</div>
+        </div>
+        <div class="step-row" style="margin-top:6px;">
+          <div class="step-num">2</div>
+          <div class="step-text">Ir hacia la <strong style="color:var(--accent-gold);">pirámide</strong>, chocar contra ella para derribarla</div>
+        </div>
+        <div class="step-row" style="margin-top:6px;">
+          <div class="step-num">3</div>
+          <div class="step-text">Ir al <strong style="color:var(--accent-gold);">ladrillo dorado</strong> que quedó arriba → ¡recompensa!</div>
+        </div>
+      </div>
+      <div class="card card-pink" style="margin-top:8px;padding:10px 14px;">
+        <h3 style="font-size:0.72em;">El problema: recompensas escasas</h3>
+        <p>Si el agente solo recibe recompensa al llegar al ladrillo dorado, puede pasar millones de pasos sin encontrar esa recompensa nunca. Necesita motivación para explorar.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Curiosidad Intrínseca ── -->
+<section>
+  <span class="slide-tag">5.1 · Curiosidad</span>
+  <h2>Curiosidad intrínseca: explorar por el placer de descubrir 🔍</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Para resolver el problema de las recompensas escasas, ML-Agents añade una <strong>recompensa interna por exploración</strong>. Es como la curiosidad de un niño:</p>
+
+  <div class="curiosity-box" style="margin-bottom:14px;">
+    <div class="cols2" style="gap:14px;">
+      <div style="font-size:0.56em;">
+        <div style="font-family:var(--font-mono);color:var(--accent-violet);font-weight:700;margin-bottom:8px;">Sin curiosidad intrínseca:</div>
+        <div class="step-row">
+          <div class="step-circle" style="background:rgba(239,68,68,0.2);border-color:#ef4444;color:#ef4444;font-size:0.6em;">⚠️</div>
+          <div class="step-text">El agente solo recibe +1 al final (si llega al oro).</div>
+        </div>
+        <div class="step-row" style="margin-top:4px;">
+          <div class="step-circle" style="background:rgba(239,68,68,0.2);border-color:#ef4444;color:#ef4444;font-size:0.6em;">⚠️</div>
+          <div class="step-text">Sin recompensas en el camino, el agente no sabe qué explorar.</div>
+        </div>
+        <div class="step-row" style="margin-top:4px;">
+          <div class="step-circle" style="background:rgba(239,68,68,0.2);border-color:#ef4444;color:#ef4444;font-size:0.6em;">❌</div>
+          <div class="step-text">Resultado: el agente da vueltas sin aprender nada.</div>
+        </div>
+      </div>
+      <div style="font-size:0.56em;">
+        <div style="font-family:var(--font-mono);color:var(--accent-cyan);font-weight:700;margin-bottom:8px;">Con curiosidad intrínseca:</div>
+        <div class="step-row">
+          <div class="step-circle" style="background:rgba(34,211,238,0.15);border-color:var(--accent-cyan);color:var(--accent-cyan);font-size:0.6em;">✅</div>
+          <div class="step-text">El agente recibe <strong>recompensa extra por visitar estados nuevos</strong> que nunca ha visto antes.</div>
+        </div>
+        <div class="step-row" style="margin-top:4px;">
+          <div class="step-circle" style="background:rgba(34,211,238,0.15);border-color:var(--accent-cyan);color:var(--accent-cyan);font-size:0.6em;">✅</div>
+          <div class="step-text">Esto lo motiva a explorar, lo que eventualmente lo lleva a encontrar el botón y la secuencia.</div>
+        </div>
+        <div class="step-row" style="margin-top:4px;">
+          <div class="step-circle" style="background:rgba(34,211,238,0.15);border-color:var(--accent-cyan);color:var(--accent-cyan);font-size:0.6em;">🏆</div>
+          <div class="step-text">Una vez que encuentra la recompensa real, aprende a maximizarla.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">🧒 La analogía perfecta</span>
+    <p>Es como un niño en un cuarto nuevo: no necesita que le digan "ve a explorar". Simplemente la novedad de cada objeto que descubre lo motiva a seguir moviéndose. El módulo de curiosidad genera esa motivación interna en el agente.</p>
+  </div>
+</section>
+
+<!-- ── Cómo entrenar con ML-Agents ── -->
+<section>
+  <span class="slide-tag">5.1 · Entrenamiento</span>
+  <h2>¿Cómo se entrena en ML-Agents? El flujo completo 🔄</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">ML-Agents usa archivos de configuración YAML para definir los hiperparámetros, y un comando de terminal para lanzar el entrenamiento:</p>
+
+  <div class="terminal" style="margin-bottom:12px;">
+    <div class="tb">
+      <span class="t-c"># Archivo de configuración SnowballTarget.yaml (extracto)</span><br>
+      behaviors:<br>
+      &nbsp;&nbsp;SnowballTarget:<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;trainer_type: ppo<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;hyperparameters:<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;batch_size: <span class="t-n">2048</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer_size: <span class="t-n">20480</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;learning_rate: <span class="t-n">0.0003</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;gamma: <span class="t-n">0.995</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;max_steps: <span class="t-n">2000000</span>  <span class="t-c"># 2 millones de pasos</span><br><br>
+      <span class="t-c"># Comando para lanzar el entrenamiento en Colab</span><br>
+      <span class="t-f">!</span>mlagents-learn ./config/ppo/SnowballTarget.yaml \<br>
+      &nbsp;&nbsp;--env="./training-envs-executables/linux/SnowballMultiAgents" \<br>
+      &nbsp;&nbsp;--run-id=snowball-run1 \<br>
+      &nbsp;&nbsp;--no-graphics  <span class="t-c"># sin ventana visual (Colab no tiene pantalla)</span>
+    </div>
+  </div>
+
+  <div class="cols3" style="gap:10px;">
+    <div class="card card-cyan" style="padding:10px 12px;">
+      <p style="font-size:0.56em;"><strong>YAML</strong> es un formato de texto para configurar parámetros. Como un archivo de ajustes del videojuego.</p>
+    </div>
+    <div class="card card-violet" style="padding:10px 12px;">
+      <p style="font-size:0.56em;"><strong>--no-graphics</strong> desactiva el renderizado visual — el entorno corre en modo invisible, hasta 10× más rápido.</p>
+    </div>
+    <div class="card card-gold" style="padding:10px 12px;">
+      <p style="font-size:0.56em;"><strong>--run-id</strong> identifica cada experimento. Útil para comparar entrenamientos con distintos hiperparámetros.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Subir al Hub con mlagents ── -->
+<section>
+  <span class="slide-tag">5.1 · Hub</span>
+  <h2>Publicar el modelo: mlagents-push-to-hf 🤗</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">ML-Agents tiene su propio comando para subir modelos al Hub — distinto del que usamos con Stable-Baselines3:</p>
+
+  <div class="terminal" style="margin-bottom:14px;">
+    <div class="tb">
+      <span class="t-c"># Subir el modelo entrenado al Hugging Face Hub</span><br>
+      <span class="t-f">!</span>mlagents-push-to-hf \<br>
+      &nbsp;&nbsp;--run-id=<span class="t-s">"snowball-run1"</span> \<br>
+      &nbsp;&nbsp;--local-dir=<span class="t-s">"./results/snowball-run1"</span> \<br>
+      &nbsp;&nbsp;--repo-id=<span class="t-s">"TU_USUARIO/ppo-SnowballTarget"</span> \<br>
+      &nbsp;&nbsp;--commit-message=<span class="t-s">"Mi agente SnowballTarget entrenado 🐻❄️"</span>
+    </div>
+  </div>
+
+  <div style="background:var(--bg-card);border:1px solid rgba(34,211,238,0.25);border-radius:14px;padding:16px 20px;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent-cyan),var(--accent-violet));"></div>
+    <div class="cols3" style="gap:10px;">
+      <div style="text-align:center;font-size:0.54em;color:var(--text-muted);">
+        <div style="font-size:1.8em;margin-bottom:4px;">🎬</div>
+        <div style="color:var(--accent-cyan);">Replay automático</div>
+        Video del agente disparando bolas de nieve
+      </div>
+      <div style="text-align:center;font-size:0.54em;color:var(--text-muted);">
+        <div style="font-size:1.8em;margin-bottom:4px;">📊</div>
+        <div style="color:var(--accent-violet);">Métricas de entrenamiento</div>
+        Curvas de recompensa y pérdida
+      </div>
+      <div style="text-align:center;font-size:0.54em;color:var(--text-muted);">
+        <div style="font-size:1.8em;margin-bottom:4px;">📄</div>
+        <div style="color:var(--accent-gold);">Modelo .onnx</div>
+        Formato compatible con el navegador de Unity
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Comparativa entornos ── -->
+<section>
+  <span class="slide-tag">5.1 · Comparativa</span>
+  <h2>ML-Agents vs. Gymnasium: ¿cuándo usar cada uno? ⚖️</h2>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:14px;">
+    <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;background:var(--bg-panel);">
+      <div style="padding:10px 14px;font-family:var(--font-mono);font-size:0.5em;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;">Característica</div>
+      <div style="padding:10px 14px;text-align:center;font-family:var(--font-mono);font-size:0.5em;color:var(--accent-cyan);">🎮 Gymnasium</div>
+      <div style="padding:10px 14px;text-align:center;font-family:var(--font-mono);font-size:0.5em;color:#22c55e;">🎮 ML-Agents</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Dimensiones del mundo</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-cyan);text-align:center;">2D</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#22c55e;text-align:center;">3D</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Física</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-cyan);text-align:center;">Simplificada</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#22c55e;text-align:center;">Completa (Unity)</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Observaciones</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-cyan);text-align:center;">Vectores numéricos</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#22c55e;text-align:center;">Raycast, cámara, vector</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Lenguaje de entornos</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-cyan);text-align:center;">Python</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#22c55e;text-align:center;">C# (Unity)</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--text-muted);">Mejor para</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:var(--accent-cyan);text-align:center;">Aprender algoritmos, investigación</div>
+      <div style="padding:8px 14px;font-size:0.54em;color:#22c55e;text-align:center;">Robots, juegos, simulaciones realistas</div>
+    </div>
+  </div>
+
+  <div class="card card-gold">
+    <p>🚀 <strong>Próximo nivel:</strong> El Módulo 7 usará ML-Agents para el entorno <strong>SoccerTwos</strong> — un partido de fútbol 2v2 donde diferentes agentes compiten entre sí. RL multi-agente en 3D.</p>
+  </div>
+</section>
+
+<!-- ── Quiz ── -->
+<section>
+  <span class="slide-tag">Quiz</span>
+  <h2>🧠 Mini Quiz — Capítulo 5.1</h2>
+  <p style="font-size:0.58em;color:var(--text-muted);margin-bottom:14px;">Sin ver las diapositivas anteriores:</p>
+
+  <div class="step-row">
+    <div class="step-num">Q1</div>
+    <div class="step-text">¿Cuáles son los tres componentes de ML-Agents? Describe brevemente qué hace cada uno.</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q2</div>
+    <div class="step-text">¿Por qué los rayos de detección son más eficientes que una cámara RGB para la mayoría de agentes en ML-Agents? Da números concretos.</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q3</div>
+    <div class="step-text">En el entorno de Pirámides, el agente necesita: (1) presionar el botón, (2) derribar la pirámide, (3) recoger el oro. Si solo hay recompensa al final, ¿por qué el agente nunca aprendería sin curiosidad intrínseca?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q4</div>
+    <div class="step-text">¿Cuál es la diferencia entre <code>push_to_hub</code> de Stable-Baselines3 y <code>mlagents-push-to-hf</code>? ¿Son intercambiables?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q5</div>
+    <div class="step-text">¿Por qué usamos <code>--no-graphics</code> al entrenar en Colab? ¿Qué ventaja concreta tiene sobre el modo con gráficos?</div>
+  </div>
+</section>
+
+<!-- ── Slide final ── -->
+<section>
+  <div class="title-slide" style="align-items:center;text-align:center;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-50px;right:-50px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(34,197,94,0.1) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="font-size:2.8em;margin-bottom:8px;">🎮 🐻 🏛️</div>
+    <div class="chapter-badge" style="font-size:0.36em;">Capítulo 5.1 completado</div>
+    <h1 style="text-align:center;font-size:1.7em;">
+      ¡Bienvenido a<br>los entornos 3D!<br>
+      <span class="gradient-text-cyan" style="font-size:0.85em;">ML-Agents abre un mundo nuevo</span>
+    </h1>
+    <div class="divider" style="margin:14px auto;"></div>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:4px;font-size:0.56em;color:var(--text-muted);">
+      <span>✅ ¿Por qué Unity?</span><span style="color:var(--border);">·</span>
+      <span>✅ Academia · Agente · Cerebro</span><span style="color:var(--border);">·</span>
+      <span>✅ Rayos de detección</span><span style="color:var(--border);">·</span>
+      <span>✅ SnowballTarget</span><span style="color:var(--border);">·</span>
+      <span>✅ Pirámides y curiosidad</span>
+    </div>
+    <div style="margin-top:18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <span class="pill">Próximo: Cap. 5.2 — Manos a la obra: SnowballTarget 🐻❄️</span>
+    </div>
+    <p style="font-size:0.5em;color:var(--text-muted);margin-top:14px;max-width:560px;">En el siguiente capítulo ejecutamos el entrenamiento real en Colab: descargamos los ejecutables de Unity, lanzamos mlagents-learn y publicamos nuestro agente en el Hub.</p>
+  </div>
+</section>
+
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+<script src="../assets/js/reveal-config.js"></script>
+</body>
+</html>

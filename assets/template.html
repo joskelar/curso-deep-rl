@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!--
+  ═══════════════════════════════════════════════════════════════
+  PLANTILLA BASE — Capítulo X.X · Curso Deep RL
+  ═══════════════════════════════════════════════════════════════
+  Instrucciones para usar esta plantilla:
+
+  1. Duplica este archivo y renómbralo como:
+       capitulo_X_Y.html  (p.ej. capitulo_1_3.html)
+
+  2. Cambia el <title> por el nombre del capítulo.
+
+  3. Reemplaza el contenido entre los comentarios
+     <!-- SLIDES START --> y <!-- SLIDES END -->
+     con las slides del capítulo.
+
+  4. Cada <section> es una slide.
+     Las secciones anidadas (<section><section>) crean
+     slides verticales (útil para contenido suplementario).
+
+  5. Para incluir una fórmula matemática, usa notación LaTeX:
+       Inline:  \( G_t = R_{t+1} + \gamma R_{t+2} \)
+       Bloque:  \[ G_t = \sum_{k=0}^{\infty} \gamma^k R_{t+k+1} \]
+
+  6. Para animaciones de aparición, agrega la clase "fragment"
+     a cualquier elemento:
+       <p class="fragment">Este texto aparece al presionar →</p>
+
+  7. Los assets (imágenes, GIFs) van en:
+       ../assets/static/diagrams/    (diagramas propios)
+       ../assets/static/hf_original/ (imágenes del curso HF)
+       ../assets/static/gifs/        (animaciones)
+     Y se incluyen con:
+       <img src="../assets/static/diagrams/mi-diagrama.png" alt="...">
+  ═══════════════════════════════════════════════════════════════
+-->
+<title>Capítulo X.X — [Nombre del Capítulo] · Curso Deep RL</title>
+
+<!-- Reveal.js CSS (framework de presentaciones) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/black.min.css">
+
+<!-- Tema visual del curso (colores, componentes, tipografía) -->
+<link rel="stylesheet" href="../assets/css/theme.css">
+
+<!-- Google Fonts: Outfit (display/body) + JetBrains Mono (código) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+
+<!-- MathJax: renderiza fórmulas LaTeX en el navegador -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"></script>
+</head>
+
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ════════════════════════════════════════════
+     SLIDES START
+     Reemplaza el contenido de aquí hacia abajo
+     con las slides de tu capítulo.
+════════════════════════════════════════════ -->
+
+<!-- ── SLIDE DE PORTADA ── -->
+<section>
+  <div class="title-slide">
+    <div class="chapter-badge">Capítulo X.X · Módulo Y</div>
+    <h1>[Título del<br>Capítulo]</h1>
+    <div class="divider"></div>
+    <p style="font-size:0.62em; color:var(--text-muted); max-width:600px; margin-top:8px;">
+      Subtítulo descriptivo del capítulo
+    </p>
+    <div style="margin-top:28px; display:flex; gap:10px; flex-wrap:wrap;">
+      <span class="pill">Deep RL Course</span>
+      <span class="pill">Unit X — HuggingFace 🤗</span>
+      <span class="pill">Jose Miguel Lara Rangel</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── SLIDE DE SECCIÓN (divisor entre temas) ── -->
+<section>
+  <div class="section-slide">
+    <span class="big-emoji">🎯</span>
+    <div class="chapter-badge" style="font-size:0.38em;">Sección X</div>
+    <h1>Nombre de<br>la Sección</h1>
+    <p style="font-size:0.6em; color:var(--text-muted); max-width:500px; text-align:center;">
+      Descripción breve de lo que cubre esta sección.
+    </p>
+  </div>
+</section>
+
+<!-- ── SLIDE DE CONTENIDO GENÉRICO ── -->
+<section>
+  <span class="slide-tag">X.X · Tema</span>
+  <h2>Título de la Slide</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">
+    Texto introductorio de la slide. Breve y directo.
+  </p>
+
+  <!-- Ejemplo: dos columnas -->
+  <div class="cols2">
+    <div class="card card-cyan">
+      <span class="card-icon">📌</span>
+      <h3>Concepto A</h3>
+      <p>Explicación del primer concepto.</p>
+    </div>
+    <div class="card card-violet">
+      <span class="card-icon">💡</span>
+      <h3>Concepto B</h3>
+      <p>Explicación del segundo concepto.</p>
+    </div>
+  </div>
+
+  <!-- Ejemplo: idea clave -->
+  <div class="key-idea" style="margin-top:14px;">
+    <span class="ki-label">🔑 Idea clave</span>
+    <p>El mensaje más importante de esta slide va aquí.</p>
+  </div>
+</section>
+
+<!-- ── SLIDE CON FÓRMULA MATEMÁTICA ── -->
+<section>
+  <span class="slide-tag">X.X · Matemáticas</span>
+  <h2>Nombre de la Fórmula</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:12px;">
+    Texto que explica qué representa la fórmula antes de mostrarla.
+  </p>
+
+  <div class="math-block">
+    \[ G_t = \sum_{k=0}^{\infty} \gamma^k \cdot R_{t+k+1} \]
+  </div>
+  <div class="math-explain">
+    G<sub>t</sub> = retorno &nbsp;·&nbsp; γ = factor de descuento &nbsp;·&nbsp; R = recompensa
+  </div>
+
+  <!-- Los fragmentos aparecen uno a uno al presionar → -->
+  <div class="card fragment" style="margin-top:14px;">
+    <p>📖 <strong>En palabras simples:</strong> explicación de la fórmula sin símbolos.</p>
+  </div>
+</section>
+
+<!-- ── SLIDE CON IMAGEN ── -->
+<section>
+  <span class="slide-tag">X.X · Visual</span>
+  <h2>Título con Imagen</h2>
+  <div class="cols2">
+    <div>
+      <p style="font-size:0.62em;">Explicación del diagrama a la izquierda.</p>
+      <div class="card card-gold" style="margin-top:10px;">
+        <p>Observación clave sobre la imagen.</p>
+      </div>
+    </div>
+    <div>
+      <img src="../assets/static/diagrams/NOMBRE_IMAGEN.png"
+           alt="Descripción de la imagen para accesibilidad">
+      <p class="img-caption">Fuente: [origen de la imagen]</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── SLIDE FINAL DEL CAPÍTULO ── -->
+<section>
+  <div class="title-slide" style="align-items:center; text-align:center;">
+    <div style="font-size:3em; margin-bottom:0.3em;">✅</div>
+    <div class="chapter-badge" style="font-size:0.36em;">Capítulo X.X completado</div>
+    <h1 style="text-align:center; font-size:1.8em;">
+      ¡Listo!<br>
+      <span class="gradient-text-cyan">Siguiente: Capítulo X.Y</span>
+    </h1>
+    <div class="divider" style="margin: 14px auto;"></div>
+    <p style="font-size:0.6em; color:var(--text-muted); max-width:520px;">
+      Resumen de lo que aprendiste en este capítulo.
+    </p>
+    <div style="margin-top:22px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+      <span class="pill">Próximo: Capítulo X.Y — Nombre</span>
+      <span class="pill">🤗 huggingface.co/learn/deep-rl-course</span>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════
+     SLIDES END
+════════════════════════════════════════════ -->
+
+</div><!-- /slides -->
+</div><!-- /reveal -->
+
+<!-- Reveal.js script (el framework en sí) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+
+<!-- Configuración global del curso (transiciones, atajos, etc.) -->
+<script src="../assets/js/reveal-config.js"></script>
+</body>
+</html>

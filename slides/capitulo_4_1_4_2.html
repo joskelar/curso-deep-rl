@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capítulos 4.1 & 4.2 — Métodos de Política · La Intuición de REINFORCE</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/black.min.css">
+<link rel="stylesheet" href="../assets/css/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"></script>
+
+<style>
+/* ── Animaciones locales ── */
+@keyframes climb-hill {
+  0%,100% { transform: translateY(0) translateX(0); }
+  50%      { transform: translateY(-18px) translateX(8px); }
+}
+@keyframes prob-grow {
+  from { width: 10%; }
+  to   { width: var(--target); }
+}
+@keyframes theta-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(168,85,247,0); }
+  50%      { box-shadow: 0 0 20px 6px rgba(168,85,247,0.4); }
+}
+@keyframes arrow-up {
+  0%,100% { transform: translateY(0); opacity:1; }
+  50%      { transform: translateY(-6px); opacity:0.6; }
+}
+@keyframes arrow-down {
+  0%,100% { transform: translateY(0); opacity:1; }
+  50%      { transform: translateY(6px); opacity:0.6; }
+}
+@keyframes gradient-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes vacuum-move {
+  0%,100% { transform: translateX(0); }
+  33%      { transform: translateX(20px); }
+  66%      { transform: translateX(-20px); }
+}
+@keyframes pole-balance {
+  0%,100% { transform: rotate(0deg); }
+  25%      { transform: rotate(-8deg); }
+  75%      { transform: rotate(8deg); }
+}
+@keyframes car-steer {
+  0%,100% { transform: rotate(0deg); }
+  50%      { transform: rotate(15deg); }
+}
+
+/* ── Hill / landscape para ascenso de gradiente ── */
+.landscape {
+  position: relative;
+  height: 110px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.landscape-hill {
+  position: absolute;
+  bottom: 0;
+  left: 0; right: 0;
+  height: 80px;
+  background: linear-gradient(180deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.05) 100%);
+  clip-path: ellipse(55% 80% at 50% 100%);
+}
+.landscape-peak {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.2em;
+}
+.landscape-climber {
+  position: absolute;
+  bottom: 30px;
+  animation: climb-hill 3s ease-in-out infinite;
+  font-size: 1em;
+}
+.landscape-label {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 0.38em;
+  color: var(--text-muted);
+}
+
+/* ── Probability bars (dinámicas) ── */
+.prob-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 5px 0;
+}
+.pb-label {
+  font-family: var(--font-mono);
+  font-size: 0.52em;
+  color: var(--text-muted);
+  min-width: 80px;
+  flex-shrink: 0;
+}
+.pb-track {
+  flex: 1;
+  height: 20px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+.pb-fill {
+  height: 100%;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  padding-left: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.46em;
+  font-weight: 700;
+  color: white;
+  transition: width 0.8s ease;
+}
+.pb-change {
+  font-family: var(--font-mono);
+  font-size: 0.46em;
+  min-width: 40px;
+  text-align: right;
+}
+
+/* ── Theta box ── */
+.theta-box {
+  background: rgba(168,85,247,0.12);
+  border: 1px solid rgba(168,85,247,0.5);
+  border-radius: 10px;
+  padding: 10px 16px;
+  text-align: center;
+  animation: theta-pulse 2s ease-in-out infinite;
+}
+
+/* ── Episode timeline ── */
+.ep-full {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  overflow-x: auto;
+  padding: 6px 0;
+}
+.ep-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+.ep-circle {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.55em;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  border: 2px solid;
+  position: relative;
+  z-index: 1;
+}
+.ep-line {
+  width: 22px; height: 2px;
+  flex-shrink: 0;
+  align-self: center;
+  margin-bottom: 16px;
+}
+.ep-sublabel {
+  font-family: var(--font-mono);
+  font-size: 0.36em;
+  color: var(--text-muted);
+  margin-top: 4px;
+  text-align: center;
+  max-width: 42px;
+}
+
+/* ── Gradient arrow visual ── */
+.grad-update {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-card);
+  border-radius: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  margin: 6px 0;
+  font-size: 0.56em;
+}
+.gu-icon { font-size: 1.4em; flex-shrink: 0; }
+.gu-arrow {
+  font-size: 1.2em;
+  flex-shrink: 0;
+}
+
+/* ── Vacuum cleaner demo ── */
+.vacuum-room {
+  background: #060a14;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 14px;
+  position: relative;
+  overflow: hidden;
+}
+.room-wall {
+  position: absolute;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+}
+.vacuum-bot {
+  font-size: 1.4em;
+  display: inline-block;
+}
+
+/* ── Continuous action illustration ── */
+.action-wheel {
+  position: relative;
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  border: 2px solid rgba(168,85,247,0.4);
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(168,85,247,0.08);
+  flex-shrink: 0;
+}
+.wheel-needle {
+  position: absolute;
+  width: 2px; height: 32px;
+  background: var(--accent-violet);
+  bottom: 50%;
+  left: 50%;
+  transform-origin: bottom center;
+  border-radius: 2px;
+  animation: car-steer 2s ease-in-out infinite;
+}
+
+/* ── Comparison table value vs policy ── */
+.vp-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.vp-table th {
+  font-family: var(--font-mono);
+  font-size: 0.5em;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 10px 14px;
+  text-align: center;
+}
+.vp-table td {
+  padding: 8px 14px;
+  font-size: 0.56em;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  vertical-align: top;
+}
+.vp-table td:first-child {
+  color: var(--text-muted);
+  font-size: 0.54em;
+}
+
+/* ── REINFORCE big picture ── */
+.reinforce-loop {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 20px;
+  position: relative;
+  overflow: hidden;
+}
+.reinforce-loop::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--accent-violet), var(--accent-cyan));
+}
+.rl-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.58em;
+}
+.rl-num {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-violet), var(--accent-cyan));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75em;
+  font-weight: 700;
+  flex-shrink: 0;
+  color: white;
+}
+.rl-arrow-down {
+  font-size: 0.9em;
+  color: var(--accent-violet);
+  padding-left: 12px;
+  animation: arrow-down 1.2s ease-in-out infinite;
+}
+</style>
+</head>
+
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ══ PORTADA ══════════════════════════════ -->
+<section>
+  <div class="title-slide" style="position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-60px;right:-60px;width:380px;height:380px;border-radius:50%;background:radial-gradient(circle,rgba(168,85,247,0.14) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-50px;left:-50px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(34,211,238,0.08) 0%,transparent 70%);pointer-events:none;"></div>
+    <div class="chapter-badge">Capítulos 4.1 + 4.2 · Módulo 4</div>
+    <h1>Aprender<br>a Actuar<br><span class="gradient-text">Directamente</span></h1>
+    <div class="divider"></div>
+    <p style="font-size:0.62em;color:var(--text-muted);max-width:640px;margin-top:8px;line-height:1.7;">
+      Métodos de política vs. métodos de valor ·<br>
+      Ventajas clave: aleatoriedad, espacios continuos, aliasing ·<br>
+      La función objetivo J(θ) · Ascenso de gradiente ·<br>
+      REINFORCE: la intuición sin derivaciones
+    </p>
+    <div style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;">
+      <span class="pill">Unit 4 — HuggingFace 🤗</span>
+      <span class="pill">Jose Miguel Lara Rangel</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SECCIÓN 4.1 ══════════════════════════ -->
+<section>
+  <div class="section-slide" style="background:linear-gradient(160deg,#04060f,#0a0614);">
+    <span class="big-emoji">🎯</span>
+    <div class="chapter-badge" style="font-size:0.38em;border-color:var(--accent-violet);color:var(--accent-violet);background:rgba(168,85,247,0.07);margin-top:8px;">Capítulo 4.1</div>
+    <h1>Métodos de Política:<br>Aprender a Actuar<br>Directamente</h1>
+    <p style="font-size:0.6em;color:var(--text-muted);max-width:520px;text-align:center;margin-top:10px;">
+      En lugar de aprender cuánto vale cada estado, aprendemos directamente qué hacer.
+    </p>
+  </div>
+</section>
+
+<!-- ── Recapitulación: dos enfoques ── -->
+<section>
+  <span class="slide-tag">4.1 · Contexto</span>
+  <h2>Recapitulación: dos caminos para encontrar π* 🗺️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">En el Módulo 1 presentamos dos grandes enfoques para entrenar agentes. Los Módulos 2 y 3 cubrieron el camino de los valores. Ahora tomamos el otro:</p>
+
+  <div class="compare-grid" style="margin-bottom:14px;">
+    <div>
+      <div class="compare-head blue">Métodos por Valor ✅ Módulos 2 y 3</div>
+      <div class="compare-body">
+        <p>Aprender <strong>cuánto vale</strong> cada estado o par (estado, acción). La política se deriva eligiendo siempre la acción de mayor valor.</p>
+        <p style="margin-top:8px;color:var(--text-muted);">Q-Learning → DQN → la política es implícita: argmax Q(s,a)</p>
+        <p style="margin-top:6px;color:var(--accent-blue);">✅ Estable · Bien entendido matemáticamente</p>
+        <p style="color:#ef4444;font-size:0.9em;">❌ No funciona bien en acciones continuas</p>
+      </div>
+    </div>
+    <div>
+      <div class="compare-head violet">Métodos por Política 🆕 Módulo 4</div>
+      <div class="compare-body">
+        <p>Aprender <strong>directamente qué hacer</strong> en cada estado. La política es una función explícita con parámetros θ que se optimizan.</p>
+        <p style="margin-top:8px;color:var(--text-muted);">REINFORCE → PPO → A2C → la política es directa: π<sub>θ</sub>(a|s)</p>
+        <p style="margin-top:6px;color:var(--accent-violet);">✅ Funciona en acciones continuas · Más flexible</p>
+        <p style="color:#ef4444;font-size:0.9em;">❌ Más difícil de entrenar · Alta varianza</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">🔑 La diferencia en una frase</span>
+    <p>Los métodos por valor aprenden un "mapa del tesoro" (los valores) y luego navegan por él. Los métodos por política aprenden directamente el "instinto del navegante" — qué hacer en cada situación sin calcular valores intermedios.</p>
+  </div>
+</section>
+
+<!-- ── La idea central ── -->
+<section>
+  <span class="slide-tag">4.1 · La Idea</span>
+  <h2>La idea central: parametrizar la política 🧠</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">En los métodos de política, la política π es una <strong>función con parámetros θ</strong> (los pesos de una red neuronal). Ajustar θ cambia cómo actúa el agente:</p>
+
+  <!-- Policy as neural network -->
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:14px;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent-violet),var(--accent-cyan));"></div>
+    <div class="diagram-row" style="margin:0;">
+      <div class="dbox" style="border-color:var(--accent-blue);background:rgba(59,130,246,0.1);min-width:110px;">
+        <div style="font-size:1.4em;">🌍</div>
+        <div style="color:var(--accent-cyan);font-size:0.85em;font-weight:700;">Estado s</div>
+        <div style="font-size:0.6em;color:var(--text-muted);">entrada a la red</div>
+      </div>
+      <div class="darrow">→</div>
+      <div class="dbox theta-box" style="min-width:160px;">
+        <div style="font-size:1.4em;">🧠</div>
+        <div style="color:var(--accent-violet);font-size:0.9em;font-weight:700;">π<sub>θ</sub>(a|s)</div>
+        <div style="font-size:0.58em;color:var(--text-muted);">Red neuronal con pesos θ</div>
+      </div>
+      <div class="darrow">→</div>
+      <div class="dbox" style="border-color:var(--accent-gold);background:rgba(251,191,36,0.08);min-width:160px;">
+        <div style="font-size:0.9em;margin-bottom:4px;">P(izq)=<span style="color:var(--accent-cyan);">40%</span><br>P(der)=<span style="color:#22c55e;">55%</span><br>P(nop)=<span style="color:var(--text-muted);">5%</span></div>
+        <div style="color:var(--accent-gold);font-size:0.7em;font-weight:700;">Distribución de acciones</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cols2">
+    <div class="card card-violet" style="padding:14px;">
+      <h3 style="font-size:0.78em;">θ son los pesos de la red</h3>
+      <p>El agente no es la red en sí — es el comportamiento que resulta de los pesos θ. Cambiar θ cambia qué acciones son más o menos probables en cada estado. El entrenamiento <strong>busca el θ óptimo</strong>.</p>
+    </div>
+    <div class="card card-gold" style="padding:14px;">
+      <h3 style="font-size:0.78em;">La política es aleatoria</h3>
+      <p>La red no devuelve una acción fija — devuelve <strong>probabilidades</strong>. Esto tiene ventajas importantes que veremos en la siguiente slide. No es un bug, ¡es una característica!</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Ventaja 1: Exploración natural ── -->
+<section>
+  <span class="slide-tag">4.1 · Ventaja 1</span>
+  <h2>Ventaja 1: exploración sin ε-greedy 🎲</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">¿Recuerdas el dilema exploración/explotación del Capítulo 1.3? Con métodos de política <strong>no necesitas ese mecanismo externo</strong>:</p>
+
+  <div class="cols2" style="margin-bottom:14px;">
+    <div class="card" style="padding:16px;border-left-color:var(--accent-blue);">
+      <h3 style="font-size:0.8em;color:var(--accent-blue);">DQN / Q-Learning</h3>
+      <p>La política es determinista: argmax Q(s,a). Para explorar hay que <strong>añadir ε-greedy por fuera</strong> — con probabilidad ε elige al azar, si no explota.</p>
+      <div style="margin-top:8px;font-family:var(--font-mono);font-size:0.52em;color:var(--text-muted);">Exploración = parche externo al algoritmo</div>
+    </div>
+    <div class="card card-violet" style="padding:16px;">
+      <h3 style="font-size:0.8em;color:var(--accent-violet);">Métodos de política</h3>
+      <p>La política ya es una distribución de probabilidades. <strong>La exploración surge naturalmente</strong>: el agente no siempre toma la misma acción porque las probabilidades raramente son 100%.</p>
+      <div style="margin-top:8px;font-family:var(--font-mono);font-size:0.52em;color:var(--accent-violet);">Exploración = propiedad intrínseca de π<sub>θ</sub></div>
+    </div>
+  </div>
+
+  <!-- Probability evolution -->
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px 18px;">
+    <p style="font-size:0.48em;color:var(--text-muted);margin-bottom:10px;">Al inicio del entrenamiento, las probabilidades son casi uniformes (mucha exploración). Con el tiempo, la acción buena gana probabilidad:</p>
+    <div>
+      <div style="font-family:var(--font-mono);font-size:0.46em;color:var(--text-muted);margin-bottom:6px;">Inicio del entrenamiento:</div>
+      <div class="prob-bar-wrap">
+        <span class="pb-label">⬅️ Izquierda</span>
+        <div class="pb-track"><div class="pb-fill" style="width:32%;background:rgba(59,130,246,0.6);">32%</div></div>
+        <span class="pb-change" style="color:var(--text-muted);">≈ uniforme</span>
+      </div>
+      <div class="prob-bar-wrap">
+        <span class="pb-label">➡️ Derecha</span>
+        <div class="pb-track"><div class="pb-fill" style="width:35%;background:rgba(59,130,246,0.6);">35%</div></div>
+        <span class="pb-change" style="color:var(--text-muted);">≈ uniforme</span>
+      </div>
+      <div class="prob-bar-wrap">
+        <span class="pb-label">🛑 No-op</span>
+        <div class="pb-track"><div class="pb-fill" style="width:33%;background:rgba(59,130,246,0.6);">33%</div></div>
+        <span class="pb-change" style="color:var(--text-muted);">≈ uniforme</span>
+      </div>
+    </div>
+    <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
+      <div style="font-family:var(--font-mono);font-size:0.46em;color:var(--text-muted);margin-bottom:6px;">Entrenamiento avanzado:</div>
+      <div class="prob-bar-wrap">
+        <span class="pb-label">⬅️ Izquierda</span>
+        <div class="pb-track"><div class="pb-fill" style="width:8%;background:rgba(239,68,68,0.5);">8%</div></div>
+        <span class="pb-change" style="color:#ef4444;">↓ baja</span>
+      </div>
+      <div class="prob-bar-wrap">
+        <span class="pb-label">➡️ Derecha</span>
+        <div class="pb-track"><div class="pb-fill" style="width:85%;background:linear-gradient(90deg,rgba(34,197,94,0.6),rgba(34,211,238,0.6));">85%</div></div>
+        <span class="pb-change" style="color:#22c55e;">↑ sube</span>
+      </div>
+      <div class="prob-bar-wrap">
+        <span class="pb-label">🛑 No-op</span>
+        <div class="pb-track"><div class="pb-fill" style="width:7%;background:rgba(239,68,68,0.4);">7%</div></div>
+        <span class="pb-change" style="color:#ef4444;">↓ baja</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Ventaja 2: Perceptual aliasing ── -->
+<section>
+  <span class="slide-tag">4.1 · Ventaja 2</span>
+  <h2>Ventaja 2: el problema de la aspiradora confundida 🤖🧹</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">El <strong>aliasing perceptual</strong> ocurre cuando dos estados <em>parecen iguales</em> pero requieren acciones distintas. Una política determinista se queda atascada; una aleatoria no:</p>
+
+  <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:12px;">
+    <!-- Room map -->
+    <div style="flex:1;">
+      <div class="vacuum-room" style="height:130px;">
+        <!-- Walls -->
+        <div class="room-wall" style="top:8px;left:0;right:0;height:4px;"></div>
+        <div class="room-wall" style="bottom:8px;left:0;right:0;height:4px;"></div>
+        <div class="room-wall" style="top:8px;bottom:8px;left:0;width:4px;"></div>
+        <div class="room-wall" style="top:8px;bottom:8px;right:0;width:4px;"></div>
+        <!-- Divider -->
+        <div class="room-wall" style="top:8px;bottom:40px;left:50%;width:3px;opacity:0.5;"></div>
+        <!-- Dust -->
+        <div style="position:absolute;top:20px;left:14px;font-size:1em;">💨</div>
+        <div style="position:absolute;top:20px;right:14px;font-size:1em;">💨</div>
+        <!-- Red states (aliased) -->
+        <div style="position:absolute;top:50%;left:18px;transform:translateY(-50%);width:30px;height:30px;background:rgba(239,68,68,0.25);border:1px solid rgba(239,68,68,0.5);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:0.7em;">🔴</div>
+        <div style="position:absolute;top:50%;right:18px;transform:translateY(-50%);width:30px;height:30px;background:rgba(239,68,68,0.25);border:1px solid rgba(239,68,68,0.5);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:0.7em;">🔴</div>
+        <!-- Vacuum -->
+        <div style="position:absolute;bottom:16px;left:50%;transform:translateX(-50%);font-size:1.3em;animation:vacuum-move 3s ease-in-out infinite;">🤖</div>
+        <!-- Labels -->
+        <div style="position:absolute;top:4px;left:8px;font-family:var(--font-mono);font-size:0.36em;color:var(--text-muted);">Estado 🔴 izq.</div>
+        <div style="position:absolute;top:4px;right:8px;font-family:var(--font-mono);font-size:0.36em;color:var(--text-muted);text-align:right;">Estado 🔴 der.</div>
+      </div>
+      <p style="font-size:0.44em;color:var(--text-muted);margin-top:6px;text-align:center;">Los dos estados 🔴 se ven iguales (paredes arriba y abajo)<br>pero uno necesita ir ← y el otro →</p>
+    </div>
+
+    <!-- Explanation -->
+    <div style="flex:1.3;display:flex;flex-direction:column;gap:8px;">
+      <div class="card card-pink" style="padding:12px 14px;">
+        <h3 style="font-size:0.78em;">Con política determinista ❌</h3>
+        <p>La aspiradora percibe "paredes arriba y abajo" en ambos estados rojos. La política determinista aprende <em>una</em> acción para ese patrón — por ejemplo, siempre ir a la derecha. En el estado 🔴 izquierdo funciona, en el derecho la aspiradora choca con la pared y se queda atascada.</p>
+      </div>
+      <div class="card card-violet" style="padding:12px 14px;">
+        <h3 style="font-size:0.78em;">Con política aleatoria ✅</h3>
+        <p>La política aprende P(←)=50%, P(→)=50% en los estados rojos. Así, en promedio la aspiradora llega al polvo en ambos lados sin quedarse atrapada. La aleatoriedad <strong>resuelve la ambigüedad</strong> del entorno.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Ventaja 3: Acciones continuas ── -->
+<section>
+  <span class="slide-tag">4.1 · Ventaja 3</span>
+  <h2>Ventaja 3: acciones continuas — el límite de DQN 🚗</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">DQN produce un valor Q para <strong>cada acción discreta posible</strong> y elige la más alta. Pero ¿qué pasa con un coche autónomo que puede girar el volante en cualquier ángulo?</p>
+
+  <div class="cols2" style="margin-bottom:14px;">
+    <div class="card card-pink" style="padding:16px;">
+      <h3 style="font-size:0.8em;">DQN con acciones continuas ❌</h3>
+      <p>Necesitaría calcular Q(s, 0°), Q(s, 0.1°), Q(s, 0.2°), … Q(s, 360°) — <strong>infinitas acciones</strong>. No solo sería imposible calcularlas todas, sino que encontrar el máximo sobre un espacio continuo es un problema de optimización en sí mismo.</p>
+    </div>
+    <div class="card card-violet" style="padding:16px;">
+      <h3 style="font-size:0.8em;">Métodos de política ✅</h3>
+      <p>La red produce directamente los <strong>parámetros de una distribución continua</strong> (por ejemplo, una distribución normal): media y varianza del ángulo. El agente muestrea un valor concreto de esa distribución — sin necesidad de enumerar opciones.</p>
+    </div>
+  </div>
+
+  <!-- Continuous action visual -->
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px 18px;">
+    <div style="display:flex;gap:16px;align-items:center;justify-content:center;">
+      <div style="text-align:center;">
+        <div style="font-size:0.5em;color:var(--text-muted);margin-bottom:8px;">DQN: Q-value por cada acción</div>
+        <div style="display:flex;gap:3px;align-items:flex-end;height:50px;">
+          <div style="width:8px;height:30%;background:rgba(59,130,246,0.4);border-radius:2px 2px 0 0;"></div>
+          <div style="width:8px;height:60%;background:rgba(59,130,246,0.5);border-radius:2px 2px 0 0;"></div>
+          <div style="width:8px;height:80%;background:rgba(59,130,246,0.6);border-radius:2px 2px 0 0;"></div>
+          <div style="width:8px;height:95%;background:rgba(34,211,238,0.8);border-radius:2px 2px 0 0;border:1px solid var(--accent-cyan);"></div>
+          <div style="width:8px;height:70%;background:rgba(59,130,246,0.5);border-radius:2px 2px 0 0;"></div>
+          <div style="width:8px;height:40%;background:rgba(59,130,246,0.4);border-radius:2px 2px 0 0;"></div>
+        </div>
+        <div style="font-size:0.42em;color:var(--text-muted);margin-top:4px;">Solo 6 ángulos discretos — limitado</div>
+      </div>
+      <div style="font-size:1.5em;color:var(--text-muted);">vs</div>
+      <div style="text-align:center;">
+        <div style="font-size:0.5em;color:var(--text-muted);margin-bottom:8px;">Política: distribución sobre ángulos</div>
+        <div style="position:relative;height:50px;width:120px;">
+          <svg width="120" height="50" viewBox="0 0 120 50">
+            <defs>
+              <linearGradient id="gauss-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" style="stop-color:rgba(168,85,247,0.2)"/>
+                <stop offset="50%" style="stop-color:rgba(168,85,247,0.8)"/>
+                <stop offset="100%" style="stop-color:rgba(168,85,247,0.2)"/>
+              </linearGradient>
+            </defs>
+            <path d="M5,48 C20,48 30,5 60,3 C90,5 100,48 115,48 Z" fill="url(#gauss-grad)" stroke="rgba(168,85,247,0.6)" stroke-width="1.5"/>
+            <line x1="60" y1="3" x2="60" y2="48" stroke="rgba(168,85,247,0.4)" stroke-width="1" stroke-dasharray="3,2"/>
+          </svg>
+        </div>
+        <div style="font-size:0.42em;color:var(--accent-violet);margin-top:4px;">Cualquier ángulo entre −180° y +180° ✅</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Desventajas ── -->
+<section>
+  <span class="slide-tag">4.1 · Desventajas</span>
+  <h2>Las desventajas que hay que conocer ⚠️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Los métodos de política no son perfectos. Conocer sus limitaciones es tan importante como conocer sus ventajas:</p>
+
+  <div style="display:flex;flex-direction:column;gap:10px;">
+    <div class="card card-pink" style="padding:14px 16px;">
+      <div style="display:flex;gap:14px;align-items:flex-start;">
+        <span style="font-size:1.8em;flex-shrink:0;">📉</span>
+        <div>
+          <h3 style="font-size:0.82em;margin-bottom:6px;">Alta varianza en el gradiente</h3>
+          <p>La estimación del gradiente se calcula a partir de pocos episodios completos. Hay mucho "ruido" — el mismo estado puede dar resultados muy distintos en distintas partidas. Esto hace que el entrenamiento sea <strong>ruidoso e inestable</strong> en comparación con DQN.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card card-pink" style="padding:14px 16px;">
+      <div style="display:flex;gap:14px;align-items:flex-start;">
+        <span style="font-size:1.8em;flex-shrink:0;">🏔️</span>
+        <div>
+          <h3 style="font-size:0.82em;margin-bottom:6px;">Convergencia a mínimos locales</h3>
+          <p>El ascenso de gradiente puede quedarse atrapado en una política que es <strong>"buena pero no óptima"</strong> — un pico local del paisaje, no la cumbre más alta. DQN, en cambio, tiende a converger de forma más global.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card card-gold" style="padding:12px 14px;margin-top:4px;">
+      <p>🔧 <strong>La solución:</strong> los capítulos 6 y 8 presentan A2C y PPO — algoritmos que combinan métodos de política con métodos de valor para reducir la varianza. Son los algoritmos de producción más usados hoy en día.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SECCIÓN 4.2 ══════════════════════════ -->
+<section>
+  <div class="section-slide" style="background:linear-gradient(160deg,#04060f,#0a0616);">
+    <span class="big-emoji">⛰️</span>
+    <div class="chapter-badge" style="font-size:0.38em;border-color:var(--accent-cyan);color:var(--accent-cyan);background:rgba(34,211,238,0.06);margin-top:8px;">Capítulo 4.2</div>
+    <h1>El Gradiente<br>de la Política:<br>La Intuición de REINFORCE</h1>
+    <p style="font-size:0.6em;color:var(--text-muted);max-width:520px;text-align:center;margin-top:10px;">
+      Subir la colina del retorno esperado — sin derivaciones matemáticas complicadas.
+    </p>
+  </div>
+</section>
+
+<!-- ── La función objetivo J(θ) ── -->
+<section>
+  <span class="slide-tag">4.2 · Función Objetivo</span>
+  <h2>La función objetivo J(θ): ¿qué queremos maximizar? 🎯</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Para optimizar los pesos θ necesitamos definir qué queremos mejorar. En los métodos de política, esa función se llama <strong>función objetivo J(θ)</strong>:</p>
+
+  <div class="eq-box" style="background:#06091a;border:1px solid rgba(168,85,247,0.4);border-radius:12px;padding:14px 20px;margin-bottom:14px;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent-violet),var(--accent-cyan));"></div>
+    <div class="math-block" style="border:none;background:none;padding:8px;font-size:1em;">
+      \[ J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\big[R(\tau)\big] \]
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:10px;">
+      <div style="background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.3);border-radius:6px;padding:6px 12px;font-family:var(--font-mono);font-size:0.5em;color:var(--accent-violet);text-align:center;">J(θ)<br><span style="font-weight:400;color:var(--text-muted);">retorno esperado<br>con pesos θ</span></div>
+      <div style="background:rgba(34,211,238,0.08);border:1px solid rgba(34,211,238,0.3);border-radius:6px;padding:6px 12px;font-family:var(--font-mono);font-size:0.5em;color:var(--accent-cyan);text-align:center;">τ ~ π<sub>θ</sub><br><span style="font-weight:400;color:var(--text-muted);">trayectorias generadas<br>por la política actual</span></div>
+      <div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.3);border-radius:6px;padding:6px 12px;font-family:var(--font-mono);font-size:0.5em;color:#22c55e;text-align:center;">R(τ)<br><span style="font-weight:400;color:var(--text-muted);">retorno total<br>de cada partida</span></div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">🎯 En palabras simples</span>
+    <p>J(θ) es el <strong>promedio de las recompensas totales</strong> que obtenemos cuando dejamos al agente jugar muchas partidas con la política actual. Queremos encontrar los pesos θ que hacen ese promedio lo más alto posible.</p>
+  </div>
+</section>
+
+<!-- ── Ascenso de gradiente ── -->
+<section>
+  <span class="slide-tag">4.2 · Ascenso de Gradiente</span>
+  <h2>Ascenso de gradiente: subir la colina del retorno ⛰️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Para maximizar J(θ) usamos <strong>ascenso de gradiente</strong> — es exactamente igual que el descenso de gradiente de DQN, pero en dirección opuesta (subimos en vez de bajar):</p>
+
+  <div class="cols2" style="margin-bottom:14px;">
+    <!-- Landscape visual -->
+    <div>
+      <div class="landscape">
+        <div class="landscape-hill"></div>
+        <div class="landscape-peak">🏆</div>
+        <!-- x axis labels -->
+        <div class="landscape-label" style="bottom:4px;left:10px;">θ malo</div>
+        <div class="landscape-label" style="bottom:4px;left:50%;transform:translateX(-50%);">θ óptimo</div>
+        <div class="landscape-label" style="bottom:4px;right:10px;">θ diferente</div>
+        <!-- Climber -->
+        <div class="landscape-climber" style="left:22%;">🤖</div>
+        <!-- Gradient arrow -->
+        <div style="position:absolute;bottom:38px;left:30%;font-size:0.9em;color:var(--accent-cyan);animation:arrow-up 1s ease-in-out infinite;">→</div>
+      </div>
+      <p style="font-size:0.44em;color:var(--text-muted);text-align:center;margin-top:6px;">Cada paso de entrenamiento mueve θ hacia el pico de J(θ)</p>
+    </div>
+
+    <!-- Update rule -->
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div class="math-block" style="font-size:0.9em;padding:12px 16px;">
+        \[ \theta \leftarrow \theta + \alpha \cdot \nabla_\theta J(\theta) \]
+      </div>
+      <div class="math-explain" style="font-size:0.54em;">
+        θ nuevo = θ viejo + tasa de aprendizaje × dirección de mayor crecimiento
+      </div>
+      <div class="card" style="padding:12px 14px;margin-top:4px;">
+        <h3 style="font-size:0.75em;margin-bottom:6px;">Comparación con DQN</h3>
+        <p>DQN minimiza L con <strong>descenso</strong>: θ ← θ − α∇L (baja la pérdida). REINFORCE maximiza J con <strong>ascenso</strong>: θ ← θ + α∇J (sube el retorno). La mecánica es la misma, la dirección opuesta.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── El problema del gradiente ── -->
+<section>
+  <span class="slide-tag">4.2 · El Problema del Gradiente</span>
+  <h2>El problema: ¿cómo calcular ∇J(θ)? 🤔</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Para subir la colina necesitamos saber en qué dirección subir — el gradiente ∇J(θ). Hay dos obstáculos:</p>
+
+  <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px;">
+    <div class="card card-pink" style="padding:14px 16px;">
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        <span style="font-size:1.6em;flex-shrink:0;">🌊</span>
+        <div>
+          <h3 style="font-size:0.8em;margin-bottom:4px;">Obstáculo 1: demasiadas trayectorias posibles</h3>
+          <p>Calcular el gradiente exacto requeriría probar <em>todas las trayectorias posibles</em> y su probabilidad. Con entornos complejos, eso es computacionalmente imposible. Necesitamos estimarlo con una <strong>muestra de episodios</strong>.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card card-pink" style="padding:14px 16px;">
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        <span style="font-size:1.6em;flex-shrink:0;">🌍</span>
+        <div>
+          <h3 style="font-size:0.8em;margin-bottom:4px;">Obstáculo 2: la dinámica del entorno es desconocida</h3>
+          <p>J(θ) depende de cómo el entorno responde a nuestras acciones (transiciones de estado). Esa función es desconocida — no podemos diferenciarsela directamente. Necesitamos un truco matemático para evitarlo.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">💡 La solución: el Teorema del Gradiente de la Política</span>
+    <p>Existe una reformulación de ∇J(θ) que <strong>no requiere conocer la dinámica del entorno</strong> y puede estimarse con episodios reales. Es el resultado matemático que hace posibles los métodos de política. No lo derivaremos, pero usaremos su resultado.</p>
+  </div>
+</section>
+
+<!-- ── El gradiente de la política ── -->
+<section>
+  <span class="slide-tag">4.2 · El Gradiente</span>
+  <h2>El gradiente de la política: el resultado que usamos 📐</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">El Teorema del Gradiente de la Política nos da esta fórmula tratable, que puede estimarse jugando episodios reales:</p>
+
+  <div class="eq-box" style="background:#06091a;border:1px solid rgba(168,85,247,0.35);border-radius:12px;padding:14px 20px;margin-bottom:14px;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent-violet),var(--accent-cyan));"></div>
+    <div class="math-block" style="border:none;background:none;padding:8px;font-size:0.9em;">
+      \[ \nabla_\theta J(\theta) \approx \frac{1}{m}\sum_{i=1}^{m}\sum_{t=0}^{T} \nabla_\theta \log \pi_\theta(a_t^{(i)}|s_t^{(i)}) \cdot R(\tau^{(i)}) \]
+    </div>
+  </div>
+
+  <!-- Decomposition -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+    <div style="background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.3);border-radius:10px;padding:12px 14px;font-size:0.56em;">
+      <div style="font-family:var(--font-mono);color:var(--accent-violet);font-weight:700;margin-bottom:6px;">∇θ log π<sub>θ</sub>(aₜ|sₜ)</div>
+      <div style="color:var(--text-muted);">La dirección en que cambiar los pesos para hacer la acción aₜ más o menos probable en el estado sₜ. Es la "palanca" del gradiente.</div>
+    </div>
+    <div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.3);border-radius:10px;padding:12px 14px;font-size:0.56em;">
+      <div style="font-family:var(--font-mono);color:#22c55e;font-weight:700;margin-bottom:6px;">R(τ⁽ⁱ⁾)</div>
+      <div style="color:var(--text-muted);">El retorno total del episodio i. Es el "peso" del gradiente — cuánto empujamos en la dirección de esa acción. Retorno alto = empuje fuerte.</div>
+    </div>
+  </div>
+
+  <div class="card card-gold" style="padding:12px 14px;">
+    <p>🔑 <strong>La intuición central:</strong> el gradiente dice <em>"mueve θ para hacer más probable la acción aₜ, proporcionalmente a cuánto retorno trajo esa acción"</em>. Si la acción fue buena → auméntala. Si fue mala → redúcela.</p>
+  </div>
+</section>
+
+<!-- ── REINFORCE: la idea intuitiva ── -->
+<section>
+  <span class="slide-tag">4.2 · REINFORCE</span>
+  <h2>REINFORCE: la intuición en 3 pasos 🎲</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;"><strong>REINFORCE</strong> (también llamado Monte Carlo Policy Gradient) es el algoritmo más sencillo de gradiente de política. Su lógica es elegante:</p>
+
+  <div class="reinforce-loop">
+    <div class="rl-step">
+      <div class="rl-num">1</div>
+      <div><strong style="color:var(--accent-cyan);">Jugar un episodio completo</strong> con la política actual π<sub>θ</sub>. Guardar cada (estado, acción, recompensa) a lo largo del camino.</div>
+    </div>
+    <div class="rl-arrow-down">↓</div>
+    <div class="rl-step">
+      <div class="rl-num">2</div>
+      <div><strong style="color:var(--accent-cyan);">Calcular el retorno G</strong> del episodio completo. Si ganamos, el retorno es alto; si perdemos, es bajo.</div>
+    </div>
+    <div class="rl-arrow-down">↓</div>
+    <div class="rl-step">
+      <div class="rl-num">3</div>
+      <div><strong style="color:var(--accent-cyan);">Actualizar θ</strong> con el gradiente: si el retorno fue alto, <em>aumentar</em> la probabilidad de las acciones tomadas; si fue bajo, <em>disminuirla</em>.</div>
+    </div>
+    <div class="rl-arrow-down">↓</div>
+    <div class="rl-step">
+      <div class="rl-num">∞</div>
+      <div><strong style="color:var(--accent-violet);">Repetir.</strong> Con cada episodio, la política mejora gradualmente.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── La actualización en acción ── -->
+<section>
+  <span class="slide-tag">4.2 · Actualización</span>
+  <h2>¿Cómo cambian las probabilidades después de un episodio? 📊</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Veamos con un ejemplo concreto qué le pasa a las probabilidades después de que el agente termina un episodio:</p>
+
+  <div style="display:flex;gap:16px;align-items:flex-start;">
+    <!-- Win episode -->
+    <div style="flex:1;">
+      <div class="card" style="padding:12px 14px;border-color:rgba(34,197,94,0.4);background:rgba(34,197,94,0.05);margin-bottom:8px;">
+        <h3 style="font-size:0.78em;color:#22c55e;">Episodio ganado 🏆 (retorno alto)</h3>
+        <p>El agente tomó: ← → ↑ → y ganó con G = +50</p>
+      </div>
+      <div class="grad-update">
+        <span class="gu-icon">⬅️</span>
+        <span style="color:var(--text-muted);">izquierda</span>
+        <span class="gu-arrow" style="color:#22c55e;animation:arrow-up 1s ease-in-out infinite;">↑</span>
+        <span style="color:#22c55e;">P sube</span>
+      </div>
+      <div class="grad-update">
+        <span class="gu-icon">➡️</span>
+        <span style="color:var(--text-muted);">derecha</span>
+        <span class="gu-arrow" style="color:#22c55e;animation:arrow-up 1s ease-in-out infinite;">↑</span>
+        <span style="color:#22c55e;">P sube</span>
+      </div>
+      <div class="grad-update">
+        <span class="gu-icon">⬆️</span>
+        <span style="color:var(--text-muted);">arriba</span>
+        <span class="gu-arrow" style="color:#22c55e;animation:arrow-up 1s ease-in-out infinite;">↑</span>
+        <span style="color:#22c55e;">P sube</span>
+      </div>
+    </div>
+
+    <!-- Loss episode -->
+    <div style="flex:1;">
+      <div class="card" style="padding:12px 14px;border-color:rgba(239,68,68,0.4);background:rgba(239,68,68,0.05);margin-bottom:8px;">
+        <h3 style="font-size:0.78em;color:#ef4444;">Episodio perdido 💀 (retorno bajo)</h3>
+        <p>El agente tomó: → → ↓ y perdió con G = −10</p>
+      </div>
+      <div class="grad-update">
+        <span class="gu-icon">➡️</span>
+        <span style="color:var(--text-muted);">derecha</span>
+        <span class="gu-arrow" style="color:#ef4444;animation:arrow-down 1s ease-in-out infinite;">↓</span>
+        <span style="color:#ef4444;">P baja</span>
+      </div>
+      <div class="grad-update">
+        <span class="gu-icon">⬇️</span>
+        <span style="color:var(--text-muted);">abajo</span>
+        <span class="gu-arrow" style="color:#ef4444;animation:arrow-down 1s ease-in-out infinite;">↓</span>
+        <span style="color:#ef4444;">P baja</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="key-idea" style="margin-top:14px;">
+    <span class="ki-label">🎓 La regla de oro de REINFORCE</span>
+    <p><strong>"Si ganaste, haz más probable lo que hiciste. Si perdiste, haz menos probable lo que hiciste."</strong> Después de miles de episodios, las acciones que consistentemente llevan a ganar acaban teniendo probabilidades altas — sin que nadie las haya programado explícitamente.</p>
+  </div>
+</section>
+
+<!-- ── REINFORCE vs Q-Learning ── -->
+<section>
+  <span class="slide-tag">4.2 · Comparativa Final</span>
+  <h2>REINFORCE vs. Q-Learning: dos filosofías distintas 🔄</h2>
+
+  <table class="vp-table" style="margin-bottom:14px;">
+    <tr style="background:var(--bg-panel);">
+      <th style="text-align:left;color:var(--text-muted);">Aspecto</th>
+      <th style="background:rgba(34,211,238,0.1);color:var(--accent-cyan);">Q-Learning / DQN</th>
+      <th style="background:rgba(168,85,247,0.1);color:var(--accent-violet);">REINFORCE</th>
+    </tr>
+    <tr>
+      <td>¿Qué aprende?</td>
+      <td style="color:var(--accent-cyan);text-align:center;">Q(s,a) — el valor de cada acción</td>
+      <td style="color:var(--accent-violet);text-align:center;">π<sub>θ</sub>(a|s) — la política directamente</td>
+    </tr>
+    <tr>
+      <td>¿Cuándo actualiza?</td>
+      <td style="color:var(--accent-cyan);text-align:center;">Paso a paso (TD)</td>
+      <td style="color:var(--accent-violet);text-align:center;">Al final del episodio (MC)</td>
+    </tr>
+    <tr>
+      <td>Tipo de acciones</td>
+      <td style="color:var(--accent-cyan);text-align:center;">Solo discretas</td>
+      <td style="color:var(--accent-violet);text-align:center;">Discretas y continuas</td>
+    </tr>
+    <tr>
+      <td>Exploración</td>
+      <td style="color:var(--accent-cyan);text-align:center;">Manual (ε-greedy)</td>
+      <td style="color:var(--accent-violet);text-align:center;">Automática (probabilística)</td>
+    </tr>
+    <tr>
+      <td>Estabilidad</td>
+      <td style="color:var(--accent-cyan);text-align:center;">Alta (búfer + red objetivo)</td>
+      <td style="color:var(--accent-violet);text-align:center;">Baja (alta varianza)</td>
+    </tr>
+    <tr>
+      <td>Algoritmo en el curso</td>
+      <td style="color:var(--accent-cyan);text-align:center;">Cap. 2.4, 3.2</td>
+      <td style="color:var(--accent-violet);text-align:center;">Cap. 4.3 (hands-on)</td>
+    </tr>
+  </table>
+
+  <div class="card card-gold">
+    <p>🤝 <strong>El futuro: Actor-Critic.</strong> Los módulos 6 y 8 presentan A2C y PPO, que combinan ambos enfoques: un <em>actor</em> (política) y un <em>crítico</em> (función de valor) que trabajan juntos para reducir la varianza sin perder la flexibilidad de las políticas continuas.</p>
+  </div>
+</section>
+
+<!-- ── Glosario ── -->
+<section>
+  <span class="slide-tag">Glosario</span>
+  <h2>Glosario de los capítulos 4.1 y 4.2</h2>
+  <div style="margin-top:10px;">
+    <div class="gloss-row">
+      <span class="gloss-term">Métodos de política</span>
+      <span class="gloss-def">Algoritmos que aprenden directamente una función π(a|s) sin pasar por una función de valor. La política tiene parámetros θ que se optimizan.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">π<sub>θ</sub>(a|s)</span>
+      <span class="gloss-def">Política parametrizada por θ. Dado un estado s, produce la probabilidad de tomar cada acción. Una red neuronal con pesos θ.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">J(θ)</span>
+      <span class="gloss-def">Función objetivo: el retorno esperado cuando el agente juega con la política π<sub>θ</sub>. Queremos encontrar θ que la maximice.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Ascenso de gradiente</span>
+      <span class="gloss-def">Técnica para maximizar J(θ): actualizar θ en la dirección que más sube J. Opuesto al descenso de gradiente (que minimiza la pérdida).</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Aliasing perceptual</span>
+      <span class="gloss-def">Cuando dos estados parecen iguales pero requieren acciones distintas. Una política determinista se queda atascada; una aleatoria puede resolverlo.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Gradiente de la política</span>
+      <span class="gloss-def">∇<sub>θ</sub>J(θ): la dirección en que cambiar θ para maximizar el retorno esperado. Se estima con episodios reales usando el log de la política.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">REINFORCE</span>
+      <span class="gloss-def">El algoritmo de gradiente de política más sencillo (Monte Carlo Policy Gradient). Juega episodios completos, calcula el retorno G, y actualiza θ para hacer más probables las acciones de los episodios ganadores.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Alta varianza</span>
+      <span class="gloss-def">La principal desventaja de REINFORCE: el mismo estado puede dar retornos muy distintos en partidas diferentes. Hace el entrenamiento ruidoso. A2C y PPO lo resuelven.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Trayectoria (τ)</span>
+      <span class="gloss-def">Una secuencia de estados y acciones de un episodio: (s₀,a₀,s₁,a₁,…,sT). REINFORCE calcula el gradiente sobre trayectorias completas.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── Quiz ── -->
+<section>
+  <span class="slide-tag">Quiz</span>
+  <h2>🧠 Mini Quiz — Capítulos 4.1 y 4.2</h2>
+  <p style="font-size:0.58em;color:var(--text-muted);margin-bottom:14px;">Sin ver las diapositivas anteriores:</p>
+
+  <div class="step-row">
+    <div class="step-num">Q1</div>
+    <div class="step-text">Un agente DQN controla un brazo robótico que puede girar en cualquier ángulo entre 0° y 360°. ¿Por qué DQN no funciona bien aquí? ¿Cómo lo resolvería un método de política?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q2</div>
+    <div class="step-text">Explica el problema de la aspiradora con aliasing perceptual. ¿Por qué la política determinista fracasa y la aleatoria no?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q3</div>
+    <div class="step-text">¿Cuál es la diferencia entre descenso de gradiente (DQN) y ascenso de gradiente (REINFORCE)? ¿Qué optimiza cada uno?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q4</div>
+    <div class="step-text">En REINFORCE, un episodio termina con retorno G = +80. ¿Qué le pasa a las probabilidades de las acciones que se tomaron en ese episodio? ¿Por qué?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q5</div>
+    <div class="step-text">¿Por qué REINFORCE tiene alta varianza? ¿Cómo se resuelve eso en algoritmos más avanzados como A2C?</div>
+  </div>
+</section>
+
+<!-- ── Slide final ── -->
+<section>
+  <div class="title-slide" style="align-items:center;text-align:center;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-60px;right:-60px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(168,85,247,0.12) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="font-size:2.8em;margin-bottom:8px;">🎯⛰️🎲</div>
+    <div class="chapter-badge" style="font-size:0.36em;">Capítulos 4.1 y 4.2 completados</div>
+    <h1 style="text-align:center;font-size:1.7em;">
+      ¡Ya entiendes<br>los métodos de política<br>
+      <span class="gradient-text-cyan" style="font-size:0.85em;">y la intuición de REINFORCE!</span>
+    </h1>
+    <div class="divider" style="margin:14px auto;"></div>
+    <div style="display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin-top:4px;font-size:0.56em;color:var(--text-muted);">
+      <span>✅ Métodos por política vs. por valor</span><span style="color:var(--border);">·</span>
+      <span>✅ Política aleatoria y sus ventajas</span><span style="color:var(--border);">·</span>
+      <span>✅ Acciones continuas</span><span style="color:var(--border);">·</span>
+      <span>✅ Función objetivo J(θ)</span><span style="color:var(--border);">·</span>
+      <span>✅ Ascenso de gradiente</span><span style="color:var(--border);">·</span>
+      <span>✅ Intuición de REINFORCE</span>
+    </div>
+    <div style="margin-top:18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <span class="pill">Próximo: Cap. 4.3 — ¡Manos a la obra! REINFORCE en CartPole 🏋️</span>
+    </div>
+    <p style="font-size:0.5em;color:var(--text-muted);margin-top:14px;max-width:560px;">En el siguiente capítulo implementarás REINFORCE desde cero en PyTorch, con código pre-estructurado y completamente comentado. Entrenas el agente en CartPole y lo subes al Hub.</p>
+  </div>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+<script src="../assets/js/reveal-config.js"></script>
+</body>
+</html>

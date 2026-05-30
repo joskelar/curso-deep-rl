@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capítulo 5.3 — Pirámides con Curiosidad + Cierre del Curso 🏛️🎓</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/black.min.css">
+<link rel="stylesheet" href="../assets/css/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"></script>
+
+<style>
+/* ── Animaciones ── */
+@keyframes pyramid-appear {
+  0%   { transform: scale(0) rotate(-10deg); opacity: 0; }
+  60%  { transform: scale(1.1) rotate(2deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+@keyframes gold-shine {
+  0%,100% { box-shadow: 0 0 8px rgba(251,191,36,0.4); }
+  50%      { box-shadow: 0 0 24px rgba(251,191,36,0.9), 0 0 40px rgba(251,191,36,0.4); }
+}
+@keyframes button-bounce {
+  0%,100% { transform: scale(1); }
+  50%      { transform: scale(0.88); }
+}
+@keyframes explore-wander {
+  0%   { transform: translateX(0) translateY(0); }
+  20%  { transform: translateX(18px) translateY(-5px); }
+  40%  { transform: translateX(30px) translateY(10px); }
+  60%  { transform: translateX(10px) translateY(5px); }
+  80%  { transform: translateX(-8px) translateY(-8px); }
+  100% { transform: translateX(0) translateY(0); }
+}
+@keyframes curiosity-spark {
+  0%,100% { opacity: 0.3; transform: scale(0.8); }
+  50%      { opacity: 1; transform: scale(1.2); }
+}
+@keyframes rnd-flow {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes confetti-fall {
+  0%   { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(200px) rotate(720deg); opacity: 0; }
+}
+@keyframes star-pop {
+  0%   { transform: scale(0); opacity: 0; }
+  50%  { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ── Terminal ── */
+.terminal {
+  background: #020812;
+  border: 1px solid rgba(34,211,238,0.3);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.48em;
+  color: #a8c8e8;
+  line-height: 1.85;
+  position: relative;
+}
+.terminal::before {
+  content: "● ● ●";
+  position: absolute;
+  top: 7px; left: 10px;
+  font-size: 0.75em;
+  color: var(--text-muted);
+  letter-spacing: 4px;
+}
+.tb   { margin-top: 14px; }
+.t-c  { color: #4a5568; }
+.t-k  { color: #c678dd; }
+.t-s  { color: #98c379; }
+.t-n  { color: #d19a66; }
+.t-f  { color: #61afef; }
+.t-v  { color: #e5c07b; }
+.t-o  { color: #22c55e; }
+.t-hi { color: var(--accent-gold); font-weight: 700; }
+.t-cmd { color: var(--accent-cyan); }
+
+/* ── YAML block ── */
+.yaml-block {
+  background: #06090f;
+  border: 1px solid rgba(168,85,247,0.3);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.45em;
+  color: #c8d0f0;
+  line-height: 1.9;
+  position: relative;
+}
+.yaml-block::before {
+  content: "YAML · PyramidsRND.yaml";
+  position: absolute;
+  top: 6px; right: 10px;
+  font-size: 0.75em;
+  color: var(--accent-violet);
+}
+.y-key  { color: var(--accent-cyan); }
+.y-val  { color: #98c379; }
+.y-num  { color: #d19a66; }
+.y-type { color: var(--accent-violet); }
+.y-comm { color: #4a5568; }
+.y-hi   { color: var(--accent-gold); font-weight: 700; }
+
+/* ── Pyramid scene ── */
+.pyramid-world {
+  background: linear-gradient(180deg, #060d1a 0%, #1a0d06 70%, #100a04 100%);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 12px;
+  padding: 14px;
+  position: relative;
+  overflow: hidden;
+  min-height: 120px;
+}
+.pw-ground {
+  position: absolute;
+  bottom: 0; left: 0; right: 0; height: 20px;
+  background: linear-gradient(180deg, rgba(80,40,10,0.5), rgba(50,25,5,0.8));
+  border-top: 1px solid rgba(139,90,43,0.3);
+}
+.pw-pyramid {
+  width: 0; height: 0;
+  border-left: 24px solid transparent;
+  border-right: 24px solid transparent;
+  border-bottom: 42px solid rgba(251,191,36,0.55);
+  display: inline-block;
+  position: relative;
+  animation: gold-shine 2s ease-in-out infinite;
+}
+.pw-button {
+  width: 18px; height: 18px;
+  background: radial-gradient(circle, rgba(239,68,68,0.8), rgba(200,30,30,0.6));
+  border: 1px solid rgba(239,68,68,0.8);
+  border-radius: 50%;
+  display: inline-block;
+  animation: button-bounce 1.8s ease-in-out infinite;
+  box-shadow: 0 0 10px rgba(239,68,68,0.5);
+}
+.pw-gold {
+  width: 20px; height: 11px;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b, #d97706);
+  border-radius: 3px;
+  display: inline-block;
+  animation: gold-shine 1.5s ease-in-out infinite;
+}
+.pw-agent {
+  font-size: 1.3em;
+  display: inline-block;
+  animation: explore-wander 4s ease-in-out infinite;
+}
+
+/* ── RND diagram ── */
+.rnd-box {
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 0.54em;
+  text-align: center;
+}
+.rnd-online {
+  background: rgba(34,211,238,0.08);
+  border: 1px solid rgba(34,211,238,0.4);
+}
+.rnd-target {
+  background: rgba(251,191,36,0.08);
+  border: 1px solid rgba(251,191,36,0.4);
+}
+.rnd-arrow-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 0.52em;
+  color: var(--accent-violet);
+}
+
+/* ── Curiosity reward visualization ── */
+.curiosity-spark {
+  display: inline-block;
+  animation: curiosity-spark 1s ease-in-out infinite;
+}
+.curiosity-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+.cb-label {
+  font-family: var(--font-mono);
+  font-size: 0.5em;
+  color: var(--text-muted);
+  min-width: 120px;
+}
+.cb-track {
+  flex: 1; height: 12px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.cb-fill {
+  height: 100%;
+  border-radius: 3px;
+  display: flex; align-items: center;
+  padding-left: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.44em;
+  font-weight: 700;
+  color: white;
+}
+
+/* ── Confetti ── */
+.confetti-piece {
+  position: absolute;
+  width: 8px; height: 8px;
+  border-radius: 2px;
+  animation: confetti-fall linear infinite;
+  pointer-events: none;
+}
+
+/* ── Course completion timeline ── */
+.course-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+  padding-left: 24px;
+}
+.course-timeline::before {
+  content: "";
+  position: absolute;
+  left: 8px; top: 0; bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, var(--accent-cyan), var(--accent-violet), var(--accent-gold));
+}
+.ct-item {
+  position: relative;
+  padding: 6px 0 6px 8px;
+  font-size: 0.58em;
+  line-height: 1.5;
+}
+.ct-item::before {
+  content: "";
+  position: absolute;
+  left: -20px; top: 12px;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 6px var(--accent-cyan);
+}
+.ct-item.completed::before { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+.ct-item.advanced::before { background: var(--accent-violet); box-shadow: 0 0 6px var(--accent-violet); }
+
+/* ── Star achievement ── */
+.achievement-star {
+  display: inline-block;
+  animation: star-pop 0.6s ease-out forwards;
+  font-size: 1.4em;
+}
+</style>
+</head>
+
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ══ PORTADA ════════════════════════════ -->
+<section>
+  <div class="title-slide" style="position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-60px;right:-60px;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(251,191,36,0.12) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-40px;left:-40px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(168,85,247,0.08) 0%,transparent 70%);pointer-events:none;"></div>
+    <div class="chapter-badge">Capítulo 5.3 · Módulo 5 + Cierre del Curso</div>
+    <h1>¡Manos a la obra!<br>
+      <span class="gradient-text">Pirámides</span><br>
+      <span style="font-size:0.8em;">con Curiosidad RND 🏛️🔍</span>
+    </h1>
+    <div class="divider"></div>
+    <p style="font-size:0.62em;color:var(--text-muted);max-width:640px;margin-top:8px;line-height:1.7;">
+      Random Network Distillation (RND) · Recompensa intrínseca ·<br>
+      Entrena el agente con PPO+RND ·
+      Publica en el Hub ·<br>
+      <strong style="color:var(--accent-gold);">¡Y cierre del curso completo! 🎓</strong>
+    </p>
+    <div style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;">
+      <span class="pill">Unit 5 Hands-on — HuggingFace 🤗</span>
+      <span class="pill">Jose Miguel Lara Rangel</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── El reto de Pirámides ── -->
+<section>
+  <span class="slide-tag">5.3 · El Reto</span>
+  <h2>El entorno Pirámides: recompensas muy escasas 🏛️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Pirámides es un entorno creado por el equipo de Unity. Es mucho más difícil que SnowballTarget porque la recompensa solo llega al <strong>final de una secuencia larga</strong>:</p>
+
+  <div style="display:flex;gap:16px;align-items:flex-start;">
+    <!-- Scene -->
+    <div style="flex:1;">
+      <div class="pyramid-world">
+        <div class="pw-ground"></div>
+        <div style="display:flex;align-items:flex-end;justify-content:space-around;height:90px;padding:0 10px 0;">
+          <div style="text-align:center;">
+            <div class="pw-button"></div>
+            <div style="font-family:var(--font-mono);font-size:0.38em;color:#ef4444;margin-top:3px;">BOTÓN<br>presionar</div>
+          </div>
+          <div style="text-align:center;position:relative;">
+            <div class="pw-pyramid"></div>
+            <div style="font-family:var(--font-mono);font-size:0.38em;color:var(--accent-gold);margin-top:4px;">PIRÁMIDE<br>derribar</div>
+          </div>
+          <div style="text-align:center;">
+            <div class="pw-gold"></div>
+            <div style="font-family:var(--font-mono);font-size:0.38em;color:var(--accent-gold);margin-top:5px;">ORO 🏆<br>recoger</div>
+          </div>
+          <div style="text-align:center;">
+            <div class="pw-agent">🤖</div>
+            <div style="font-family:var(--font-mono);font-size:0.38em;color:var(--accent-violet);margin-top:2px;">AGENTE<br>explorar</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Problem explanation -->
+    <div style="flex:1.3;display:flex;flex-direction:column;gap:8px;">
+      <div class="card card-pink" style="padding:12px 14px;">
+        <h3 style="font-size:0.78em;">El problema del huevo y la gallina</h3>
+        <p>Para ganar, el agente necesita saber que <strong>el botón hace aparecer la pirámide</strong>. Pero sin explorar el botón por casualidad, nunca verá ese efecto. Y sin recompensa, ¿por qué exploraría el botón?</p>
+      </div>
+      <div class="card card-violet" style="padding:12px 14px;">
+        <h3 style="font-size:0.78em;">Diferencia con SnowballTarget</h3>
+        <p>SnowballTarget: el objetivo está visible y la recompensa (+1) llega casi inmediatamente. Pirámides: la recompensa solo llega después de 3 acciones específicas en orden correcto. Sin curiosidad, el agente nunca aprende.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── RND: qué es ── -->
+<section>
+  <span class="slide-tag">5.3 · RND</span>
+  <h2>Random Network Distillation (RND): curiosidad técnica 🔬</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">RND es la técnica de curiosidad que usa el entorno Pirámides. Genera una recompensa extra cuando el agente visita estados nuevos, usando un truco elegante con dos redes:</p>
+
+  <!-- RND diagram -->
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:14px;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent-violet),var(--accent-cyan));"></div>
+
+    <div style="display:flex;gap:14px;align-items:center;justify-content:center;flex-wrap:wrap;">
+      <!-- State input -->
+      <div style="text-align:center;font-size:0.56em;">
+        <div style="font-size:2em;margin-bottom:4px;">🌍</div>
+        <div style="color:var(--accent-blue);">Estado s<br>(nuevo lugar)</div>
+      </div>
+      <div style="color:var(--accent-cyan);font-size:1.2em;">→</div>
+      <!-- Two networks -->
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div class="rnd-target">
+          <div style="font-size:1.2em;margin-bottom:2px;">🧊</div>
+          <div style="font-family:var(--font-mono);color:var(--accent-gold);font-size:0.85em;font-weight:700;">Red Objetivo</div>
+          <div style="font-size:0.78em;color:var(--text-muted);margin-top:2px;">Pesos FIJOS (no cambia)</div>
+        </div>
+        <div class="rnd-online">
+          <div style="font-size:1.2em;margin-bottom:2px;">🧠</div>
+          <div style="font-family:var(--font-mono);color:var(--accent-cyan);font-size:0.85em;font-weight:700;">Red Predictora</div>
+          <div style="font-size:0.78em;color:var(--text-muted);margin-top:2px;">Se entrena para imitar a la red objetivo</div>
+        </div>
+      </div>
+      <div style="color:var(--accent-cyan);font-size:1.2em;">→</div>
+      <!-- Error = reward -->
+      <div style="text-align:center;font-size:0.56em;max-width:130px;">
+        <div style="font-size:1.8em;margin-bottom:4px;"><span class="curiosity-spark">✨</span></div>
+        <div style="color:var(--accent-violet);font-weight:700;">Error de predicción</div>
+        <div style="color:var(--text-muted);margin-top:3px;">Si el error es alto → estado nuevo → recompensa de curiosidad</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">💡 La intuición</span>
+    <p>La red predictora <strong>aprende a predecir el output de la red fija</strong>. En estados que ha visto muchas veces, el error es bajo (ya sabe qué esperar). En estados <strong>nuevos</strong>, el error es alto — y ese error alto se convierte en recompensa de curiosidad. ¡El agente es recompensado por explorar!</p>
+  </div>
+</section>
+
+<!-- ── Recompensa total ── -->
+<section>
+  <span class="slide-tag">5.3 · Recompensa Combinada</span>
+  <h2>Recompensa total = extrínseca + intrínseca 🎁</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">El agente de Pirámides recibe dos tipos de recompensa simultáneamente. Con el tiempo, la curiosidad va bajando y la recompensa real toma el control:</p>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:14px;">
+    <p style="font-size:0.48em;color:var(--text-muted);margin-bottom:10px;">Evolución de las recompensas durante el entrenamiento:</p>
+    <!-- Early training -->
+    <div style="margin-bottom:10px;">
+      <div style="font-family:var(--font-mono);font-size:0.46em;color:var(--text-muted);margin-bottom:6px;">Al inicio (0–200k pasos) — el agente no conoce el entorno:</div>
+      <div class="curiosity-bar-row">
+        <span class="cb-label">🔍 Curiosidad (RND)</span>
+        <div class="cb-track"><div class="cb-fill" style="width:80%;background:linear-gradient(90deg,rgba(168,85,247,0.7),rgba(34,211,238,0.6));">ALTA — explora todo</div></div>
+      </div>
+      <div class="curiosity-bar-row">
+        <span class="cb-label">🏆 Externa (real)</span>
+        <div class="cb-track"><div class="cb-fill" style="width:5%;background:rgba(34,197,94,0.4);">baja</div></div>
+      </div>
+    </div>
+    <!-- Late training -->
+    <div style="border-top:1px solid var(--border);padding-top:10px;">
+      <div style="font-family:var(--font-mono);font-size:0.46em;color:var(--text-muted);margin-bottom:6px;">Al final (700k–1M pasos) — el agente ya conoce la secuencia:</div>
+      <div class="curiosity-bar-row">
+        <span class="cb-label">🔍 Curiosidad (RND)</span>
+        <div class="cb-track"><div class="cb-fill" style="width:20%;background:rgba(168,85,247,0.4);">baja — ya exploró todo</div></div>
+      </div>
+      <div class="curiosity-bar-row">
+        <span class="cb-label">🏆 Externa (real)</span>
+        <div class="cb-track"><div class="cb-fill" style="width:75%;background:linear-gradient(90deg,rgba(34,197,94,0.7),rgba(34,211,238,0.6));">ALTA — ejecuta la secuencia perfecta</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="math-block" style="font-size:0.85em;padding:10px 16px;">
+    \[ R_{\text{total}} = R_{\text{extrínseca}} + \beta \cdot R_{\text{RND}} \]
+  </div>
+  <div class="math-explain">β (beta) controla el peso de la curiosidad — en el YAML es el parámetro <code>strength</code> de la señal de recompensa intrínseca</div>
+</section>
+
+<!-- ── El YAML de Pirámides ── -->
+<section>
+  <span class="slide-tag">5.3 · YAML</span>
+  <h2>El archivo PyramidsRND.yaml ya existe 📄</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">A diferencia de SnowballTarget, Pirámides es un entorno oficial de Unity y <strong>su archivo YAML ya está incluido</strong> en ML-Agents. Solo necesitamos hacer un cambio:</p>
+
+  <div class="yaml-block" style="margin-bottom:14px;">
+    <div class="tb" style="margin-top:18px;">
+      <span class="y-comm"># Ubicación: ./config/ppo/PyramidsRND.yaml</span><br>
+      <span class="y-comm"># PyramidsRND combina PPO + RND curiosity</span><br><br>
+      behaviors:<br>
+      &nbsp;&nbsp;<span class="y-key">Pyramids</span>:<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;trainer_type: <span class="y-type">ppo</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="y-hi">max_steps: 1000000</span>  <span class="y-comm"># ← CAMBIA ESTO (original: 10000000)</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;reward_signals:<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;extrinsic:      <span class="y-comm"># recompensa real del entorno</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;gamma: <span class="y-num">0.99</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;strength: <span class="y-num">1.0</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="y-hi">rnd</span>:           <span class="y-comm"># recompensa de curiosidad RND</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;gamma: <span class="y-num">0.99</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;strength: <span class="y-num">0.5</span>  <span class="y-comm"># β — peso de la curiosidad</span>
+    </div>
+  </div>
+
+  <div class="card card-gold" style="padding:12px 14px;">
+    <p>🔑 <strong>El único cambio necesario:</strong> Reducir <code>max_steps</code> de 10,000,000 (original) a <code>1,000,000</code>. El benchmark (recompensa media = 1.75) se alcanza con 1M de pasos. Los 10M originales tardarían más de 4 horas en Colab.</p>
+  </div>
+</section>
+
+<!-- ── Entrenamiento Pirámides ── -->
+<section>
+  <span class="slide-tag">5.3 · Entrenamiento</span>
+  <h2>Entrenar y publicar el agente de Pirámides 🚀</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">El proceso es idéntico al de SnowballTarget, con el ejecutable y el YAML de Pirámides:</p>
+
+  <div class="terminal" style="margin-bottom:12px;">
+    <div class="tb">
+      <span class="t-c"># 1. Descargar el ejecutable de Pirámides</span><br>
+      <span class="t-cmd">!</span>wget <span class="t-s">"https://huggingface.co/spaces/unity/ML-Agents-Pyramids/resolve/main/Pyramids.zip"</span> \<br>
+      &nbsp;&nbsp;-O ./training-envs-executables/linux/Pyramids.zip<br>
+      <span class="t-cmd">!</span>unzip -d ./training-envs-executables/linux/ \<br>
+      &nbsp;&nbsp;./training-envs-executables/linux/Pyramids.zip<br>
+      <span class="t-cmd">!</span>chmod -R 755 ./training-envs-executables/linux/Pyramids/Pyramids<br><br>
+      <span class="t-c"># 2. Lanzar entrenamiento (~30-45 min con GPU)</span><br>
+      <span class="t-cmd">!</span>mlagents-learn ./config/ppo/PyramidsRND.yaml \<br>
+      &nbsp;&nbsp;--env=./training-envs-executables/linux/Pyramids/Pyramids \<br>
+      &nbsp;&nbsp;--run-id=<span class="t-hi">"Pyramids-Training"</span> \<br>
+      &nbsp;&nbsp;--no-graphics<br><br>
+      <span class="t-c"># 3. Publicar en el Hub</span><br>
+      <span class="t-cmd">!</span>mlagents-push-to-hf \<br>
+      &nbsp;&nbsp;--run-id=<span class="t-s">"Pyramids-Training"</span> \<br>
+      &nbsp;&nbsp;--local-dir=<span class="t-s">"./results/Pyramids-Training"</span> \<br>
+      &nbsp;&nbsp;--repo-id=<span class="t-s">"TU_USUARIO/ppo-pyramids"</span> \<br>
+      &nbsp;&nbsp;--commit-message=<span class="t-s">"Agente Pirámides con curiosidad RND 🏛️"</span>
+    </div>
+  </div>
+
+  <div class="cols2">
+    <div class="card card-cyan" style="padding:12px 14px;">
+      <p>🎬 <strong>Ver tu agente jugando:</strong><br>
+      <a href="https://huggingface.co/spaces/unity/ML-Agents-Pyramids" style="color:var(--accent-cyan);">spaces/unity/ML-Agents-Pyramids</a><br>
+      Meta de certificación: recompensa media = 1.75</p>
+    </div>
+    <div class="card card-gold" style="padding:12px 14px;">
+      <p>⏱️ <strong>Tiempo estimado:</strong> 30–45 min con GPU T4 de Colab. Sin GPU puede tardar varias horas. Siempre activa la GPU: Runtime → Change Runtime → GPU.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SECCIÓN: CIERRE DEL CURSO ══════════ -->
+<section>
+  <div class="section-slide" style="background:linear-gradient(160deg,#04060f,#0a0814);position:relative;overflow:hidden;">
+    <!-- Confetti decorativo -->
+    <div class="confetti-piece" style="left:10%;background:#3b82f6;animation-duration:3s;animation-delay:0s;"></div>
+    <div class="confetti-piece" style="left:25%;background:#a855f7;animation-duration:4s;animation-delay:0.5s;border-radius:50%;"></div>
+    <div class="confetti-piece" style="left:45%;background:#22c55e;animation-duration:3.5s;animation-delay:1s;"></div>
+    <div class="confetti-piece" style="left:65%;background:#fbbf24;animation-duration:2.8s;animation-delay:0.3s;border-radius:50%;"></div>
+    <div class="confetti-piece" style="left:82%;background:#ec4899;animation-duration:3.2s;animation-delay:0.8s;"></div>
+    <div class="confetti-piece" style="left:92%;background:#22d3ee;animation-duration:4.2s;animation-delay:1.5s;border-radius:50%;"></div>
+
+    <span class="big-emoji">🎓</span>
+    <div class="chapter-badge" style="font-size:0.38em;border-color:var(--accent-gold);color:var(--accent-gold);background:rgba(251,191,36,0.07);margin-top:8px;">¡Curso Completo!</div>
+    <h1>¡Lo Lograste!<br>Eres un<br>Creador de Agentes</h1>
+    <p style="font-size:0.6em;color:var(--text-muted);max-width:500px;text-align:center;margin-top:10px;">
+      De cero a Deep RL — el mismo recorrido que hacen estudiantes universitarios del mundo entero.
+    </p>
+  </div>
+</section>
+
+<!-- ── Todo lo que aprendiste ── -->
+<section>
+  <span class="slide-tag">Cierre · Resumen del Curso</span>
+  <h2>Todo lo que dominaste en este curso 🗺️</h2>
+
+  <div class="cols2" style="gap:12px;margin-top:8px;">
+    <div class="course-timeline">
+      <div class="ct-item completed">
+        <strong style="color:var(--accent-cyan);">Módulo 1</strong> — El lenguaje del RL: agente, entorno, recompensa, política, valor, γ, exploración/explotación
+      </div>
+      <div class="ct-item completed">
+        <strong style="color:var(--accent-cyan);">Módulo 2</strong> — Q-Learning desde cero: Q-table, Bellman, MC vs TD, FrozenLake, Taxi
+      </div>
+      <div class="ct-item completed">
+        <strong style="color:var(--accent-cyan);">Módulo 3</strong> — Deep Q-Learning: DQN, CNN, frame stacking, Experience Replay, Target Network, Space Invaders
+      </div>
+      <div class="ct-item completed">
+        <strong style="color:var(--accent-cyan);">Módulo 4</strong> — Métodos de política: REINFORCE, J(θ), ascenso de gradiente, CartPole, PixelCopter
+      </div>
+      <div class="ct-item completed">
+        <strong style="color:var(--accent-cyan);">Módulo 5</strong> — Unity ML-Agents: SnowballTarget, Pirámides, RND, entornos 3D
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div class="card card-gold" style="padding:12px 14px;">
+        <h3 style="font-size:0.78em;">Herramientas que usaste</h3>
+        <div style="font-size:0.56em;line-height:1.8;margin-top:4px;">
+          <div>🐍 Python con NumPy y PyTorch</div>
+          <div>🎮 Gymnasium (FrozenLake, Taxi, CartPole, Atari)</div>
+          <div>📦 Stable-Baselines3 (LunarLander)</div>
+          <div>🤖 Unity ML-Agents (SnowballTarget, Pirámides)</div>
+          <div>🤗 Hugging Face Hub (publicar todos tus modelos)</div>
+        </div>
+      </div>
+      <div class="card card-violet" style="padding:12px 14px;">
+        <h3 style="font-size:0.78em;">Agentes que entrenaste</h3>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;font-size:0.54em;">
+          <span style="background:rgba(34,211,238,0.1);border:1px solid rgba(34,211,238,0.3);border-radius:5px;padding:2px 8px;color:var(--accent-cyan);">🌕 LunarLander</span>
+          <span style="background:rgba(34,211,238,0.1);border:1px solid rgba(34,211,238,0.3);border-radius:5px;padding:2px 8px;color:var(--accent-cyan);">🐶 Huggy</span>
+          <span style="background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.3);border-radius:5px;padding:2px 8px;color:var(--accent-violet);">❄️ FrozenLake</span>
+          <span style="background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.3);border-radius:5px;padding:2px 8px;color:var(--accent-violet);">🚖 Taxi</span>
+          <span style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);border-radius:5px;padding:2px 8px;color:var(--accent-gold);">👾 DQN Atari</span>
+          <span style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);border-radius:5px;padding:2px 8px;color:var(--accent-gold);">🏋️ CartPole</span>
+          <span style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:5px;padding:2px 8px;color:#22c55e;">🚁 PixelCopter</span>
+          <span style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:5px;padding:2px 8px;color:#22c55e;">🐻 SnowballTarget</span>
+          <span style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:5px;padding:2px 8px;color:#22c55e;">🏛️ Pirámides</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Conceptos clave que dominaste ── -->
+<section>
+  <span class="slide-tag">Cierre · Conceptos</span>
+  <h2>Los conceptos que ya forman parte de tu vocabulario 🧠</h2>
+
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px 20px;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan),var(--accent-violet),var(--accent-gold));"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px 14px;font-size:0.54em;">
+      <div class="gloss-row"><span style="font-family:var(--font-mono);color:var(--accent-cyan);">Agente · Entorno</span></div>
+      <div class="gloss-row"><span style="font-family:var(--font-mono);color:var(--accent-cyan);">Recompensa · Retorno G</span></div>
+      <div class="gloss-row"><span style="font-family:var(--font-mono);color:var(--accent-cyan);">Factor de descuento γ</span></div>
+      <div class="gloss-row"><span style="font-family:var(--font-mono);color:var(--accent-violet);">Política π · Q(s,a) · V(s)</span></div>
+      <div class="gloss-row"><span style="font-family:var(--font-mono);color:var(--accent-violet);">ε-greedy · Exploración</span></div>
+      <div class="gloss-row"><span style="font-family:var(--font-mono);color:var(--accent-violet);">Ecuación de Bellman</span></div>
+      <div class="gloss-row"><span style="font-family:var(--font-mono);color:var(--accent-blue);">Q-Learning · Q-table</span></div>
+      <div class="gloss-row"><span style="font-family:var(--font-mono);color:var(--accent-blue);">Monte Carlo vs TD</span></div>
+      <div class="gloss-row"><span style="font-family:var(--font-mono);color:var(--accent-blue);">Bootstrapping · Off-policy</span></div>
+      <div class="gloss-row"><span style="font-family:var(--font-mono);color:var(--accent-gold);">DQN · Experience Replay</span></div>
+      <div class="gloss-row"><span style="font-family:var(--font-mono);color:var(--accent-gold);">Target Network · Double DQN</span></div>
+      <div class="gloss-row"><span style="font-family:var(--font-mono);color:var(--accent-gold);">Frame stacking · CNN</span></div>
+      <div class="gloss-row"><span style="font-family:var(--font-mono);color:#22c55e;">J(θ) · Ascenso de gradiente</span></div>
+      <div class="gloss-row"><span style="font-family:var(--font-mono);color:#22c55e;">REINFORCE · log-probabilidad</span></div>
+      <div class="gloss-row"><span style="font-family:var(--font-mono);color:#22c55e;">RND · Curiosidad intrínseca</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── ¿Qué sigue? ── -->
+<section>
+  <span class="slide-tag">Cierre · ¿Qué Sigue?</span>
+  <h2>¿Qué puedes aprender ahora? El horizonte del RL 🔭</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Este curso cubrió los fundamentos. El campo de Deep RL es enorme. Aquí el mapa de lo que puedes explorar después:</p>
+
+  <div class="cols2" style="margin-bottom:14px;">
+    <div class="card card-cyan" style="padding:14px;">
+      <span class="card-icon">🎭</span>
+      <h3>Actor-Critic y PPO</h3>
+      <p>A2C y PPO combinan métodos de valor y política para reducir la varianza de REINFORCE. Son los algoritmos más usados en producción hoy — incluidos los que entrenan robots y LLMs con RLHF.</p>
+      <div style="font-family:var(--font-mono);font-size:0.5em;color:var(--accent-cyan);margin-top:6px;">🤗 Módulos 6 y 8 del curso de HF</div>
+    </div>
+    <div class="card card-violet" style="padding:14px;">
+      <span class="card-icon">🌐</span>
+      <h3>Multi-Agent RL (MARL)</h3>
+      <p>Varios agentes aprendiendo en el mismo entorno — cooperando o compitiendo. Self-play (aprender contra uno mismo) y el torneo SoccerTwos de HF.</p>
+      <div style="font-family:var(--font-mono);font-size:0.5em;color:var(--accent-violet);margin-top:6px;">🤗 Módulo 7 del curso de HF</div>
+    </div>
+    <div class="card card-gold" style="padding:14px;">
+      <span class="card-icon">🗺️</span>
+      <h3>RL Basado en Modelos</h3>
+      <p>El agente aprende un "modelo del mundo" (cómo funciona el entorno) y lo usa para planear sin necesidad de millones de interacciones reales. Mucho más eficiente.</p>
+      <div style="font-family:var(--font-mono);font-size:0.5em;color:var(--accent-gold);margin-top:6px;">🤗 Bonus Unit 3 del curso de HF</div>
+    </div>
+    <div class="card" style="padding:14px;">
+      <span class="card-icon">🤖</span>
+      <h3>RL + LLMs (RLHF)</h3>
+      <p>El Aprendizaje por Refuerzo con Retroalimentación Humana es la técnica que hace que modelos como ChatGPT sean útiles y seguros. PPO ajusta el comportamiento según las preferencias humanas.</p>
+      <div style="font-family:var(--font-mono);font-size:0.5em;color:var(--text-muted);margin-top:6px;">🔬 Investigación activa en Anthropic y OpenAI</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Recursos para seguir ── -->
+<section>
+  <span class="slide-tag">Cierre · Recursos</span>
+  <h2>Recursos para seguir aprendiendo 📚</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">El campo de RL tiene recursos excelentes y accesibles. Aquí los más útiles para el siguiente paso:</p>
+
+  <div style="display:flex;flex-direction:column;gap:8px;">
+    <div class="step-badge" style="display:flex;gap:12px;align-items:flex-start;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+      <span class="sb-icon">🤗</span>
+      <div style="font-size:0.56em;">
+        <strong style="color:var(--accent-cyan);">Curso de HF (Módulos 6-8)</strong> — Actor-Critic, Multi-Agent, PPO completo<br>
+        <span style="color:var(--text-muted);">huggingface.co/learn/deep-rl-course</span>
+      </div>
+    </div>
+    <div class="step-badge" style="display:flex;gap:12px;align-items:flex-start;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+      <span class="sb-icon">📖</span>
+      <div style="font-size:0.56em;">
+        <strong style="color:var(--accent-violet);">Sutton & Barto — Reinforcement Learning: An Introduction</strong><br>
+        El libro de texto definitivo del campo. Disponible gratis en PDF oficial.<br>
+        <span style="color:var(--text-muted);">incompleteideas.net/book/the-book-2nd.html</span>
+      </div>
+    </div>
+    <div class="step-badge" style="display:flex;gap:12px;align-items:flex-start;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+      <span class="sb-icon">🎮</span>
+      <div style="font-size:0.56em;">
+        <strong style="color:var(--accent-gold);">OpenAI Spinning Up in Deep RL</strong><br>
+        Implementaciones limpias de algoritmos clásicos con explicaciones detalladas.<br>
+        <span style="color:var(--text-muted);">spinningup.openai.com</span>
+      </div>
+    </div>
+    <div class="step-badge" style="display:flex;gap:12px;align-items:flex-start;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+      <span class="sb-icon">🧪</span>
+      <div style="font-size:0.56em;">
+        <strong style="color:#22c55e;">CleanRL — implementaciones mínimas y claras de PPO, DQN, SAC</strong><br>
+        Cada algoritmo en un solo archivo Python. Ideal para estudiar el código real.<br>
+        <span style="color:var(--text-muted);">github.com/vwxyzjn/cleanrl</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Quiz final ── -->
+<section>
+  <span class="slide-tag">Quiz Final</span>
+  <h2>🧠 Mini Quiz — Capítulo 5.3 y repaso general</h2>
+  <p style="font-size:0.58em;color:var(--text-muted);margin-bottom:14px;">El quiz final del curso. Sin notas:</p>
+
+  <div class="step-row">
+    <div class="step-num">Q1</div>
+    <div class="step-text">¿Por qué no funciona PPO sin curiosidad en el entorno Pirámides, aunque sí funciona en SnowballTarget? ¿Qué hace RND para resolver ese problema?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q2</div>
+    <div class="step-text">La recompensa de RND baja con el tiempo mientras la recompensa extrínseca sube. ¿Qué indica eso sobre el estado del aprendizaje del agente?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q3</div>
+    <div class="step-text">Sin ver el temario: nombra los 5 algoritmos de RL que aprendiste en este curso y el entorno donde lo aplicaste. (Pista: uno por módulo)</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q4</div>
+    <div class="step-text">Un investigador quiere entrenar un robot físico para que aprenda a caminar en el mundo real. ¿Qué limitación tiene DQN para esta tarea? ¿Qué algoritmo de este curso sería más adecuado y por qué?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q5</div>
+    <div class="step-text">¿Qué es RLHF y por qué el Aprendizaje por Refuerzo es relevante para entrenar modelos de lenguaje como ChatGPT? ¿Qué conceptos de este curso son fundamentales para entenderlo?</div>
+  </div>
+</section>
+
+<!-- ── Slide final del curso ── -->
+<section>
+  <div class="title-slide" style="align-items:center;text-align:center;position:relative;overflow:hidden;">
+    <!-- Confetti final -->
+    <div class="confetti-piece" style="left:5%;background:#3b82f6;animation-duration:3s;"></div>
+    <div class="confetti-piece" style="left:15%;background:#a855f7;animation-duration:3.8s;animation-delay:0.3s;border-radius:50%;"></div>
+    <div class="confetti-piece" style="left:30%;background:#22c55e;animation-duration:3.3s;animation-delay:0.6s;"></div>
+    <div class="confetti-piece" style="left:50%;background:#fbbf24;animation-duration:3.6s;animation-delay:0.2s;border-radius:50%;"></div>
+    <div class="confetti-piece" style="left:68%;background:#ec4899;animation-duration:3.1s;animation-delay:0.9s;"></div>
+    <div class="confetti-piece" style="left:82%;background:#22d3ee;animation-duration:4s;animation-delay:1.2s;border-radius:50%;"></div>
+    <div class="confetti-piece" style="left:93%;background:#a855f7;animation-duration:3.4s;animation-delay:0.4s;"></div>
+
+    <div style="position:absolute;top:-50px;right:-50px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(251,191,36,0.14) 0%,transparent 70%);pointer-events:none;"></div>
+
+    <div style="font-size:3em;margin-bottom:8px;">
+      <span class="achievement-star" style="animation-delay:0s;">🌕</span>
+      <span class="achievement-star" style="animation-delay:0.1s;">🐶</span>
+      <span class="achievement-star" style="animation-delay:0.2s;">❄️</span>
+      <span class="achievement-star" style="animation-delay:0.3s;">🚖</span>
+      <span class="achievement-star" style="animation-delay:0.4s;">👾</span>
+      <span class="achievement-star" style="animation-delay:0.5s;">🏋️</span>
+      <span class="achievement-star" style="animation-delay:0.6s;">🚁</span>
+      <span class="achievement-star" style="animation-delay:0.7s;">🐻</span>
+      <span class="achievement-star" style="animation-delay:0.8s;">🏛️</span>
+    </div>
+
+    <div class="chapter-badge" style="font-size:0.4em;border-color:var(--accent-gold);color:var(--accent-gold);background:rgba(251,191,36,0.08);">Curso Completo · Deep Reinforcement Learning en Español</div>
+
+    <h1 style="text-align:center;font-size:1.7em;margin-top:10px;">
+      ¡Felicitaciones,<br>Ingeniero de Agentes! 🎓<br>
+      <span style="background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan),var(--accent-violet),var(--accent-gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-size:0.85em;">De cero a Deep RL 🚀</span>
+    </h1>
+
+    <div class="divider" style="margin:14px auto;background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan),var(--accent-violet),var(--accent-gold));"></div>
+
+    <p style="font-size:0.56em;color:var(--text-muted);max-width:600px;margin-top:6px;line-height:1.7;">
+      Completaste el mismo material que los estudiantes universitarios de todo el mundo estudian en cursos de Aprendizaje por Refuerzo. Ahora tienes las bases para explorar Actor-Critic, PPO completo, Multi-Agent RL, e incluso RLHF — los algoritmos detrás de los modelos de IA más avanzados del mundo.
+    </p>
+
+    <div style="margin-top:18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <span class="pill">🤗 huggingface.co/learn/deep-rl-course</span>
+      <span class="pill">Jose Miguel Lara Rangel</span>
+    </div>
+  </div>
+</section>
+
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+<script src="../assets/js/reveal-config.js"></script>
+</body>
+</html>

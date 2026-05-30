@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capítulos 1.1 & 1.2 — Aprendizaje por Refuerzo Profundo</title>
+
+<!-- Reveal.js -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/black.min.css">
+
+<!-- MathJax -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"></script>
+
+<!-- Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Outfit:wght@300;400;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<style>
+  /* ═══════════════════════════════════════════════
+     DESIGN SYSTEM — Aerospace Dark Blue → Purple
+  ═══════════════════════════════════════════════ */
+  :root {
+    --bg-deep:      #04060f;
+    --bg-panel:     #090d1a;
+    --bg-card:      #0d1226;
+    --accent-blue:  #3b82f6;
+    --accent-cyan:  #22d3ee;
+    --accent-violet:#a855f7;
+    --accent-pink:  #ec4899;
+    --accent-gold:  #fbbf24;
+    --text-primary: #e8eaf2;
+    --text-muted:   #7b83a6;
+    --border:       rgba(59,130,246,0.25);
+    --glow-blue:    0 0 40px rgba(59,130,246,0.35);
+    --glow-violet:  0 0 40px rgba(168,85,247,0.35);
+    --font-display: 'Outfit', sans-serif;
+    --font-mono:    'JetBrains Mono', monospace;
+    --font-body:    'Outfit', sans-serif;
+  }
+
+  /* ── Override Reveal defaults ── */
+  .reveal-viewport { background: var(--bg-deep); }
+
+  .reveal {
+    font-family: var(--font-body);
+    font-size: 36px;
+    color: var(--text-primary);
+  }
+
+  .reveal .slides section {
+    text-align: left;
+    padding: 0 60px;
+    height: 100%;
+    box-sizing: border-box;
+  }
+
+  /* ── Headings ── */
+  .reveal h1 {
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: 2em;
+    line-height: 1.1;
+    color: #fff;
+    text-transform: none;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.3em;
+    text-shadow: var(--glow-blue);
+  }
+  .reveal h2 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.45em;
+    color: var(--accent-cyan);
+    text-transform: none;
+    letter-spacing: -0.01em;
+    margin-bottom: 0.5em;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.2em;
+  }
+  .reveal h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.05em;
+    color: var(--accent-violet);
+    text-transform: none;
+    margin-bottom: 0.35em;
+  }
+
+  /* ── Body text ── */
+  .reveal p, .reveal li {
+    font-size: 0.72em;
+    line-height: 1.65;
+    color: var(--text-primary);
+  }
+  .reveal ul { list-style: none; padding-left: 0; }
+  .reveal ul li::before {
+    content: "▸ ";
+    color: var(--accent-cyan);
+    font-weight: 700;
+  }
+
+  /* ── Accent highlights ── */
+  .hl-blue   { color: var(--accent-blue);   font-weight: 700; }
+  .hl-cyan   { color: var(--accent-cyan);   font-weight: 700; }
+  .hl-violet { color: var(--accent-violet); font-weight: 700; }
+  .hl-pink   { color: var(--accent-pink);   font-weight: 700; }
+  .hl-gold   { color: var(--accent-gold);   font-weight: 700; }
+
+  /* ── Chapter badge ── */
+  .chapter-badge {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.42em;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent-cyan);
+    border: 1px solid var(--accent-cyan);
+    padding: 4px 12px;
+    border-radius: 4px;
+    margin-bottom: 0.6em;
+    background: rgba(34,211,238,0.07);
+  }
+
+  /* ── Section number tag ── */
+  .slide-tag {
+    position: absolute;
+    top: 22px;
+    right: 60px;
+    font-family: var(--font-mono);
+    font-size: 0.36em;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+  }
+
+  /* ── Cards / concept boxes ── */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin: 8px 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px; height: 100%;
+    background: linear-gradient(180deg, var(--accent-blue), var(--accent-violet));
+  }
+  .card p { margin: 0; font-size: 0.68em; }
+
+  /* Card variants */
+  .card-cyan::before   { background: var(--accent-cyan); }
+  .card-violet::before { background: var(--accent-violet); }
+  .card-gold::before   { background: var(--accent-gold); }
+  .card-pink::before   { background: var(--accent-pink); }
+
+  /* ── Diagram boxes ── */
+  .diagram-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: center;
+    margin: 14px 0;
+  }
+  .dbox {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 16px;
+    text-align: center;
+    font-size: 0.58em;
+    line-height: 1.4;
+    min-width: 90px;
+  }
+  .dbox-agent {
+    border-color: var(--accent-blue);
+    box-shadow: var(--glow-blue);
+    background: rgba(59,130,246,0.1);
+  }
+  .dbox-env {
+    border-color: var(--accent-violet);
+    box-shadow: var(--glow-violet);
+    background: rgba(168,85,247,0.1);
+  }
+  .darrow {
+    color: var(--accent-cyan);
+    font-size: 0.8em;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .darrow-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font-size: 0.52em;
+    color: var(--accent-gold);
+    flex-shrink: 0;
+  }
+
+  /* ── Two-column grid ── */
+  .cols2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  .cols3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  /* ── Math block ── */
+  .math-block {
+    background: #060a14;
+    border: 1px solid rgba(168,85,247,0.4);
+    border-radius: 10px;
+    padding: 14px 22px;
+    margin: 10px 0;
+    font-family: var(--font-mono);
+    font-size: 0.62em;
+    color: var(--accent-violet);
+    text-align: center;
+  }
+  .math-explain {
+    font-size: 0.56em;
+    color: var(--text-muted);
+    margin-top: 8px;
+    text-align: center;
+    font-family: var(--font-body);
+  }
+
+  /* ── Quote / key idea ── */
+  .key-idea {
+    background: linear-gradient(135deg, rgba(59,130,246,0.12), rgba(168,85,247,0.12));
+    border: 1px solid rgba(168,85,247,0.4);
+    border-radius: 14px;
+    padding: 18px 24px;
+    margin: 12px 0;
+  }
+  .key-idea p {
+    font-size: 0.68em;
+    font-style: italic;
+    color: #c8d0f0;
+    margin: 0;
+  }
+  .key-idea .ki-label {
+    font-family: var(--font-mono);
+    font-size: 0.42em;
+    color: var(--accent-violet);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    display: block;
+    font-style: normal;
+  }
+
+  /* ── Emoji icon in cards ── */
+  .card-icon {
+    font-size: 1.6em;
+    line-height: 1;
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  /* ── Divider ── */
+  .divider {
+    width: 60px;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-violet));
+    border-radius: 2px;
+    margin: 12px 0;
+  }
+
+  /* ── Timeline / step sequence ── */
+  .step-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin: 8px 0;
+  }
+  .step-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-violet));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.5em;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 3px;
+  }
+  .step-text { font-size: 0.67em; line-height: 1.5; }
+
+  /* ── Title slide specific ── */
+  .title-slide {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+  .title-slide::before {
+    content: "";
+    position: absolute;
+    top: -100px; right: -100px;
+    width: 500px; height: 500px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(168,85,247,0.18) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .title-slide::after {
+    content: "";
+    position: absolute;
+    bottom: -80px; left: -80px;
+    width: 400px; height: 400px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* ── Section divider slide ── */
+  .section-slide {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    text-align: center !important;
+    background: linear-gradient(135deg, #060c1a, #0d0620);
+  }
+  .section-slide h1 { font-size: 2.2em; text-align: center; }
+  .section-slide .big-emoji { font-size: 2.5em; display: block; margin-bottom: 0.3em; }
+
+  /* ── Reward scale visual ── */
+  .reward-scale {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 10px 0;
+  }
+  .reward-item {
+    background: var(--bg-card);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.55em;
+    border: 1px solid var(--border);
+    display: flex; flex-direction: column; align-items: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 80px;
+  }
+  .reward-pos { border-color: #22c55e; color: #22c55e; }
+  .reward-neg { border-color: #ef4444; color: #ef4444; }
+
+  /* ── Progress bar ── */
+  .progress-track {
+    position: fixed;
+    bottom: 0; left: 0;
+    width: 100%; height: 3px;
+    background: rgba(255,255,255,0.05);
+    z-index: 9999;
+  }
+
+  /* ── Grid background mesh ── */
+  .reveal .slides {
+    background-image:
+      linear-gradient(rgba(59,130,246,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59,130,246,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* ── Annotation pill ── */
+  .pill {
+    display: inline-block;
+    background: rgba(59,130,246,0.2);
+    border: 1px solid rgba(59,130,246,0.5);
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-size: 0.52em;
+    color: var(--accent-cyan);
+    font-family: var(--font-mono);
+    margin: 0 4px;
+    vertical-align: middle;
+  }
+
+  /* ── Glossary row ── */
+  .gloss-row {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .gloss-term {
+    font-family: var(--font-mono);
+    font-size: 0.6em;
+    color: var(--accent-cyan);
+    min-width: 150px;
+    flex-shrink: 0;
+  }
+  .gloss-def {
+    font-size: 0.6em;
+    color: var(--text-primary);
+    line-height: 1.4;
+  }
+
+  /* ── Comparison table ── */
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .compare-head {
+    font-family: var(--font-mono);
+    font-size: 0.55em;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 8px 14px;
+    border-radius: 8px 8px 0 0;
+    text-align: center;
+  }
+  .compare-head.blue { background: rgba(59,130,246,0.25); color: var(--accent-blue); }
+  .compare-head.violet { background: rgba(168,85,247,0.25); color: var(--accent-violet); }
+  .compare-body {
+    background: var(--bg-card);
+    border-radius: 0 0 8px 8px;
+    padding: 12px 14px;
+    font-size: 0.6em;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Gamma visual ── */
+  .gamma-row {
+    display: flex;
+    gap: 6px;
+    align-items: stretch;
+    margin: 8px 0;
+  }
+  .gamma-cell {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 0.52em;
+    line-height: 1.4;
+  }
+
+  /* ── Reveal transitions ── */
+  .reveal .fragment { opacity: 0.15; }
+  .reveal .fragment.visible { opacity: 1; }
+
+  /* ── Horizontal rule ── */
+  .reveal hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+
+  /* Force black background globally */
+  .reveal-viewport, .reveal, .reveal .slides {
+    background-color: var(--bg-deep) !important;
+  }
+
+  /* Slide number */
+  .reveal .slide-number {
+    font-family: var(--font-mono);
+    font-size: 0.4em;
+    color: var(--text-muted);
+    background: none;
+    bottom: 14px; right: 20px;
+  }
+
+  /* ── img helper ── */
+  .reveal img {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    max-width: 100%;
+  }
+  .img-caption {
+    font-size: 0.42em;
+    color: var(--text-muted);
+    text-align: center;
+    margin-top: 4px;
+    font-style: italic;
+  }
+</style>
+</head>
+
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ╔══════════════════════════════════════════════╗
+     ║  TITLE SLIDE — Chapters 1.1 & 1.2           ║
+     ╚══════════════════════════════════════════════╝ -->
+<section>
+  <div class="title-slide">
+    <div class="chapter-badge">Capítulo 1.1 + 1.2 · Módulo 1</div>
+    <h1>¿Qué es el<br>Aprendizaje por<br><span style="background: linear-gradient(90deg,#3b82f6,#a855f7); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">Refuerzo?</span></h1>
+    <div class="divider"></div>
+    <p style="font-size:0.62em; color:var(--text-muted); max-width:600px; margin-top:8px;">
+      El agente · El entorno · El ciclo de aprendizaje<br>
+      Recompensas, descuento y el objetivo del agente
+    </p>
+    <div style="margin-top:28px; display:flex; gap:10px; flex-wrap:wrap;">
+      <span class="pill">Deep RL Course</span>
+      <span class="pill">Unit 1 — HuggingFace 🤗</span>
+      <span class="pill">Josue Hernandez Pavon</span>
+    </div>
+  </div>
+</section>
+
+<!-- ╔══════════════════════════════════════════════╗
+     ║  AGENDA                                      ║
+     ╚══════════════════════════════════════════════╝ -->
+<section>
+  <span class="slide-tag">CONTENIDO</span>
+  <h2>¿Qué vamos a aprender hoy?</h2>
+  <div class="cols2" style="margin-top:10px;">
+    <div>
+      <div class="chapter-badge" style="font-size:0.36em;">Capítulo 1.1</div>
+      <div class="card card-cyan" style="margin-top:6px;">
+        <span class="card-icon">🤖</span>
+        <p><strong style="color:var(--accent-cyan);">El framework de RL</strong><br>Qué es el Aprendizaje por Refuerzo, cómo aprende un agente, quiénes son los "actores" del juego y cómo se comunican entre sí.</p>
+      </div>
+    </div>
+    <div>
+      <div class="chapter-badge" style="font-size:0.36em; border-color:var(--accent-violet); color:var(--accent-violet); background:rgba(168,85,247,0.07);">Capítulo 1.2</div>
+      <div class="card card-violet" style="margin-top:6px;">
+        <span class="card-icon">🏆</span>
+        <p><strong style="color:var(--accent-violet);">Recompensas y el objetivo</strong><br>Qué quiere maximizar el agente, cómo funciona el descuento γ, y la diferencia entre tareas episódicas y continuas.</p>
+      </div>
+    </div>
+  </div>
+  <div class="key-idea" style="margin-top:14px;">
+    <span class="ki-label">🎯 Meta del módulo</span>
+    <p>Al terminar, entenderás el "idioma básico" del RL: los conceptos que aparecerán en <em>todos</em> los capítulos siguientes. ¡No te saltes esta parte!</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     CHAPTER 1.1 SECTION BREAK
+══════════════════════════════════════════════ -->
+<section>
+  <div class="section-slide">
+    <span class="big-emoji">🤖</span>
+    <div class="chapter-badge" style="font-size:0.38em;">Capítulo 1.1</div>
+    <h1>¿Qué es el<br>Aprendizaje por Refuerzo?</h1>
+    <p style="font-size:0.6em; color:var(--text-muted); max-width:500px; text-align:center;">Aprende a través de la experiencia, igual que tú.</p>
+  </div>
+</section>
+
+<!-- ── ¿Qué es Machine Learning? ── -->
+<section>
+  <span class="slide-tag">1.1 · ¿Qué es RL?</span>
+  <h2>Primero: ¿dónde vive el RL?</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:12px;">El Aprendizaje por Refuerzo (RL) es una <em>rama</em> del Machine Learning. Antes de entrar a RL, ubiquémonos en el mapa.</p>
+  <div class="cols3">
+    <div class="card">
+      <span class="card-icon">🧠</span>
+      <h3 style="font-size:0.7em; margin-bottom:6px;">Inteligencia Artificial</h3>
+      <p>Cualquier técnica que hace que una máquina <strong>parezca inteligente</strong>. Es el paraguas más grande.</p>
+    </div>
+    <div class="card card-cyan">
+      <span class="card-icon">📊</span>
+      <h3 style="font-size:0.7em; margin-bottom:6px;">Machine Learning</h3>
+      <p>La máquina <strong>aprende patrones</strong> a partir de datos, sin ser programada regla por regla.</p>
+    </div>
+    <div class="card card-violet">
+      <span class="card-icon">🎮</span>
+      <h3 style="font-size:0.7em; margin-bottom:6px;">Deep RL</h3>
+      <p>La máquina aprende <strong>tomando decisiones</strong> en un entorno y recibiendo recompensas. Usa redes neuronales.</p>
+    </div>
+  </div>
+  <div class="key-idea" style="margin-top:12px;">
+    <span class="ki-label">💡 La diferencia clave</span>
+    <p>En ML clásico aprendes de un dataset fijo (fotos etiquetadas, precios históricos). En RL, <strong>tú creas el dataset mientras juegas</strong>: cada acción genera nueva información.</p>
+  </div>
+</section>
+
+<!-- ── Analogía del niño ── -->
+<section>
+  <span class="slide-tag">1.1 · ¿Qué es RL?</span>
+  <h2>Aprende como un niño jugando</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">Imagina a tu hermano menor frente a un videojuego que nunca ha visto. Le das el control y lo dejas solo.</p>
+
+  <div class="cols3">
+    <div class="card card-cyan">
+      <span class="card-icon">🕹️</span>
+      <p><strong>Acción:</strong> Presiona el botón derecho y recoge una moneda.</p>
+      <p style="color:#22c55e; font-size:0.58em; margin-top:6px;">+1 recompensa 🟢<br><em>"¡Las monedas son buenas!"</em></p>
+    </div>
+    <div class="card card-pink">
+      <span class="card-icon">👾</span>
+      <p><strong>Acción:</strong> Presiona derecha otra vez y choca contra un enemigo.</p>
+      <p style="color:#ef4444; font-size:0.58em; margin-top:6px;">−1 recompensa 🔴<br><em>"¡Los enemigos son malos!"</em></p>
+    </div>
+    <div class="card card-violet">
+      <span class="card-icon">💡</span>
+      <p><strong>Después de muchos intentos:</strong> El niño <strong>aprende solo</strong> a esquivar enemigos y recoger monedas.</p>
+      <p style="color:var(--accent-violet); font-size:0.58em; margin-top:6px;">Sin instrucciones.<br>Solo prueba y error.</p>
+    </div>
+  </div>
+
+  <div class="key-idea" style="margin-top:14px;">
+    <span class="ki-label">📌 Definición formal</span>
+    <p>El Aprendizaje por Refuerzo es un framework para resolver problemas de decisión construyendo <strong>agentes</strong> que aprenden del entorno <strong>interactuando con él</strong> mediante prueba y error, y recibiendo <strong>recompensas</strong> como única retroalimentación.</p>
+  </div>
+</section>
+
+<!-- ── Los actores del RL ── -->
+<section>
+  <span class="slide-tag">1.1 · Los actores del RL</span>
+  <h2>Los protagonistas del Aprendizaje por Refuerzo</h2>
+  <p style="font-size:0.62em; color:var(--text-muted);">En cualquier problema de RL siempre hay exactamente <strong class="hl-cyan">dos</strong> actores que se comunican entre sí:</p>
+  <div class="cols2" style="margin-top:10px;">
+    <div class="card card-cyan">
+      <span class="card-icon">🤖</span>
+      <h3>Agente <span class="pill">Agent</span></h3>
+      <p>Es quien <strong>toma las decisiones</strong>. Observa lo que pasa en el entorno, elige una acción y recibe el resultado. Puede ser un robot, un personaje de videojuego, un auto autónomo, o incluso un software.</p>
+    </div>
+    <div class="card card-violet">
+      <span class="card-icon">🌍</span>
+      <h3>Entorno <span class="pill">Environment</span></h3>
+      <p>Es el <strong>mundo donde vive el agente</strong>. Puede ser un videojuego, un laberinto, un simulador físico o incluso el mercado de valores. El entorno responde a las acciones del agente.</p>
+    </div>
+  </div>
+  <div class="card" style="margin-top:12px;">
+    <p><strong class="hl-gold">Ejemplos reales:</strong> En Mario Bros, <em>el agente es Mario</em> y <em>el entorno es el nivel</em>. En un robot aspiradora, <em>el agente es la aspiradora</em> y <em>el entorno es tu casa</em>. En AlphaGo, <em>el agente es el programa</em> y <em>el entorno es el tablero de Go</em>.</p>
+  </div>
+</section>
+
+<!-- ── El ciclo RL ── -->
+<section>
+  <span class="slide-tag">1.1 · El ciclo de RL</span>
+  <h2>El ciclo de Aprendizaje por Refuerzo</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:12px;">Agente y entorno se comunican en un <strong>ciclo continuo</strong>. Esto es lo que pasa en cada "turno":</p>
+
+  <!-- Main cycle diagram -->
+  <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:20px; margin-bottom:14px;">
+    <div class="diagram-row">
+      <div class="dbox dbox-agent">
+        <div style="font-size:1.8em;">🤖</div>
+        <div style="color:var(--accent-cyan); font-weight:700;">AGENTE</div>
+      </div>
+      <div class="darrow-label">
+        <span style="color:var(--accent-gold);">Acción A<sub>t</sub></span>
+        <span class="darrow">→</span>
+      </div>
+      <div class="dbox dbox-env">
+        <div style="font-size:1.8em;">🌍</div>
+        <div style="color:var(--accent-violet); font-weight:700;">ENTORNO</div>
+      </div>
+      <div class="darrow-label">
+        <span style="color:#22c55e;">Recompensa R<sub>t+1</sub></span>
+        <span class="darrow">→</span>
+        <span style="color:var(--accent-blue); margin-top:4px;">Nuevo estado S<sub>t+1</sub></span>
+      </div>
+      <div class="dbox dbox-agent" style="opacity:0.7;">
+        <div style="font-size:1.8em;">🤖</div>
+        <div style="color:var(--accent-cyan); font-weight:700;">AGENTE</div>
+        <div style="font-size:0.8em; color:var(--text-muted);">(siguiente turno)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Steps -->
+  <div class="step-row">
+    <div class="step-num">1</div>
+    <div class="step-text">El agente recibe el <strong class="hl-blue">estado S<sub>0</sub></strong> del entorno — por ejemplo, la primera pantalla del videojuego.</div>
+  </div>
+  <div class="step-row">
+    <div class="step-num">2</div>
+    <div class="step-text">Con base en ese estado, el agente elige una <strong class="hl-gold">acción A<sub>0</sub></strong> — por ejemplo, moverse a la derecha.</div>
+  </div>
+  <div class="step-row">
+    <div class="step-num">3</div>
+    <div class="step-text">El entorno pasa a un <strong class="hl-blue">nuevo estado S<sub>1</sub></strong> y le entrega al agente una <strong class="hl-cyan" style="color:#22c55e;">recompensa R<sub>1</sub></strong> — por ejemplo, +1 por no morir.</div>
+  </div>
+  <div class="step-row">
+    <div class="step-num">4</div>
+    <div class="step-text">El ciclo se repite indefinidamente. El agente <strong>va aprendiendo</strong> de cada interacción.</div>
+  </div>
+</section>
+
+<!-- ── Estado vs Observación ── -->
+<section>
+  <span class="slide-tag">1.1 · Estado vs Observación</span>
+  <h2>Estado vs. Observación: ¿ves todo o solo una parte?</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">Esta es una distinción importante que distingue <strong>cuánta información</strong> percibe el agente del entorno:</p>
+
+  <div class="compare-grid">
+    <div>
+      <div class="compare-head blue">Estado (State) — Información completa</div>
+      <div class="compare-body">
+        <p>El agente ve <strong>todo</strong> lo que pasa en el mundo. No hay secretos.</p>
+        <p style="margin-top:8px; color:var(--text-muted);">Ejemplo: En el <strong>ajedrez</strong>, ambos jugadores ven todo el tablero. No hay información oculta. Eso es un <em>entorno completamente observado</em>.</p>
+        <p style="margin-top:8px; font-family:var(--font-mono); color:var(--accent-blue); font-size:0.9em;">♟️ Ajedrez · Go · Conecta4</p>
+      </div>
+    </div>
+    <div>
+      <div class="compare-head violet">Observación (Obs.) — Información parcial</div>
+      <div class="compare-body">
+        <p>El agente solo ve <strong>una parte</strong> del entorno en cada momento.</p>
+        <p style="margin-top:8px; color:var(--text-muted);">Ejemplo: En <strong>Super Mario Bros</strong>, la cámara solo muestra lo que está cerca de Mario. No sabes qué hay más adelante en el nivel.</p>
+        <p style="margin-top:8px; font-family:var(--font-mono); color:var(--accent-violet); font-size:0.9em;">🍄 Mario · 🚗 Autos · 🏎️ Poker</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-gold" style="margin-top:12px;">
+    <p><strong class="hl-gold">Nota práctica:</strong> En este curso usaremos el término <strong>"estado"</strong> para ambos casos (es la convención común). Pero en código sí distinguiremos cuándo el agente tiene información completa o parcial.</p>
+  </div>
+</section>
+
+<!-- ── Espacios de acción ── -->
+<section>
+  <span class="slide-tag">1.1 · Espacio de Acciones</span>
+  <h2>¿Cuántas cosas puede hacer el agente?</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">El <strong>espacio de acciones</strong> es el conjunto de todas las cosas que puede hacer el agente. Hay dos tipos:</p>
+
+  <div class="compare-grid">
+    <div>
+      <div class="compare-head blue">Espacio Discreto</div>
+      <div class="compare-body">
+        <p>El número de acciones posibles es <strong>finito</strong>. El agente elige entre opciones concretas.</p>
+        <div style="text-align:center; font-size:1.8em; margin:10px 0;">⬆️ ⬇️ ⬅️ ➡️ 🅱️</div>
+        <p style="color:var(--text-muted);">Mario Bros: izquierda, derecha, saltar, agacharse. Solo 4–5 botones. Fin.</p>
+        <p style="margin-top:6px; font-size:0.88em; color:var(--accent-blue);">También: FrozenLake ❄️, Taxi 🚖, Atari 👾</p>
+      </div>
+    </div>
+    <div>
+      <div class="compare-head violet">Espacio Continuo</div>
+      <div class="compare-body">
+        <p>El número de acciones es <strong>infinito</strong>. El agente elige valores numéricos exactos.</p>
+        <div style="text-align:center; font-size:0.72em; margin:10px 0; font-family:var(--font-mono); color:var(--accent-violet);">ángulo_volante = 21.37°<br>aceleración = 0.82<br>freno = 0.03</div>
+        <p style="color:var(--text-muted);">Auto autónomo: puede girar el volante 20°, 20.1°, 20.15°… infinitas posibilidades.</p>
+        <p style="margin-top:6px; font-size:0.88em; color:var(--accent-violet);">También: Brazo robótico 🦾, Huggy 🐶</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="key-idea" style="margin-top:12px;">
+    <span class="ki-label">⚙️ ¿Por qué importa?</span>
+    <p>Esta diferencia determina <strong>qué algoritmo de RL usaremos</strong>. Algunos algoritmos solo funcionan con acciones discretas; otros están diseñados para acciones continuas. Lo veremos en detalle más adelante.</p>
+  </div>
+</section>
+
+<!-- ── La Hipótesis de la Recompensa ── -->
+<section>
+  <span class="slide-tag">1.1 · Hipótesis de la Recompensa</span>
+  <h2>La idea central del RL: la Hipótesis de la Recompensa</h2>
+
+  <div class="key-idea" style="margin-top:10px; padding: 22px 28px;">
+    <span class="ki-label">🏛️ Hipótesis de la Recompensa</span>
+    <p style="font-size:0.72em;">Todo objetivo que queramos lograr puede describirse como la <strong>maximización de la recompensa acumulada esperada</strong>.</p>
+  </div>
+
+  <p style="font-size:0.62em; margin-top:14px; color:var(--text-muted);">Dicho de otra forma: el agente siempre busca obtener el <strong>mayor puntaje total posible</strong> a lo largo del tiempo. Esa es su única motivación.</p>
+
+  <div class="cols3" style="margin-top:12px;">
+    <div class="card card-cyan">
+      <span class="card-icon">🎮</span>
+      <p><strong>Videojuego:</strong> maximizar puntos antes de que se acabe la partida.</p>
+    </div>
+    <div class="card card-violet">
+      <span class="card-icon">🤖</span>
+      <p><strong>Robot:</strong> maximizar la distancia recorrida sin caerse.</p>
+    </div>
+    <div class="card card-gold">
+      <span class="card-icon">♟️</span>
+      <p><strong>Ajedrez:</strong> maximizar la probabilidad de ganar la partida (+1 al final).</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Propiedad de Markov ── -->
+<section>
+  <span class="slide-tag">1.1 · Propiedad de Markov</span>
+  <h2>La Propiedad de Markov: el agente vive en el presente</h2>
+
+  <div class="cols2" style="margin-top:10px;">
+    <div>
+      <div class="card card-cyan">
+        <span class="card-icon">📸</span>
+        <h3>Lo que asume el RL</h3>
+        <p>El agente <strong>solo necesita el estado actual</strong> para decidir qué hacer. No necesita recordar toda la historia de lo que pasó antes.</p>
+      </div>
+      <div class="card" style="margin-top:10px;">
+        <span class="card-icon">🧠</span>
+        <h3>Analogía</h3>
+        <p>Imagina que juegas Tetris. Para saber cuál pieza colocar, <strong>solo necesitas ver el tablero ahora mismo</strong>. No importa en qué orden cayeron las piezas anteriores.</p>
+      </div>
+    </div>
+    <div>
+      <div class="key-idea" style="height:calc(100% - 0px);">
+        <span class="ki-label">📐 Markov Decision Process (MDP)</span>
+        <p>En los papers y libros, el proceso de RL se llama formalmente un <strong>Proceso de Decisión de Markov (MDP)</strong>. Es el framework matemático estándar para modelar problemas de decisión secuencial bajo incertidumbre.</p>
+        <p style="margin-top:10px;">Veremos más detalles de MDPs en capítulos posteriores. Por ahora quédate con esto: <strong>el estado actual contiene toda la información necesaria.</strong></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     CHAPTER 1.2 SECTION BREAK
+══════════════════════════════════════════════ -->
+<section>
+  <div class="section-slide">
+    <span class="big-emoji">🏆</span>
+    <div class="chapter-badge" style="font-size:0.38em; border-color:var(--accent-violet); color:var(--accent-violet); background:rgba(168,85,247,0.07);">Capítulo 1.2</div>
+    <h1>Recompensas,<br>Descuento y<br>el Objetivo del Agente</h1>
+    <p style="font-size:0.6em; color:var(--text-muted); max-width:520px; text-align:center;">¿Cuánto vale una recompensa futura vs. una inmediata? Conoce γ.</p>
+  </div>
+</section>
+
+<!-- ── La Recompensa ── -->
+<section>
+  <span class="slide-tag">1.2 · Recompensas</span>
+  <h2>La recompensa: la única señal de aprendizaje</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">La recompensa (reward) es <strong>la única información</strong> que recibe el agente sobre si hizo bien o mal. No recibe explicaciones, solo un número.</p>
+
+  <div class="reward-scale" style="margin-bottom:12px;">
+    <div class="reward-item reward-pos">
+      <span style="font-size:1.8em;">🟢</span>
+      <strong>Positiva</strong>
+      <span style="color:#22c55e;">+1, +10, +100</span>
+      <span style="color:var(--text-muted);">Acción buena</span>
+    </div>
+    <div class="reward-item reward-neg">
+      <span style="font-size:1.8em;">🔴</span>
+      <strong>Negativa</strong>
+      <span style="color:#ef4444;">−1, −10, −100</span>
+      <span style="color:var(--text-muted);">Acción mala</span>
+    </div>
+    <div class="reward-item" style="border-color:var(--text-muted); color:var(--text-muted);">
+      <span style="font-size:1.8em;">⚫</span>
+      <strong>Cero</strong>
+      <span>0</span>
+      <span style="color:var(--text-muted);">Ni buena ni mala</span>
+    </div>
+  </div>
+
+  <div class="cols2">
+    <div class="card card-cyan">
+      <h3>Diseño de la recompensa</h3>
+      <p>Quien <strong>diseña la recompensa</strong> determina el comportamiento del agente. Si recompensas mal, obtienes comportamientos inesperados. A esto se le llama <em>reward engineering</em> y es uno de los retos más difíciles del RL.</p>
+    </div>
+    <div class="card card-pink">
+      <h3>Ejemplo: recompensa mal diseñada 😅</h3>
+      <p>Un agente de carreras que recibe puntos por velocidad aprendió a <strong>girar en círculos</strong> en lugar de correr la pista. ¡Velocidad alta, sin avanzar!</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Retorno Acumulado ── -->
+<section>
+  <span class="slide-tag">1.2 · Retorno Acumulado</span>
+  <h2>El Retorno: la suma de todas las recompensas</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">El agente no solo quiere maximizar la recompensa <em>de este turno</em>. Quiere maximizar el <strong>total de recompensas de toda la partida</strong>. A eso lo llamamos el <strong class="hl-cyan">Retorno G<sub>t</sub></strong>.</p>
+
+  <div class="math-block">
+    \[ G_t = R_{t+1} + R_{t+2} + R_{t+3} + \cdots \]
+  </div>
+  <div class="math-explain">
+    G<sub>t</sub> = retorno en el paso t &nbsp;·&nbsp; R<sub>t+1</sub> = recompensa del siguiente paso &nbsp;·&nbsp; y así sucesivamente hasta el final
+  </div>
+
+  <div class="card card-gold" style="margin-top:14px;">
+    <span class="card-icon">⚠️</span>
+    <h3>¿Pero esto tiene un problema...</h3>
+    <p>¿Una recompensa de +100 que obtendrás dentro de 1000 pasos vale igual que +100 ahora? En la vida real, <strong>las recompensas futuras son más inciertas</strong>. Puede que nunca llegues a ellas. Por eso necesitamos el <strong class="hl-violet">descuento</strong>.</p>
+  </div>
+</section>
+
+<!-- ── El Descuento Gamma ── -->
+<section>
+  <span class="slide-tag">1.2 · El Descuento γ</span>
+  <h2>El Descuento γ (gamma): el futuro vale menos</h2>
+
+  <div class="cols2" style="margin-top:8px;">
+    <div>
+      <p style="font-size:0.62em;">Imagina a un ratoncito 🐭 que quiere comer queso. Hay queso cercano (+1) y queso lejos (+5). Pero el gato 🐱 se mueve y el camino hacia el queso grande es peligroso.</p>
+      <p style="font-size:0.62em; margin-top:8px; color:var(--text-muted);">Las recompensas <strong>más lejanas en el tiempo</strong> son más inciertas — quizás no llegues a ellas. El descuento γ modela esto matemáticamente.</p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <div class="dbox" style="text-align:left; font-size:0.55em; padding:12px;">
+        <span style="font-size:1.5em;">🐭</span> → queso cerca → <span style="color:#22c55e;">+1 ahora</span>
+      </div>
+      <div class="dbox" style="text-align:left; font-size:0.55em; padding:12px;">
+        <span style="font-size:1.5em;">🐭</span> → gato 🐱 → queso → <span style="color:#ef4444;">peligro</span> → <span style="color:var(--accent-gold);">+5 si llegas</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="math-block" style="margin-top:12px;">
+    \[ G_t = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \gamma^3 R_{t+4} + \cdots \]
+  </div>
+
+  <div class="gamma-row" style="margin-top:10px;">
+    <div class="gamma-cell" style="background:rgba(59,130,246,0.15); border:1px solid var(--accent-blue);">
+      <div style="font-size:1.4em;">γ</div>
+      <div style="font-size:0.6em; color:var(--accent-blue); margin-top:4px;">Gamma</div>
+      <div style="font-size:0.55em; color:var(--text-muted);">Número entre 0 y 1</div>
+    </div>
+    <div class="gamma-cell" style="background:rgba(34,211,238,0.1); border:1px solid var(--accent-cyan);">
+      <div style="font-size:1.1em;">γ → 1</div>
+      <div style="font-size:0.55em; color:var(--accent-cyan); margin-top:4px;">Cerca de 1: el agente <strong>valora mucho el futuro</strong>. Planea a largo plazo. (típico: 0.99)</div>
+    </div>
+    <div class="gamma-cell" style="background:rgba(168,85,247,0.1); border:1px solid var(--accent-violet);">
+      <div style="font-size:1.1em;">γ → 0</div>
+      <div style="font-size:0.55em; color:var(--accent-violet); margin-top:4px;">Cerca de 0: el agente solo quiere <strong>recompensas inmediatas</strong>. Vive el momento.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Gamma intuición visual ── -->
+<section>
+  <span class="slide-tag">1.2 · El Descuento γ</span>
+  <h2>¿Cómo "encoge" el descuento las recompensas futuras?</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:12px;">Usemos γ = 0.9 como ejemplo. Cada paso al futuro, la recompensa se multiplica por γ de nuevo:</p>
+
+  <!-- Visual timeline -->
+  <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:12px;">
+    <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+      <div class="gamma-cell" style="background:rgba(59,130,246,0.3); border:1px solid var(--accent-blue); flex:1; min-width:70px;">
+        <div style="font-size:1.1em; color:var(--accent-blue);">Paso 0</div>
+        <div style="font-size:1.3em; font-weight:700;">R × 1.0</div>
+        <div style="font-size:0.55em; color:var(--text-muted);">γ⁰ = 1</div>
+      </div>
+      <div style="color:var(--accent-cyan); font-size:1.2em;">→</div>
+      <div class="gamma-cell" style="background:rgba(59,130,246,0.22); border:1px solid rgba(59,130,246,0.5); flex:1; min-width:70px;">
+        <div style="font-size:1.1em; color:var(--accent-blue);">Paso 1</div>
+        <div style="font-size:1.3em; font-weight:700;">R × 0.90</div>
+        <div style="font-size:0.55em; color:var(--text-muted);">γ¹ = 0.9</div>
+      </div>
+      <div style="color:var(--accent-cyan); font-size:1.2em;">→</div>
+      <div class="gamma-cell" style="background:rgba(59,130,246,0.14); border:1px solid rgba(59,130,246,0.35); flex:1; min-width:70px;">
+        <div style="font-size:1.1em; color:var(--accent-blue);">Paso 2</div>
+        <div style="font-size:1.3em; font-weight:700;">R × 0.81</div>
+        <div style="font-size:0.55em; color:var(--text-muted);">γ² = 0.81</div>
+      </div>
+      <div style="color:var(--accent-cyan); font-size:1.2em;">→</div>
+      <div class="gamma-cell" style="background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.25); flex:1; min-width:70px;">
+        <div style="font-size:1.1em; color:var(--accent-blue);">Paso 5</div>
+        <div style="font-size:1.3em; font-weight:700;">R × 0.59</div>
+        <div style="font-size:0.55em; color:var(--text-muted);">γ⁵ = 0.59</div>
+      </div>
+      <div style="color:var(--accent-cyan); font-size:1.2em;">→</div>
+      <div class="gamma-cell" style="background:rgba(59,130,246,0.04); border:1px solid rgba(59,130,246,0.15); flex:1; min-width:70px;">
+        <div style="font-size:1.1em; color:var(--accent-blue);">Paso 10</div>
+        <div style="font-size:1.3em; font-weight:700;">R × 0.35</div>
+        <div style="font-size:0.55em; color:var(--text-muted);">γ¹⁰ = 0.35</div>
+      </div>
+    </div>
+    <p style="font-size:0.5em; color:var(--text-muted); text-align:center; margin-top:10px;">La misma recompensa R en el paso 10 solo vale el 35% de lo que valdría ahora. Con γ = 0.9.</p>
+  </div>
+
+  <div class="math-block">
+    \[ G_t = \sum_{k=0}^{\infty} \gamma^k \cdot R_{t+k+1} \]
+  </div>
+  <div class="math-explain">
+    El retorno es la suma infinita de recompensas futuras, cada una "encogida" por γ elevado al número de pasos que faltan.
+  </div>
+</section>
+
+<!-- ── Tareas Episódicas vs. Continuas ── -->
+<section>
+  <span class="slide-tag">1.2 · Tipos de Tareas</span>
+  <h2>¿La partida tiene fin? Episódica vs. Continua</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">Dependiendo del problema, la interacción del agente con el entorno puede tener un final definido, o no tenerlo nunca.</p>
+
+  <div class="compare-grid">
+    <div>
+      <div class="compare-head blue">Tarea Episódica</div>
+      <div class="compare-body">
+        <p>Hay un <strong>inicio</strong> y un <strong>final</strong> (estado terminal). Cada "partida completa" se llama <strong class="hl-cyan">episodio</strong>.</p>
+        <div style="margin:10px 0; font-size:0.7em; color:var(--text-muted);">
+          Un episodio = lista de (Estado, Acción, Recompensa, Siguiente Estado)
+        </div>
+        <p style="color:var(--accent-blue);">Ejemplos:</p>
+        <p>🍄 Mario Bros — termina cuando mueres o llegas al castillo</p>
+        <p>♟️ Ajedrez — termina con jaque mate</p>
+        <p>🌕 LunarLander — termina cuando aterrizas o te estrellas</p>
+      </div>
+    </div>
+    <div>
+      <div class="compare-head violet">Tarea Continua</div>
+      <div class="compare-body">
+        <p>No hay estado terminal. El agente <strong>corre para siempre</strong> (hasta que lo detengamos).</p>
+        <div style="margin:10px 0; font-size:0.7em; color:var(--text-muted);">
+          Aquí γ es crucial: sin descuento, el retorno sería infinito (suma infinita sin fin).
+        </div>
+        <p style="color:var(--accent-violet);">Ejemplos:</p>
+        <p>📈 Agente de trading automático</p>
+        <p>🤖 Robot de manufactura 24/7</p>
+        <p>🌡️ Sistema de control de temperatura</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Política ── -->
+<section>
+  <span class="slide-tag">1.2 → 1.3 preview · Política</span>
+  <h2>La Política π: el "cerebro" del agente</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">Ahora que sabemos lo que quiere el agente (maximizar G<sub>t</sub>), ¿cómo lo logra? A través de su <strong class="hl-cyan">política</strong>.</p>
+
+  <div class="key-idea" style="margin-bottom:12px;">
+    <span class="ki-label">🧠 Definición</span>
+    <p>La <strong>política π</strong> es la función que le dice al agente <em>"dado que estoy en este estado, ¿qué acción debo tomar?"</em>. Es literalmente el cerebro del agente.</p>
+  </div>
+
+  <div class="compare-grid">
+    <div>
+      <div class="compare-head blue">Política Determinista</div>
+      <div class="compare-body">
+        <p>Dado un estado, <strong>siempre devuelve la misma acción</strong>. No hay aleatoriedad.</p>
+        <div class="math-block" style="font-size:0.9em; margin-top:8px; padding:8px;">
+          \[ a = \pi(s) \]
+        </div>
+        <p style="font-size:0.85em; color:var(--text-muted);">"En el estado s, <em>siempre</em> haz la acción a."</p>
+      </div>
+    </div>
+    <div>
+      <div class="compare-head violet">Política Estocástica</div>
+      <div class="compare-body">
+        <p>Dado un estado, devuelve una <strong>distribución de probabilidades</strong> sobre las acciones.</p>
+        <div class="math-block" style="font-size:0.9em; margin-top:8px; padding:8px;">
+          \[ \pi(a \mid s) = P(A=a \mid S=s) \]
+        </div>
+        <p style="font-size:0.85em; color:var(--text-muted);">"En el estado s, hay un 70% de ir a la derecha, 30% de saltar."</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Value-based vs Policy-based ── -->
+<section>
+  <span class="slide-tag">1.2 → 1.3 preview · Enfoques</span>
+  <h2>Dos formas de encontrar la política óptima</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">El objetivo del agente es encontrar la <strong>política óptima π*</strong> que maximiza el retorno esperado. Hay dos grandes estrategias:</p>
+
+  <div class="compare-grid">
+    <div>
+      <div class="compare-head blue">Métodos Basados en Valor</div>
+      <div class="compare-body">
+        <p>El agente aprende <strong>cuánto vale estar en cada estado</strong> (o cuánto vale tomar cada acción). Luego elige la acción que lleva al estado más valioso.</p>
+        <p style="margin-top:8px; color:var(--text-muted);">Imagina un mapa de "temperatura": los estados cerca de la meta son calientes (+alto valor), los lejanos son fríos (−bajo valor).</p>
+        <p style="margin-top:8px; color:var(--accent-blue);">🧊 Q-Learning · DQN</p>
+        <p style="font-size:0.85em; color:var(--text-muted);">(Capítulos 2.x y 3.x)</p>
+      </div>
+    </div>
+    <div>
+      <div class="compare-head violet">Métodos Basados en Política</div>
+      <div class="compare-body">
+        <p>El agente aprende <strong>directamente qué acción tomar</strong> en cada estado. No necesita saber el valor de los estados.</p>
+        <p style="margin-top:8px; color:var(--text-muted);">Como aprender a montar bicicleta: no calculas físicamente el equilibrio, simplemente aprendes los movimientos correctos.</p>
+        <p style="margin-top:8px; color:var(--accent-violet);">🎯 REINFORCE · PPO · A2C</p>
+        <p style="font-size:0.85em; color:var(--text-muted);">(Capítulos 4.x, 6.x y 8.x)</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-gold" style="margin-top:10px;">
+    <p>🔑 <strong>No hay un ganador universal.</strong> Cada enfoque tiene ventajas y desventajas que dependen del problema. Aprenderemos ambos en profundidad.</p>
+  </div>
+</section>
+
+<!-- ── El "Deep" en Deep RL ── -->
+<section>
+  <span class="slide-tag">1.2 · Deep RL</span>
+  <h2>¿Y qué significa el "Deep" en Deep RL?</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">Hasta ahora hemos hablado de Reinforcement Learning. Pero el curso se llama <strong>Deep</strong> Reinforcement Learning. ¿Qué añade el "Deep"?</p>
+
+  <div class="cols2" style="margin-top:6px;">
+    <div class="card">
+      <h3>RL clásico</h3>
+      <p>Usa <strong>tablas</strong> (como hojas de cálculo) para guardar los valores o las políticas. Funciona bien en problemas con pocos estados.</p>
+      <div style="text-align:center; margin-top:10px; font-size:0.7em; font-family:var(--font-mono); color:var(--text-muted);">
+        Q-table: [estado₁ → acción₁, ...]<br>
+        🟦🟦🟦 estados posibles: ~100s
+      </div>
+    </div>
+    <div class="card card-violet">
+      <h3>Deep RL</h3>
+      <p>Usa <strong>redes neuronales profundas</strong> para aproximar los valores o la política. Escala a problemas enormes con millones de estados posibles.</p>
+      <div style="text-align:center; margin-top:10px; font-size:0.7em; font-family:var(--font-mono); color:var(--accent-violet);">
+        Red neuronal: input(estado) → output(acción)<br>
+        🎮 Atari: 10⁹+ estados posibles
+      </div>
+    </div>
+  </div>
+
+  <div class="key-idea" style="margin-top:12px;">
+    <span class="ki-label">🧠 La conexión</span>
+    <p>La red neuronal reemplaza la tabla. En lugar de buscar en una tabla, el agente <em>pasa el estado por la red</em> y obtiene directamente el valor o la acción óptima. Más potente, pero más complejo de entrenar.</p>
+  </div>
+</section>
+
+<!-- ── Glosario ── -->
+<section>
+  <span class="slide-tag">Resumen</span>
+  <h2>Glosario: términos clave de los capítulos 1.1 y 1.2</h2>
+  <div style="margin-top:10px;">
+    <div class="gloss-row">
+      <span class="gloss-term">Agente (Agent)</span>
+      <span class="gloss-def">El "jugador" que aprende. Observa el entorno, toma acciones y recibe recompensas.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Entorno (Environment)</span>
+      <span class="gloss-def">El "mundo" donde vive el agente. Responde a sus acciones.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Estado / Obs. (State/Obs.)</span>
+      <span class="gloss-def">La información que percibe el agente del entorno en un momento dado.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Acción (Action)</span>
+      <span class="gloss-def">Lo que puede hacer el agente. Puede ser discreta (elegir botón) o continua (elegir ángulo).</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Recompensa (Reward) R</span>
+      <span class="gloss-def">Señal numérica (+/−/0) que indica si la acción fue buena o mala.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Retorno (Return) G<sub>t</sub></span>
+      <span class="gloss-def">Suma total (descontada) de recompensas desde el paso t hasta el final.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Descuento γ (Gamma)</span>
+      <span class="gloss-def">Factor entre 0 y 1 que hace que las recompensas futuras valgan menos que las inmediatas.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Política (Policy) π</span>
+      <span class="gloss-def">La estrategia del agente: dado un estado, dice qué acción tomar.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Episodio (Episode)</span>
+      <span class="gloss-def">Una "partida" completa de inicio a fin. Las tareas episódicas tienen episodios; las continuas, no.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">MDP</span>
+      <span class="gloss-def">Proceso de Decisión de Markov — el framework matemático formal del RL.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── Resumen visual ── -->
+<section>
+  <span class="slide-tag">Resumen</span>
+  <h2>Resumen: el ciclo completo de RL</h2>
+
+  <!-- Full cycle integrated -->
+  <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:18px; margin-bottom:12px; position:relative; overflow:hidden;">
+    <div style="position:absolute; top:0; left:0; width:100%; height:3px; background:linear-gradient(90deg, var(--accent-blue), var(--accent-cyan), var(--accent-violet));"></div>
+    <div class="diagram-row">
+      <div class="dbox dbox-env" style="min-width:120px;">
+        <div style="font-size:1.6em;">🌍</div>
+        <div style="color:var(--accent-violet); font-weight:700; font-size:0.9em;">ENTORNO</div>
+        <div style="font-size:0.7em; color:var(--text-muted); margin-top:4px;">Genera S<sub>t</sub></div>
+      </div>
+      <div class="darrow-label">
+        <span style="color:var(--accent-cyan); font-size:0.9em; font-weight:700;">S<sub>t</sub> →</span>
+      </div>
+      <div class="dbox dbox-agent" style="min-width:140px;">
+        <div style="font-size:1.6em;">🤖</div>
+        <div style="color:var(--accent-cyan); font-weight:700; font-size:0.9em;">AGENTE</div>
+        <div style="font-size:0.7em; color:var(--text-muted); margin-top:4px;">Política π(a|s)</div>
+      </div>
+      <div class="darrow-label">
+        <span style="color:var(--accent-gold); font-size:0.9em; font-weight:700;">→ A<sub>t</sub></span>
+      </div>
+      <div class="dbox dbox-env" style="min-width:120px;">
+        <div style="font-size:1.6em;">🌍</div>
+        <div style="color:var(--accent-violet); font-weight:700; font-size:0.9em;">ENTORNO</div>
+        <div style="font-size:0.7em; color:#22c55e; margin-top:4px;">→ R<sub>t+1</sub>, S<sub>t+1</sub></div>
+      </div>
+    </div>
+    <div style="text-align:center; font-size:0.52em; color:var(--text-muted); margin-top:10px;">
+      El ciclo se repite miles (o millones) de veces durante el entrenamiento
+    </div>
+  </div>
+
+  <div class="cols2">
+    <div class="card card-cyan">
+      <p>🎯 <strong>Objetivo:</strong> Encontrar la política π* que <strong>maximice</strong> el retorno esperado \(G_t = \sum_{k=0}^{\infty} \gamma^k R_{t+k+1}\)</p>
+    </div>
+    <div class="card card-violet">
+      <p>🛠️ <strong>Cómo:</strong> Métodos basados en <strong>valor</strong> (Q-Learning, DQN) o en <strong>política</strong> (REINFORCE, PPO) — ¡los aprenderemos todos!</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── ¿Qué sigue? ── -->
+<section>
+  <span class="slide-tag">¿Qué sigue?</span>
+  <h2>¿Qué viene en los próximos capítulos?</h2>
+
+  <div class="cols2" style="margin-top:12px;">
+    <div>
+      <div class="card card-cyan" style="margin-bottom:10px;">
+        <span class="card-icon">⚖️</span>
+        <h3>Capítulo 1.3</h3>
+        <p>El dilema <strong>exploración vs. explotación</strong>: ¿cómo decide el agente cuándo probar algo nuevo vs. hacer lo que ya sabe que funciona?</p>
+      </div>
+      <div class="card card-violet">
+        <span class="card-icon">🧮</span>
+        <h3>Capítulo 1.4 + 1.5</h3>
+        <p>Funciones de valor V(s) y Q(s,a). Las "brújulas" matemáticas que guían al agente hacia las mejores acciones.</p>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="height:calc(100% - 10px);">
+        <span class="card-icon">🌕</span>
+        <h3>Capítulo 1.5 — Hands-on</h3>
+        <p>Tu <strong>primer agente real</strong>: entrenas una nave espacial para aterrizar en la Luna usando <strong>PPO + Stable-Baselines3</strong> en Google Colab, y subes el modelo al Hugging Face Hub.</p>
+        <div style="margin-top:10px; font-family:var(--font-mono); font-size:0.52em; color:var(--accent-cyan);">
+          🎮 Entorno: LunarLander-v2<br>
+          📦 Librería: stable-baselines3<br>
+          🤗 Destino: HuggingFace Hub
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Quiz ── -->
+<section>
+  <span class="slide-tag">Quiz</span>
+  <h2>🧠 Mini Quiz — Comprueba lo que aprendiste</h2>
+  <p style="font-size:0.58em; color:var(--text-muted); margin-bottom:14px;">Intenta responder cada pregunta antes de ver la respuesta. ¡Sin trampas! 😄</p>
+
+  <div class="step-row">
+    <div class="step-num">Q1</div>
+    <div class="step-text">¿Cuáles son los dos actores principales en cualquier problema de RL?
+      <div class="card" style="margin-top:6px; padding:10px 14px; font-size:0.85em; border-color:rgba(59,130,246,0.2);">
+        💬 <span style="color:var(--text-muted);">Pista: uno decide, el otro responde.</span>
+      </div>
+    </div>
+  </div>
+  <div class="step-row" style="margin-top:8px;">
+    <div class="step-num">Q2</div>
+    <div class="step-text">¿Por qué las recompensas futuras se "descuentan"? ¿Qué símbolo usamos para el factor de descuento?
+      <div class="card" style="margin-top:6px; padding:10px 14px; font-size:0.85em; border-color:rgba(168,85,247,0.2);">
+        💬 <span style="color:var(--text-muted);">Pista: γ, entre 0 y 1, y tiene que ver con incertidumbre.</span>
+      </div>
+    </div>
+  </div>
+  <div class="step-row" style="margin-top:8px;">
+    <div class="step-num">Q3</div>
+    <div class="step-text">¿Cuál es la diferencia entre una tarea episódica y una tarea continua? Da un ejemplo de cada una.
+      <div class="card" style="margin-top:6px; padding:10px 14px; font-size:0.85em; border-color:rgba(34,211,238,0.2);">
+        💬 <span style="color:var(--text-muted);">Pista: una tiene estado terminal, la otra no.</span>
+      </div>
+    </div>
+  </div>
+  <div class="step-row" style="margin-top:8px;">
+    <div class="step-num">Q4</div>
+    <div class="step-text">¿Qué diferencia a los métodos basados en valor de los basados en política?
+    </div>
+  </div>
+</section>
+
+<!-- ── Final slide ── -->
+<section>
+  <div class="title-slide" style="align-items:center; text-align:center;">
+    <div style="font-size:3em; margin-bottom:0.3em;">🚀</div>
+    <div class="chapter-badge" style="font-size:0.36em;">Capítulos 1.1 y 1.2 completados</div>
+    <h1 style="text-align:center; font-size:1.8em;">¡Tienes las bases<br>del <span style="background: linear-gradient(90deg,#22d3ee,#a855f7); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">Aprendizaje<br>por Refuerzo!</span></h1>
+    <div class="divider" style="margin: 14px auto;"></div>
+    <p style="font-size:0.6em; color:var(--text-muted); max-width:520px;">Ahora entiendes el lenguaje del RL: agente, entorno, estado, acción, recompensa, retorno, descuento y política. Estos conceptos aparecerán en <em>cada uno</em> de los capítulos que siguen.</p>
+    <div style="margin-top:22px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+      <span class="pill">Próximo: Cap. 1.3 — Exploración vs. Explotación</span>
+      <span class="pill">🤗 huggingface.co/learn/deep-rl-course</span>
+    </div>
+  </div>
+</section>
+
+</div><!-- /slides -->
+</div><!-- /reveal -->
+
+<!-- Reveal.js scripts -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+<script>
+  Reveal.initialize({
+    width: 1200,
+    height: 700,
+    margin: 0.04,
+    minScale: 0.2,
+    maxScale: 2.0,
+    controls: true,
+    controlsTutorial: false,
+    progress: true,
+    slideNumber: 'c/t',
+    hash: true,
+    history: false,
+    keyboard: true,
+    overview: true,
+    center: false,
+    touch: true,
+    loop: false,
+    rtl: false,
+    shuffle: false,
+    fragments: true,
+    fragmentInURL: false,
+    embedded: false,
+    help: true,
+    showNotes: false,
+    autoPlayMedia: false,
+    preloadIframes: null,
+    autoSlide: 0,
+    autoSlideStoppable: true,
+    mouseWheel: false,
+    hideInactiveCursor: true,
+    hideCursorTime: 3000,
+    previewLinks: false,
+    transition: 'fade',
+    transitionSpeed: 'fast',
+    backgroundTransition: 'fade',
+    viewDistance: 3,
+    mobileViewDistance: 2,
+  });
+</script>
+</body>
+</html>

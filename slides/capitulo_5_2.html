@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capítulo 5.2 — ¡Manos a la obra! SnowballTarget 🐻❄️</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/black.min.css">
+<link rel="stylesheet" href="../assets/css/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+
+<style>
+/* ── Animaciones ── */
+@keyframes snow-float {
+  0%,100% { transform: translateY(0) rotate(-5deg); opacity: 0.8; }
+  50%      { transform: translateY(-10px) rotate(5deg); opacity: 1; }
+}
+@keyframes target-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(34,211,238,0); }
+  50%      { box-shadow: 0 0 16px 4px rgba(34,211,238,0.4); }
+}
+@keyframes snowball-arc {
+  0%   { transform: translateX(0) translateY(0) scale(1); opacity: 1; }
+  50%  { transform: translateX(50px) translateY(-20px) scale(0.8); opacity: 0.9; }
+  100% { transform: translateX(90px) translateY(5px) scale(0.3); opacity: 0; }
+}
+@keyframes hit-flash {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0.3; background: rgba(34,211,238,0.4); }
+}
+@keyframes training-progress {
+  from { width: 0; }
+  to   { width: var(--prog-w); }
+}
+@keyframes step-appear {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Terminal ── */
+.terminal {
+  background: #020812;
+  border: 1px solid rgba(34,211,238,0.3);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.48em;
+  color: #a8c8e8;
+  line-height: 1.85;
+  position: relative;
+}
+.terminal::before {
+  content: "● ● ●";
+  position: absolute;
+  top: 7px; left: 10px;
+  font-size: 0.75em;
+  color: var(--text-muted);
+  letter-spacing: 4px;
+}
+.tb { margin-top: 14px; }
+.t-c  { color: #4a5568; }
+.t-k  { color: #c678dd; }
+.t-s  { color: #98c379; }
+.t-n  { color: #d19a66; }
+.t-f  { color: #61afef; }
+.t-v  { color: #e5c07b; }
+.t-o  { color: #22c55e; }
+.t-hi { color: var(--accent-gold); font-weight: 700; }
+.t-cmd { color: var(--accent-cyan); }
+
+/* ── YAML block ── */
+.yaml-block {
+  background: #06090f;
+  border: 1px solid rgba(168,85,247,0.3);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.46em;
+  color: #c8d0f0;
+  line-height: 1.9;
+  position: relative;
+  overflow: hidden;
+}
+.yaml-block::before {
+  content: "YAML · SnowballTarget.yaml";
+  position: absolute;
+  top: 6px; right: 10px;
+  font-size: 0.75em;
+  color: var(--accent-violet);
+  letter-spacing: 0.06em;
+}
+.y-key   { color: var(--accent-cyan); }
+.y-val   { color: #98c379; }
+.y-num   { color: #d19a66; }
+.y-type  { color: var(--accent-violet); }
+.y-comm  { color: #4a5568; }
+
+/* ── Training scene ── */
+.sbt-world {
+  background: linear-gradient(180deg, #060d1a 0%, #0a150d 60%, #081008 100%);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 12px;
+  padding: 14px;
+  position: relative;
+  overflow: hidden;
+  min-height: 130px;
+}
+.world-ground {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 20px;
+  background: linear-gradient(180deg, rgba(20,60,10,0.5), rgba(10,40,5,0.8));
+  border-top: 1px solid rgba(34,197,94,0.2);
+}
+.world-sky {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 24px;
+  background: linear-gradient(180deg, rgba(10,20,40,0.8), transparent);
+}
+
+/* ── Multi-agent visual ── */
+.multi-agent-row {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+.agent-copy {
+  background: rgba(59,130,246,0.08);
+  border: 1px solid rgba(59,130,246,0.2);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 0.54em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 50px;
+}
+.agent-copy.active {
+  border-color: var(--accent-cyan);
+  background: rgba(34,211,238,0.08);
+}
+
+/* ── Progress bar entrenamiento ── */
+.train-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 5px 0;
+}
+.tpr-label {
+  font-family: var(--font-mono);
+  font-size: 0.5em;
+  color: var(--text-muted);
+  min-width: 110px;
+}
+.tpr-track {
+  flex: 1;
+  height: 14px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.tpr-fill {
+  height: 100%;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  padding-left: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.45em;
+  font-weight: 700;
+  color: white;
+}
+.tpr-val {
+  font-family: var(--font-mono);
+  font-size: 0.5em;
+  min-width: 55px;
+  text-align: right;
+}
+
+/* ── Hub card ── */
+.hub-display {
+  background: linear-gradient(135deg, rgba(34,211,238,0.05), rgba(168,85,247,0.05));
+  border: 1px solid rgba(34,211,238,0.25);
+  border-radius: 12px;
+  padding: 14px 18px;
+  position: relative;
+  overflow: hidden;
+}
+.hub-display::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--accent-cyan), var(--accent-violet));
+}
+
+/* ── Checkpoint timeline ── */
+.checkpoint-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  overflow-x: auto;
+  padding: 4px 0;
+}
+.ckpt {
+  flex-shrink: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-family: var(--font-mono);
+  font-size: 0.44em;
+  text-align: center;
+  min-width: 60px;
+}
+.ckpt.saved { border-color: rgba(34,211,238,0.5); color: var(--accent-cyan); }
+.ckpt.best  { border-color: rgba(251,191,36,0.6); color: var(--accent-gold); background: rgba(251,191,36,0.08); }
+.ckpt-arrow { color: var(--text-muted); font-size: 0.8em; flex-shrink: 0; }
+</style>
+</head>
+
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ══ PORTADA ════════════════════════════ -->
+<section>
+  <div class="title-slide" style="position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-50px;right:-50px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(147,197,253,0.1) 0%,transparent 70%);pointer-events:none;"></div>
+    <!-- Copos decorativos -->
+    <div style="position:absolute;top:12%;left:8%;font-size:1.2em;animation:snow-float 3s ease-in-out infinite;opacity:0.5;">❄️</div>
+    <div style="position:absolute;top:20%;right:10%;font-size:0.9em;animation:snow-float 4s ease-in-out infinite;animation-delay:1s;opacity:0.4;">❄️</div>
+    <div style="position:absolute;top:55%;left:5%;font-size:0.8em;animation:snow-float 3.5s ease-in-out infinite;animation-delay:0.5s;opacity:0.3;">❄️</div>
+
+    <div class="chapter-badge">Capítulo 5.2 · Módulo 5</div>
+    <h1>¡Manos a la obra!<br>
+      <span class="gradient-text">SnowballTarget</span><br>
+      <span style="font-size:0.8em;">🐻 Bolas de Nieve ❄️</span>
+    </h1>
+    <div class="divider"></div>
+    <p style="font-size:0.62em;color:var(--text-muted);max-width:640px;margin-top:8px;line-height:1.7;">
+      Clonar ML-Agents · Descargar el ejecutable Unity ·<br>
+      Configurar el YAML de hiperparámetros ·<br>
+      Entrenar, guardar checkpoints y publicar en el Hub
+    </p>
+    <div style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;">
+      <span class="pill">Unit 5 Hands-on — HuggingFace 🤗</span>
+      <span class="pill">Jose Miguel Lara Rangel</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── ¿Qué vamos a hacer? ── -->
+<section>
+  <span class="slide-tag">5.2 · Objetivo</span>
+  <h2>¿Qué haremos en este capítulo? 🎯</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Vamos a entrenar al oso Julien para que dispare bolas de nieve a objetivos que aparecen en posiciones aleatorias. El flujo completo en 5 pasos:</p>
+
+  <div style="display:flex;flex-direction:column;gap:8px;">
+    <div class="step-card" style="display:flex;gap:14px;align-items:flex-start;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:12px 16px;">
+      <div class="step-num">1</div>
+      <div class="step-content"><strong style="color:var(--accent-cyan);">Preparar el entorno</strong> — Clonar ML-Agents y crear el entorno virtual con Python compatible</div>
+    </div>
+    <div class="step-card" style="display:flex;gap:14px;align-items:flex-start;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:12px 16px;">
+      <div class="step-num">2</div>
+      <div class="step-content"><strong style="color:var(--accent-cyan);">Descargar el ejecutable</strong> — Obtener el binario de Unity de SnowballTarget desde GitHub</div>
+    </div>
+    <div class="step-card" style="display:flex;gap:14px;align-items:flex-start;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:12px 16px;">
+      <div class="step-num">3</div>
+      <div class="step-content"><strong style="color:var(--accent-cyan);">Crear el archivo YAML</strong> — Definir los hiperparámetros del entrenamiento PPO</div>
+    </div>
+    <div class="step-card" style="display:flex;gap:14px;align-items:flex-start;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:12px 16px;">
+      <div class="step-num">4</div>
+      <div class="step-content"><strong style="color:var(--accent-cyan);">Lanzar el entrenamiento</strong> — mlagents-learn con --no-graphics (~10-35 min)</div>
+    </div>
+    <div class="step-card" style="display:flex;gap:14px;align-items:flex-start;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:12px 16px;">
+      <div class="step-num">5</div>
+      <div class="step-content"><strong style="color:var(--accent-cyan);">Publicar y jugar</strong> — mlagents-push-to-hf y ver al oso en el navegador</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Paso 1: Clonar ML-Agents y setup ── -->
+<section>
+  <span class="slide-tag">5.2 · Paso 1: Setup</span>
+  <h2>Paso 1: Preparar ML-Agents en Colab 🔧</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">El notebook requiere Python 3.10 — Colab a veces tiene una versión incompatible. El script crea un entorno virtual con la versión correcta:</p>
+
+  <div class="terminal" style="margin-bottom:10px;">
+    <div class="tb">
+      <span class="t-c"># 1. Clonar ML-Agents desde GitHub (puede tardar ~3 min)</span><br>
+      <span class="t-cmd">!</span>git clone --depth 1 https://github.com/Unity-Technologies/ml-agents<br><br>
+      <span class="t-c"># 2. Instalar Miniconda y crear entorno Python 3.10</span><br>
+      <span class="t-cmd">!</span>wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh<br>
+      <span class="t-cmd">!</span>./Miniconda3-latest-Linux-x86_64.sh -b -f -p /usr/local<br>
+      <span class="t-cmd">!</span>conda install -q -y --prefix /usr/local <span class="t-hi">python=3.10.12</span><br><br>
+      <span class="t-c"># 3. Instalar ML-Agents desde el código fuente</span><br>
+      <span class="t-cmd">%</span>cd ml-agents<br>
+      <span class="t-cmd">!</span>pip3 install -e ./ml-agents-envs<br>
+      <span class="t-cmd">!</span>pip3 install -e ./ml-agents
+    </div>
+  </div>
+
+  <div class="cols2">
+    <div class="card card-gold" style="padding:12px 14px;">
+      <h3 style="font-size:0.75em;">⚠️ Error frecuente: "command not found"</h3>
+      <p>Si ves <code>mlagents-learn: command not found</code> significa que la instalación no coincidió con la versión de Python de Colab. El script de Miniconda resuelve esto creando un entorno con Python 3.10.12 explícitamente.</p>
+    </div>
+    <div class="card card-cyan" style="padding:12px 14px;">
+      <h3 style="font-size:0.75em;">💡 La bandera --depth 1</h3>
+      <p>ML-Agents tiene un historial de commits enorme. <code>--depth 1</code> clona solo el estado más reciente (sin historial), lo que reduce el tiempo de descarga de ~15 min a ~3 min.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Paso 2: Descargar el ejecutable ── -->
+<section>
+  <span class="slide-tag">5.2 · Paso 2: Ejecutable</span>
+  <h2>Paso 2: Descargar el entorno de Unity 📦</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">El entorno de SnowballTarget viene como un ejecutable de Unity compilado para Linux (ya que Colab corre Ubuntu). No necesitamos Unity instalado — solo el binario:</p>
+
+  <div class="terminal" style="margin-bottom:12px;">
+    <div class="tb">
+      <span class="t-c"># Crear carpetas para los ejecutables</span><br>
+      <span class="t-cmd">!</span>mkdir -p ./training-envs-executables/linux/<br><br>
+      <span class="t-c"># Descargar SnowballTarget.zip desde GitHub</span><br>
+      <span class="t-cmd">!</span>wget <span class="t-s">"https://github.com/huggingface/Snowball-Target/raw/main/SnowballTarget.zip"</span> \<br>
+      &nbsp;&nbsp;-O ./training-envs-executables/linux/SnowballTarget.zip<br><br>
+      <span class="t-c"># Descomprimir el archivo</span><br>
+      <span class="t-cmd">!</span>unzip -d ./training-envs-executables/linux/ \<br>
+      &nbsp;&nbsp;./training-envs-executables/linux/SnowballTarget.zip<br><br>
+      <span class="t-c"># Dar permisos de ejecución (necesario en Linux)</span><br>
+      <span class="t-cmd">!</span>chmod -R 755 ./training-envs-executables/linux/SnowballTarget
+    </div>
+  </div>
+
+  <div class="card card-violet" style="padding:12px 14px;">
+    <p>🐧 <strong>¿Por qué un ejecutable Linux?</strong> Colab corre Ubuntu. El ejecutable de Unity ya contiene el motor de juego completo compilado para esa plataforma — la física, los gráficos, la lógica del juego. ML-Agents Python solo envía acciones y recibe observaciones a través de una conexión local.</p>
+  </div>
+</section>
+
+<!-- ── Paso 3: El archivo YAML ── -->
+<section>
+  <span class="slide-tag">5.2 · Paso 3: YAML</span>
+  <h2>Paso 3: Configurar los hiperparámetros en YAML 📄</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Crea el archivo <code>./config/ppo/SnowballTarget.yaml</code> con estos parámetros. Aquí explicamos los más importantes:</p>
+
+  <div class="cols2" style="gap:12px;margin-bottom:10px;">
+    <div class="yaml-block">
+      <div class="tb" style="margin-top:18px;">
+        behaviors:<br>
+        &nbsp;&nbsp;<span class="y-key">SnowballTarget</span>:<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;trainer_type: <span class="y-type">ppo</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;summary_freq: <span class="y-num">10000</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;keep_checkpoints: <span class="y-num">10</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;max_steps: <span class="y-num">200000</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;time_horizon: <span class="y-num">64</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;threaded: <span class="y-type">true</span>
+      </div>
+    </div>
+    <div class="yaml-block">
+      <div class="tb" style="margin-top:18px;">
+        &nbsp;&nbsp;&nbsp;&nbsp;hyperparameters:<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;learning_rate: <span class="y-num">0.0003</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;batch_size: <span class="y-num">128</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer_size: <span class="y-num">2048</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;epsilon: <span class="y-num">0.2</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;network_settings:<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hidden_units: <span class="y-num">256</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;num_layers: <span class="y-num">2</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="cols3" style="gap:8px;">
+    <div class="card card-cyan" style="padding:10px 12px;">
+      <p style="font-size:0.54em;"><strong>max_steps: 200,000</strong><br>Pasos totales de entrenamiento. Para la meta (15 objetivos/episodio) son suficientes.</p>
+    </div>
+    <div class="card card-violet" style="padding:10px 12px;">
+      <p style="font-size:0.54em;"><strong>keep_checkpoints: 10</strong><br>Guarda los últimos 10 modelos. Útil para comparar distintos momentos del entrenamiento.</p>
+    </div>
+    <div class="card card-gold" style="padding:10px 12px;">
+      <p style="font-size:0.54em;"><strong>time_horizon: 64</strong><br>Cada cuántos pasos se actualiza la política aunque el episodio no haya terminado.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Paso 4: Entrenamiento ── -->
+<section>
+  <span class="slide-tag">5.2 · Paso 4: Entrenamiento</span>
+  <h2>Paso 4: ¡A entrenar! 🔥</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Con el YAML listo, lanzamos el entrenamiento con un solo comando:</p>
+
+  <div class="terminal" style="margin-bottom:12px;">
+    <div class="tb">
+      <span class="t-c"># Lanzar entrenamiento (~10-35 min según GPU)</span><br>
+      <span class="t-cmd">!</span>mlagents-learn ./config/ppo/SnowballTarget.yaml \<br>
+      &nbsp;&nbsp;--env=./training-envs-executables/linux/SnowballTarget/SnowballTarget \<br>
+      &nbsp;&nbsp;--run-id=<span class="t-hi">"SnowballTarget1"</span> \<br>
+      &nbsp;&nbsp;--no-graphics<br><br>
+      <span class="t-c"># Si Colab se desconecta, usa --resume para retomar</span><br>
+      <span class="t-c"># !\mlagents-learn ... --resume  (puede fallar la 1a vez, ejecutar 2 veces)</span>
+    </div>
+  </div>
+
+  <!-- Multi-agent visual -->
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:12px;">
+    <p style="font-size:0.5em;color:var(--text-muted);margin-bottom:8px;"><strong>¿Cuántos agentes corren en paralelo?</strong></p>
+    <div class="multi-agent-row">
+      <div class="agent-copy active"><div style="font-size:1.4em;">🐻</div><div>Agente 1</div></div>
+      <div class="agent-copy active"><div style="font-size:1.4em;">🐻</div><div>Agente 2</div></div>
+      <div class="agent-copy active"><div style="font-size:1.4em;">🐻</div><div>Agente 3</div></div>
+      <div class="agent-copy active"><div style="font-size:1.4em;">🐻</div><div>Agente 4</div></div>
+      <div class="agent-copy active"><div style="font-size:1.4em;">🐻</div><div>Agente 5</div></div>
+      <div class="agent-copy active"><div style="font-size:1.4em;">🐻</div><div>Agente 6</div></div>
+      <div class="agent-copy"><div style="font-size:1.4em;">🐻</div><div>Agente 7</div></div>
+      <div class="agent-copy"><div style="font-size:1.4em;">🐻</div><div>…</div></div>
+    </div>
+    <p style="font-size:0.46em;color:var(--text-muted);margin-top:6px;">ML-Agents corre múltiples copias del entorno en paralelo dentro del mismo ejecutable. Todos los agentes comparten la misma política pero juegan episodios independientes. Esto acelera el entrenamiento.</p>
+  </div>
+
+  <div class="card card-gold" style="padding:12px 14px;">
+    <p>☕ <strong>Descansa un momento.</strong> El entrenamiento tarda entre 10 y 35 minutos según la GPU. Puedes ver el progreso en los logs: la línea <code>Mean Reward</code> debería ir subiendo gradualmente. Meta: recompensa media ≥ 15 objetivos por episodio.</p>
+  </div>
+</section>
+
+<!-- ── Progreso del entrenamiento ── -->
+<section>
+  <span class="slide-tag">5.2 · Progreso</span>
+  <h2>¿Cómo leer los logs durante el entrenamiento? 📊</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">ML-Agents imprime estadísticas cada <code>summary_freq</code> pasos. Esto es lo que verás y qué significa cada línea:</p>
+
+  <div class="terminal" style="margin-bottom:14px;">
+    <div class="tb">
+      <span class="t-c"># Salida típica del entrenamiento de SnowballTarget</span><br>
+      [INFO] <span class="t-v">SnowballTarget</span>. Step: <span class="t-n">10000</span>. Mean Reward: <span class="t-o">1.2</span> ± 0.4. Std: 0.4<br>
+      [INFO] <span class="t-v">SnowballTarget</span>. Step: <span class="t-n">50000</span>. Mean Reward: <span class="t-o">4.8</span> ± 1.2. Std: 1.2<br>
+      [INFO] <span class="t-v">SnowballTarget</span>. Step: <span class="t-n">100000</span>. Mean Reward: <span class="t-o">9.3</span> ± 2.1. Std: 2.1<br>
+      [INFO] <span class="t-v">SnowballTarget</span>. Step: <span class="t-n">150000</span>. Mean Reward: <span class="t-o">13.7</span> ± 1.8. Std: 1.8<br>
+      [INFO] <span class="t-v">SnowballTarget</span>. Step: <span class="t-n">200000</span>. Mean Reward: <span class="t-hi">16.2</span> ± 1.5 <span class="t-c">← ¡meta alcanzada!</span>
+    </div>
+  </div>
+
+  <!-- Progress visualization -->
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:12px 16px;">
+    <p style="font-size:0.48em;color:var(--text-muted);margin-bottom:10px;">Curva típica de aprendizaje (recompensa media vs. pasos):</p>
+    <div class="train-progress-row">
+      <span class="tpr-label">10k pasos</span>
+      <div class="tpr-track"><div class="tpr-fill" style="width:8%;background:rgba(239,68,68,0.6);">1.2</div></div>
+      <span class="tpr-val" style="color:#ef4444;">~1</span>
+    </div>
+    <div class="train-progress-row">
+      <span class="tpr-label">50k pasos</span>
+      <div class="tpr-track"><div class="tpr-fill" style="width:25%;background:rgba(251,191,36,0.5);">4.8</div></div>
+      <span class="tpr-val" style="color:var(--accent-gold);">~5</span>
+    </div>
+    <div class="train-progress-row">
+      <span class="tpr-label">100k pasos</span>
+      <div class="tpr-track"><div class="tpr-fill" style="width:50%;background:rgba(34,211,238,0.5);">9.3</div></div>
+      <span class="tpr-val" style="color:var(--accent-cyan);">~9</span>
+    </div>
+    <div class="train-progress-row">
+      <span class="tpr-label">200k pasos ✅</span>
+      <div class="tpr-track"><div class="tpr-fill" style="width:85%;background:linear-gradient(90deg,rgba(34,197,94,0.7),rgba(34,211,238,0.6));">16.2</div></div>
+      <span class="tpr-val" style="color:#22c55e;font-weight:700;">≥15 🏆</span>
+    </div>
+    <p style="font-size:0.44em;color:var(--accent-cyan);margin-top:6px;">Meta de certificación HF: recompensa media ≥ 15 (o 30 objetivos por episodio para los más ambiciosos)</p>
+  </div>
+</section>
+
+<!-- ── Checkpoints ── -->
+<section>
+  <span class="slide-tag">5.2 · Checkpoints</span>
+  <h2>Los checkpoints: distintas versiones del agente 💾</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">ML-Agents guarda automáticamente el modelo cada <code>checkpoint_interval</code> pasos. Tienes varios archivos <code>.onnx</code> para comparar:</p>
+
+  <!-- Checkpoint timeline -->
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px;">
+    <p style="font-size:0.48em;color:var(--text-muted);margin-bottom:10px;">Archivos guardados en <code>./results/SnowballTarget1/</code>:</p>
+    <div class="checkpoint-row">
+      <div class="ckpt saved">
+        <div>50k</div>
+        <div style="font-size:0.85em;margin-top:2px;">SnowballTarget-50000.onnx</div>
+      </div>
+      <div class="ckpt-arrow">→</div>
+      <div class="ckpt saved">
+        <div>100k</div>
+        <div style="font-size:0.85em;margin-top:2px;">SnowballTarget-100000.onnx</div>
+      </div>
+      <div class="ckpt-arrow">→</div>
+      <div class="ckpt saved">
+        <div>150k</div>
+        <div style="font-size:0.85em;margin-top:2px;">SnowballTarget-150000.onnx</div>
+      </div>
+      <div class="ckpt-arrow">→</div>
+      <div class="ckpt best">
+        <div>200k ⭐</div>
+        <div style="font-size:0.85em;margin-top:2px;">SnowballTarget.onnx</div>
+        <div style="font-size:0.75em;color:var(--text-muted);">el más reciente</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">🔍 Prueba distintos checkpoints</span>
+    <p>Al visualizar tu agente en el Hub, puedes elegir cuál checkpoint cargar. Comparar el de 50k pasos con el de 200k pasos muestra visualmente cómo mejoró el oso. El de 50k probablemente dispara en la dirección equivocada; el de 200k ya apunta bien y minimiza el tiempo entre disparos.</p>
+  </div>
+</section>
+
+<!-- ── Paso 5: Publicar en el Hub ── -->
+<section>
+  <span class="slide-tag">5.2 · Paso 5: Hub</span>
+  <h2>Paso 5: Publicar y ver tu oso jugar 🎮🤗</h2>
+
+  <div class="terminal" style="margin-bottom:12px;">
+    <div class="tb">
+      <span class="t-c"># 1. Iniciar sesión en HuggingFace</span><br>
+      <span class="t-k">from</span> <span class="t-v">huggingface_hub</span> <span class="t-k">import</span> <span class="t-f">notebook_login</span><br>
+      <span class="t-f">notebook_login</span>()<br><br>
+      <span class="t-c"># 2. Subir el modelo al Hub</span><br>
+      <span class="t-cmd">!</span>mlagents-push-to-hf \<br>
+      &nbsp;&nbsp;--run-id=<span class="t-hi">"SnowballTarget1"</span> \<br>
+      &nbsp;&nbsp;--local-dir=<span class="t-s">"./results/SnowballTarget1"</span> \<br>
+      &nbsp;&nbsp;--repo-id=<span class="t-s">"TU_USUARIO/ppo-SnowballTarget"</span> \<br>
+      &nbsp;&nbsp;--commit-message=<span class="t-s">"Mi oso entrenado 🐻❄️"</span>
+    </div>
+  </div>
+
+  <div class="hub-display" style="margin-bottom:12px;">
+    <div class="cols3" style="gap:10px;">
+      <div style="text-align:center;font-size:0.54em;color:var(--text-muted);">
+        <div style="font-size:1.8em;margin-bottom:4px;">🎬</div>
+        <div style="color:var(--accent-cyan);">Video del oso</div>
+        Replay automático en el Space
+      </div>
+      <div style="text-align:center;font-size:0.54em;color:var(--text-muted);">
+        <div style="font-size:1.8em;margin-bottom:4px;">📊</div>
+        <div style="color:var(--accent-violet);">Checkpoints</div>
+        Todos los .onnx disponibles
+      </div>
+      <div style="text-align:center;font-size:0.54em;color:var(--text-muted);">
+        <div style="font-size:1.8em;margin-bottom:4px;">🕹️</div>
+        <div style="color:var(--accent-gold);">Jugable en vivo</div>
+        <a href="https://huggingface.co/spaces/ThomasSimonini/ML-Agents-SnowballTarget" style="color:var(--accent-gold);font-size:0.9em;">spaces/SnowballTarget</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-cyan" style="padding:12px 14px;">
+    <p>👁️ <strong>Para ver tu agente:</strong> Ve a <a href="https://huggingface.co/spaces/ThomasSimonini/ML-Agents-SnowballTarget" style="color:var(--accent-cyan);">spaces/ThomasSimonini/ML-Agents-SnowballTarget</a>, escribe tu nombre de usuario (distingue mayúsculas), selecciona tu repositorio y elige el checkpoint que quieres ver jugar. ¡El oso corre en tu navegador sin instalar nada!</p>
+  </div>
+</section>
+
+<!-- ── Retos ── -->
+<section>
+  <span class="slide-tag">5.2 · Retos</span>
+  <h2>Retos opcionales para ir más lejos 🔥</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">¿Ya tienes al oso disparando bien? Aquí hay desafíos adicionales que el curso propone:</p>
+
+  <div class="cols2">
+    <div class="card card-cyan" style="padding:14px;">
+      <span class="card-icon">⏱️</span>
+      <h3>Más pasos de entrenamiento</h3>
+      <p>Cambia <code>max_steps: 200000</code> a <code>500000</code> o más. ¿Llega a 30 objetivos por episodio?</p>
+    </div>
+    <div class="card card-violet" style="padding:14px;">
+      <span class="card-icon">🎛️</span>
+      <h3>Modificar hiperparámetros</h3>
+      <p>Experimenta con <code>learning_rate</code>, <code>hidden_units</code> o <code>batch_size</code>. ¿Cuál combinación aprende más rápido?</p>
+    </div>
+    <div class="card card-gold" style="padding:14px;">
+      <span class="card-icon">📉</span>
+      <h3>Observar el TensorBoard</h3>
+      <p>ML-Agents guarda logs para TensorBoard. Lanza <code>tensorboard --logdir results</code> para ver las curvas de aprendizaje en tiempo real.</p>
+    </div>
+    <div class="card" style="padding:14px;">
+      <span class="card-icon">🌍</span>
+      <h3>Otro entorno de ML-Agents</h3>
+      <p>ML-Agents tiene 17+ entornos: Walker (robot que camina), Worm (gusano que se arrastra), etc. El mismo proceso YAML funciona con todos.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Quiz ── -->
+<section>
+  <span class="slide-tag">Quiz</span>
+  <h2>🧠 Mini Quiz — Capítulo 5.2</h2>
+  <p style="font-size:0.58em;color:var(--text-muted);margin-bottom:14px;">Pon a prueba lo que hiciste:</p>
+
+  <div class="step-row">
+    <div class="step-num">Q1</div>
+    <div class="step-text">¿Por qué necesitamos descargar un ejecutable de Unity compilado para Linux en lugar de usar Python directamente? ¿Qué contiene ese ejecutable?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q2</div>
+    <div class="step-text">El parámetro <code>keep_checkpoints: 10</code> guarda los últimos 10 modelos. Si entrenas 1,000,000 pasos con <code>checkpoint_interval: 50000</code>, ¿cuántos checkpoints en total se guardan? ¿Cuáles se conservan?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q3</div>
+    <div class="step-text">Corres el entrenamiento y ves que <code>Mean Reward</code> se estanca en ~5 sin subir más después de 100k pasos. Nombra dos hiperparámetros que podrías cambiar para ayudar al agente a seguir mejorando.</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q4</div>
+    <div class="step-text">¿Por qué usamos <code>--no-graphics</code> durante el entrenamiento pero necesitamos el archivo .onnx para visualizar el agente en el navegador?</div>
+  </div>
+</section>
+
+<!-- ── Slide final ── -->
+<section>
+  <div class="title-slide" style="align-items:center;text-align:center;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:6%;left:6%;font-size:1.5em;animation:snow-float 3s ease-in-out infinite;opacity:0.4;">❄️</div>
+    <div style="position:absolute;top:10%;right:8%;font-size:1.2em;animation:snow-float 4s ease-in-out infinite;animation-delay:1.2s;opacity:0.3;">❄️</div>
+    <div style="position:absolute;top:-50px;right:-50px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(147,197,253,0.1) 0%,transparent 70%);pointer-events:none;"></div>
+
+    <div style="font-size:2.8em;margin-bottom:8px;">🐻 ❄️ 🎯</div>
+    <div class="chapter-badge" style="font-size:0.36em;">Capítulo 5.2 completado</div>
+    <h1 style="text-align:center;font-size:1.7em;">
+      ¡El oso Julien<br>sabe disparar! 🏆<br>
+      <span class="gradient-text-cyan" style="font-size:0.85em;">Tu primer agente 3D en el Hub</span>
+    </h1>
+    <div class="divider" style="margin:14px auto;"></div>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:4px;font-size:0.56em;color:var(--text-muted);">
+      <span>✅ Setup ML-Agents + Miniconda</span><span style="color:var(--border);">·</span>
+      <span>✅ Ejecutable Unity en Linux</span><span style="color:var(--border);">·</span>
+      <span>✅ YAML de hiperparámetros</span><span style="color:var(--border);">·</span>
+      <span>✅ Entrenamiento PPO 200k pasos</span><span style="color:var(--border);">·</span>
+      <span>✅ Publicado y jugable en el Hub</span>
+    </div>
+    <div style="margin-top:18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <span class="pill">Próximo: Cap. 5.3 — ¡Manos a la obra! Pirámides con Curiosidad 🏛️</span>
+    </div>
+  </div>
+</section>
+
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+<script src="../assets/js/reveal-config.js"></script>
+</body>
+</html>

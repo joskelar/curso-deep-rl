@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capítulos 1.5 & 1.6 — LunarLander Hands-On · Huggy el Perro</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/black.min.css">
+<link rel="stylesheet" href="../assets/css/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"></script>
+
+<style>
+/* ── Animaciones y estilos locales ── */
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0px) rotate(-2deg); }
+  50%       { transform: translateY(-12px) rotate(2deg); }
+}
+@keyframes thruster-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(251,191,36,0.5); }
+  50%       { box-shadow: 0 0 22px rgba(251,191,36,0.9), 0 0 40px rgba(251,191,36,0.4); }
+}
+@keyframes orbit {
+  from { transform: rotate(0deg) translateX(34px) rotate(0deg); }
+  to   { transform: rotate(360deg) translateX(34px) rotate(-360deg); }
+}
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+@keyframes typing {
+  from { width: 0; }
+  to   { width: 100%; }
+}
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes star-twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50%       { opacity: 1; transform: scale(1.3); }
+}
+@keyframes paw-bounce {
+  0%, 100% { transform: translateY(0); }
+  40%       { transform: translateY(-8px); }
+}
+@keyframes wag-tail {
+  0%, 100% { transform: rotate(-20deg); }
+  50%       { transform: rotate(20deg); }
+}
+
+/* Luna flotante animada */
+.moon-float {
+  animation: float-slow 4s ease-in-out infinite;
+  display: inline-block;
+}
+
+/* Nave con motor pulsante */
+.lander-ship {
+  position: relative;
+  display: inline-block;
+}
+.thruster-glow {
+  animation: thruster-pulse 0.8s ease-in-out infinite;
+  border-radius: 50%;
+}
+
+/* Estrella centelleante */
+.star-twinkle {
+  animation: star-twinkle ease-in-out infinite;
+  display: inline-block;
+}
+
+/* Bloque de código con estilo terminal */
+.terminal {
+  background: #020812;
+  border: 1px solid rgba(34,211,238,0.3);
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-family: var(--font-mono);
+  font-size: 0.5em;
+  color: #a8c8e8;
+  line-height: 1.8;
+  position: relative;
+  overflow: hidden;
+}
+.terminal::before {
+  content: "● ● ●";
+  position: absolute;
+  top: 8px; left: 12px;
+  font-size: 0.75em;
+  color: var(--text-muted);
+  letter-spacing: 4px;
+}
+.terminal-body { margin-top: 16px; }
+.t-comment  { color: #4a6a7a; }
+.t-keyword  { color: #c678dd; }
+.t-string   { color: #98c379; }
+.t-number   { color: #d19a66; }
+.t-fn       { color: #61afef; }
+.t-var      { color: #e5c07b; }
+.t-output   { color: #22c55e; }
+.t-prompt   { color: var(--accent-cyan); }
+
+/* Línea de resultado con check verde */
+.result-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(34,197,94,0.08);
+  border: 1px solid rgba(34,197,94,0.3);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.52em;
+  color: #22c55e;
+  margin: 6px 0;
+}
+
+/* Paso numerado con icono */
+.step-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 18px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin: 8px 0;
+  transition: border-color 0.2s;
+}
+.step-card:hover { border-color: var(--accent-blue); }
+.step-circle {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-violet));
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 0.7em;
+  flex-shrink: 0;
+  color: white;
+}
+.step-content { flex: 1; font-size: 0.62em; line-height: 1.55; }
+.step-content strong { color: var(--accent-cyan); }
+
+/* Reward badge */
+.reward-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-family: var(--font-mono);
+  font-size: 0.55em;
+  font-weight: 700;
+}
+.rb-pos { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.4); color: #22c55e; }
+.rb-neg { background: rgba(239,68,68,0.15);  border: 1px solid rgba(239,68,68,0.4); color: #ef4444; }
+
+/* Sensor diagram for Huggy */
+.huggy-diagram {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+}
+.sensor-line {
+  position: absolute;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent-cyan));
+  transform-origin: right center;
+}
+.sensor-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 8px var(--accent-cyan);
+  display: inline-block;
+}
+
+/* Observation boxes for LunarLander */
+.obs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.obs-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.52em;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.obs-idx {
+  font-family: var(--font-mono);
+  color: var(--accent-violet);
+  font-size: 0.9em;
+  flex-shrink: 0;
+  min-width: 20px;
+}
+
+/* Hub card visual */
+.hub-card {
+  background: linear-gradient(135deg, rgba(34,211,238,0.06), rgba(168,85,247,0.06));
+  border: 1px solid rgba(34,211,238,0.3);
+  border-radius: 14px;
+  padding: 16px 20px;
+  position: relative;
+  overflow: hidden;
+}
+.hub-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--accent-cyan), var(--accent-violet));
+}
+
+/* Paw print animation */
+.paw { animation: paw-bounce 0.5s ease-in-out infinite; display: inline-block; }
+.paw:nth-child(2) { animation-delay: 0.1s; }
+.paw:nth-child(3) { animation-delay: 0.2s; }
+
+/* Acción de aceleración visual */
+.action-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.56em;
+  margin: 3px;
+}
+.ap-0 { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); color: var(--text-muted); }
+.ap-1 { background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.4); color: var(--accent-blue); }
+.ap-2 { background: rgba(251,191,36,0.15); border: 1px solid rgba(251,191,36,0.4); color: var(--accent-gold); }
+.ap-3 { background: rgba(168,85,247,0.15); border: 1px solid rgba(168,85,247,0.4); color: var(--accent-violet); }
+
+/* Reward bar per episode */
+.episode-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 3px 0;
+}
+.ep-label { font-family: var(--font-mono); font-size: 0.5em; color: var(--text-muted); min-width: 80px; }
+.ep-track { flex: 1; height: 12px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; }
+.ep-fill  { height: 100%; border-radius: 4px; }
+.ep-val   { font-family: var(--font-mono); font-size: 0.5em; min-width: 50px; text-align: right; }
+
+/* Space background stars */
+.space-bg {
+  position: absolute; inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.space-star {
+  position: absolute;
+  border-radius: 50%;
+  background: white;
+  animation: star-twinkle ease-in-out infinite;
+}
+</style>
+</head>
+
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ══════════════════════════════════════════
+     PORTADA
+══════════════════════════════════════════ -->
+<section>
+  <div class="title-slide" style="position:relative; overflow:hidden;">
+    <!-- Space background -->
+    <div class="space-bg">
+      <div class="space-star" style="width:2px;height:2px;top:8%;left:12%;animation-duration:2.1s;"></div>
+      <div class="space-star" style="width:3px;height:3px;top:18%;left:70%;animation-duration:3.4s;animation-delay:0.5s;"></div>
+      <div class="space-star" style="width:2px;height:2px;top:35%;left:88%;animation-duration:2.8s;animation-delay:1s;"></div>
+      <div class="space-star" style="width:2px;height:2px;top:55%;left:5%;animation-duration:3.1s;animation-delay:0.3s;"></div>
+      <div class="space-star" style="width:3px;height:3px;top:72%;left:45%;animation-duration:2.5s;animation-delay:1.5s;"></div>
+      <div class="space-star" style="width:2px;height:2px;top:85%;left:80%;animation-duration:3.7s;animation-delay:0.8s;"></div>
+      <div class="space-star" style="width:1px;height:1px;top:12%;left:55%;animation-duration:4.2s;animation-delay:0.2s;"></div>
+      <div class="space-star" style="width:2px;height:2px;top:48%;left:92%;animation-duration:2.9s;animation-delay:2s;"></div>
+    </div>
+
+    <div class="chapter-badge">Capítulos 1.5 + 1.6 · Módulo 1</div>
+    <h1>¡Manos a la obra! 🚀<br>
+      <span class="gradient-text">LunarLander</span><br>
+      <span style="font-size:0.7em; color:var(--text-muted);">+ Huggy el Perro 🐶</span>
+    </h1>
+    <div class="divider"></div>
+    <p style="font-size:0.62em; color:var(--text-muted); max-width:640px; margin-top:8px; line-height:1.7;">
+      Tu primer agente real en Google Colab · Gymnasium · Stable-Baselines3 ·<br>
+      Subir tu modelo al Hugging Face Hub · Entrenar a Huggy en 3D
+    </p>
+    <div style="margin-top:24px; display:flex; gap:10px; flex-wrap:wrap;">
+      <span class="pill">Unit 1 Hands-on + Bonus Unit 1</span>
+      <span class="pill">HuggingFace 🤗</span>
+      <span class="pill">Jose Miguel Lara Rangel</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     CAP 1.5 — SECCIÓN BREAK
+══════════════════════════════════════════ -->
+<section>
+  <div class="section-slide" style="position:relative; overflow:hidden; background:linear-gradient(160deg, #04060f, #0a0d1f);">
+    <div class="space-bg">
+      <div class="space-star" style="width:2px;height:2px;top:10%;left:15%;animation-duration:2.3s;"></div>
+      <div class="space-star" style="width:3px;height:3px;top:25%;left:75%;animation-duration:3.1s;"></div>
+      <div class="space-star" style="width:2px;height:2px;top:60%;left:20%;animation-duration:2.7s;animation-delay:1s;"></div>
+      <div class="space-star" style="width:2px;height:2px;top:80%;left:65%;animation-duration:3.5s;animation-delay:0.5s;"></div>
+    </div>
+    <span class="big-emoji"><span class="moon-float">🌕</span></span>
+    <div class="chapter-badge" style="font-size:0.38em; margin-top:10px;">Capítulo 1.5</div>
+    <h1>¡Manos a la obra!<br>Tu Primer Agente:<br>LunarLander</h1>
+    <p style="font-size:0.6em; color:var(--text-muted); max-width:500px; text-align:center; margin-top:10px;">
+      Vamos a entrenar una nave para aterrizar en la Luna. Sin trampa, sin cartón — código real en Google Colab.
+    </p>
+  </div>
+</section>
+
+<!-- ── ¿Qué es Google Colab? ── -->
+<section>
+  <span class="slide-tag">1.5 · Herramientas</span>
+  <h2>¿Qué necesitas para este ejercicio?</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:12px;">Antes de arrancar, conozcamos las herramientas que vamos a usar.</p>
+
+  <div class="cols3" style="margin-bottom:12px;">
+    <div class="card card-cyan">
+      <span class="card-icon">📓</span>
+      <h3>Google Colab</h3>
+      <p>Un "cuaderno" de código en la nube, <strong>gratis</strong>. Puedes escribir Python en celdas y ejecutarlas con un botón. No necesitas instalar nada en tu computadora.</p>
+      <div style="margin-top:8px; font-family:var(--font-mono); font-size:0.55em; color:var(--accent-cyan);">colab.research.google.com</div>
+    </div>
+    <div class="card card-violet">
+      <span class="card-icon">🤗</span>
+      <h3>Hugging Face Hub</h3>
+      <p>El lugar donde <strong>guardas y compartes tu modelo</strong> entrenado. Es como GitHub pero para modelos de IA. Gratis con cuenta de correo.</p>
+      <div style="margin-top:8px; font-family:var(--font-mono); font-size:0.55em; color:var(--accent-violet);">huggingface.co</div>
+    </div>
+    <div class="card card-gold">
+      <span class="card-icon">📦</span>
+      <h3>Stable-Baselines3</h3>
+      <p>Una <strong>biblioteca de Python</strong> con implementaciones listas de algoritmos de RL profundo. Con pocas líneas de código, entrenas agentes potentes.</p>
+      <div style="margin-top:8px; font-family:var(--font-mono); font-size:0.55em; color:var(--accent-gold);">stable-baselines3.readthedocs.io</div>
+    </div>
+  </div>
+
+  <div style="display:flex; gap:10px;">
+    <div class="card card-cyan" style="flex:1;">
+      <p>✅ <strong>Paso 0:</strong> Crea tu cuenta gratuita en <a href="https://huggingface.co/join" style="color:var(--accent-cyan);">huggingface.co/join</a> si aún no la tienes.</p>
+    </div>
+    <div class="card" style="flex:1;">
+      <p>✅ <strong>Paso 0b:</strong> Genera un <strong>token de acceso</strong> en tu perfil → Settings → Access Tokens → New token (permiso: Write).</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── El entorno LunarLander ── -->
+<section>
+  <span class="slide-tag">1.5 · El Entorno</span>
+  <h2>El entorno: LunarLander-v2 🌕</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">En este ejercicio, nuestro agente controla una <strong>nave espacial</strong> que debe aterrizar suavemente en una plataforma en la Luna. Suena difícil — y lo es, por eso es un buen primer reto.</p>
+
+  <div style="display:flex; gap:16px; align-items:flex-start;">
+    <!-- Luna visual -->
+    <div style="flex:1; background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:16px; position:relative; overflow:hidden; min-height:200px;">
+      <div class="space-bg">
+        <div class="space-star" style="width:2px;height:2px;top:12%;left:20%;animation-duration:2.5s;"></div>
+        <div class="space-star" style="width:2px;height:2px;top:30%;left:75%;animation-duration:3.2s;animation-delay:1s;"></div>
+        <div class="space-star" style="width:1px;height:1px;top:55%;left:40%;animation-duration:2.8s;animation-delay:0.5s;"></div>
+      </div>
+      <!-- Nave -->
+      <div style="text-align:center; padding: 20px 0 0 0; position:relative; z-index:1;">
+        <div class="moon-float" style="font-size:3em; line-height:1;">🚀</div>
+        <div style="font-size:0.48em; color:var(--text-muted); margin:4px 0;">↓ cayendo...</div>
+        <!-- Plataforma luna -->
+        <div style="display:flex; align-items:flex-end; justify-content:center; gap:0; margin-top:10px;">
+          <div style="width:30px; height:14px; background:rgba(255,255,255,0.06); border-radius:4px 0 0 4px;"></div>
+          <div style="width:50px; height:4px; background:linear-gradient(90deg,var(--accent-gold),var(--accent-cyan)); border-radius:2px; display:flex; align-items:center; justify-content:center;"></div>
+          <div style="width:30px; height:14px; background:rgba(255,255,255,0.06); border-radius:0 4px 4px 0;"></div>
+        </div>
+        <div style="font-size:0.44em; color:var(--accent-gold); margin-top:4px;">PLATAFORMA DE ATERRIZAJE</div>
+        <!-- Surface -->
+        <div style="height:8px; background:linear-gradient(180deg,rgba(180,160,120,0.3),rgba(120,100,80,0.5)); border-radius:0 0 8px 8px; margin-top:2px;"></div>
+      </div>
+    </div>
+
+    <!-- Info del entorno -->
+    <div style="flex:1.3; display:flex; flex-direction:column; gap:8px;">
+      <div class="card card-cyan" style="padding:12px 16px;">
+        <h3 style="font-size:0.75em; margin-bottom:6px;">¿Qué "ve" la nave? (observaciones)</h3>
+        <div class="obs-grid">
+          <div class="obs-box"><span class="obs-idx">[0]</span>Posición horizontal (x)</div>
+          <div class="obs-box"><span class="obs-idx">[1]</span>Posición vertical (y)</div>
+          <div class="obs-box"><span class="obs-idx">[2]</span>Velocidad horizontal</div>
+          <div class="obs-box"><span class="obs-idx">[3]</span>Velocidad vertical</div>
+          <div class="obs-box"><span class="obs-idx">[4]</span>Ángulo de inclinación</div>
+          <div class="obs-box"><span class="obs-idx">[5]</span>Velocidad angular</div>
+          <div class="obs-box"><span class="obs-idx">[6]</span>Pata izq. toca suelo</div>
+          <div class="obs-box"><span class="obs-idx">[7]</span>Pata der. toca suelo</div>
+        </div>
+        <p style="font-size:0.5em; color:var(--text-muted); margin-top:6px;">8 números que describen el estado completo de la nave en cada instante.</p>
+      </div>
+
+      <div class="card card-violet" style="padding:12px 16px;">
+        <h3 style="font-size:0.75em; margin-bottom:6px;">¿Qué puede hacer? (acciones)</h3>
+        <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
+          <span class="action-pill ap-0">0 — No hacer nada</span>
+          <span class="action-pill ap-1">1 — Motor izquierdo</span>
+          <span class="action-pill ap-2">2 — Motor principal ↑</span>
+          <span class="action-pill ap-3">3 — Motor derecho</span>
+        </div>
+        <p style="font-size:0.5em; color:var(--text-muted); margin-top:6px;">Espacio discreto: solo 4 botones posibles.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Sistema de recompensas LunarLander ── -->
+<section>
+  <span class="slide-tag">1.5 · Recompensas</span>
+  <h2>¿Cómo sabe la nave si lo está haciendo bien? 💰</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:12px;">El entorno otorga o quita puntos en cada paso. El agente aprende a maximizar el total.</p>
+
+  <div class="cols2" style="margin-bottom:12px;">
+    <div>
+      <h3 style="font-size:0.78em; margin-bottom:8px; color:var(--accent-green);">Recompensas positivas ✅</h3>
+      <div class="result-line">🎯 Acercarse a la plataforma</div>
+      <div class="result-line">🐢 Moverse lento (más seguro)</div>
+      <div class="result-line">↕️ Mantenerse horizontal</div>
+      <div class="result-line" style="font-size:0.55em;">🦵 +10 pts por cada pata que toca el suelo</div>
+      <div class="result-line" style="border-color:rgba(34,197,94,0.6); font-weight:700;">🏆 +100 pts por aterrizar con éxito</div>
+    </div>
+    <div>
+      <h3 style="font-size:0.78em; margin-bottom:8px; color:var(--accent-red);">Penalizaciones ❌</h3>
+      <div style="display:flex; align-items:center; gap:8px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.3); border-radius:6px; padding:6px 12px; font-family:var(--font-mono); font-size:0.52em; color:#ef4444; margin:3px 0;">
+        🔥 −0.03 pts por frame usando motor lateral
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.3); border-radius:6px; padding:6px 12px; font-family:var(--font-mono); font-size:0.52em; color:#ef4444; margin:3px 0;">
+        🚀 −0.30 pts por frame usando motor principal
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.5); border-radius:6px; padding:6px 12px; font-family:var(--font-mono); font-size:0.55em; color:#ef4444; margin:3px 0; font-weight:700;">
+        💥 −100 pts por estrellarse
+      </div>
+    </div>
+  </div>
+
+  <!-- Episode score progression -->
+  <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:14px 18px;">
+    <p style="font-size:0.5em; color:var(--text-muted); margin-bottom:8px;">Progresión típica durante el entrenamiento — el agente mejora gradualmente:</p>
+    <div class="episode-bar">
+      <span class="ep-label">Episodio 1</span>
+      <div class="ep-track"><div class="ep-fill" style="width:15%; background:#ef4444;"></div></div>
+      <span class="ep-val" style="color:#ef4444; font-size:0.5em;">−400</span>
+    </div>
+    <div class="episode-bar">
+      <span class="ep-label">Ep. 10k</span>
+      <div class="ep-track"><div class="ep-fill" style="width:30%; background:#f59e0b;"></div></div>
+      <span class="ep-val" style="color:#f59e0b; font-size:0.5em;">−150</span>
+    </div>
+    <div class="episode-bar">
+      <span class="ep-label">Ep. 100k</span>
+      <div class="ep-track"><div class="ep-fill" style="width:60%; background:#eab308;"></div></div>
+      <span class="ep-val" style="color:#eab308; font-size:0.5em;">+50</span>
+    </div>
+    <div class="episode-bar">
+      <span class="ep-label">Ep. 500k</span>
+      <div class="ep-track"><div class="ep-fill" style="width:80%; background:#22c55e;"></div></div>
+      <span class="ep-val" style="color:#22c55e; font-size:0.5em;">+150</span>
+    </div>
+    <div class="episode-bar">
+      <span class="ep-label">Ep. 1M ✅</span>
+      <div class="ep-track"><div class="ep-fill" style="width:95%; background:linear-gradient(90deg,#22c55e,#22d3ee);"></div></div>
+      <span class="ep-val" style="color:#22c55e; font-size:0.5em; font-weight:700;">+200 🏆</span>
+    </div>
+    <p style="font-size:0.44em; color:var(--text-muted); text-align:center; margin-top:6px;">Meta de certificación del curso: puntuación media ≥ 200 (recompensa - desviación estándar)</p>
+  </div>
+</section>
+
+<!-- ── Paso 1: Abrir Colab ── -->
+<section>
+  <span class="slide-tag">1.5 · Paso a Paso</span>
+  <h2>Guía paso a paso — ¡vamos al código! 💻</h2>
+
+  <div class="step-card">
+    <div class="step-circle">1</div>
+    <div class="step-content">
+      <strong>Abre el notebook en Google Colab</strong><br>
+      Haz clic en el botón "Abrir en Colab" del curso de HuggingFace, o ve directo a:<br>
+      <span style="font-family:var(--font-mono); font-size:0.88em; color:var(--accent-cyan);">colab.research.google.com/github/huggingface/deep-rl-class/blob/master/notebooks/unit1/unit1.ipynb</span><br>
+      <span style="color:var(--text-muted);">Activa la GPU: Entorno de ejecución → Cambiar tipo de entorno → GPU T4</span>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-circle">2</div>
+    <div class="step-content">
+      <strong>Instala las dependencias</strong> — ejecuta la primera celda del notebook:<br>
+      <div class="terminal" style="margin-top:6px;">
+        <div class="terminal-body">
+          <span class="t-comment"># Instala todas las librerías necesarias de una vez</span><br>
+          <span class="t-prompt">!</span><span class="t-fn">pip install</span> <span class="t-string">-r https://raw.githubusercontent.com/huggingface/deep-rl-class/main/notebooks/unit1/requirements-unit1.txt</span>
+        </div>
+      </div>
+      <span style="color:var(--text-muted); font-size:0.9em;">⚠️ Cuando te pida reiniciar el entorno, acepta — es normal.</span>
+    </div>
+  </div>
+
+  <div class="step-card">
+    <div class="step-circle">3</div>
+    <div class="step-content">
+      <strong>Importa las librerías</strong> — esto carga todas las herramientas:
+      <div class="terminal" style="margin-top:6px;">
+        <div class="terminal-body">
+          <span class="t-keyword">import</span> <span class="t-var">gymnasium</span> <span class="t-keyword">as</span> <span class="t-var">gym</span><br>
+          <span class="t-keyword">from</span> <span class="t-var">stable_baselines3</span> <span class="t-keyword">import</span> <span class="t-fn">PPO</span><br>
+          <span class="t-keyword">from</span> <span class="t-var">stable_baselines3.common.env_util</span> <span class="t-keyword">import</span> <span class="t-fn">make_vec_env</span><br>
+          <span class="t-keyword">from</span> <span class="t-var">huggingface_sb3</span> <span class="t-keyword">import</span> <span class="t-fn">package_to_hub</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Crear y explorar el entorno ── -->
+<section>
+  <span class="slide-tag">1.5 · Código</span>
+  <h2>Explorar el entorno con Gymnasium 🔍</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;"><strong>Gymnasium</strong> es la biblioteca que contiene LunarLander y cientos de otros entornos. Así se crea y examina uno:</p>
+
+  <div class="terminal" style="margin-bottom:12px;">
+    <div class="terminal-body">
+      <span class="t-comment"># Crear el entorno</span><br>
+      <span class="t-var">env</span> = <span class="t-fn">gym.make</span>(<span class="t-string">"LunarLander-v2"</span>)<br>
+      <span class="t-var">env</span>.<span class="t-fn">reset</span>()<br><br>
+      <span class="t-comment"># Ver qué información recibe el agente</span><br>
+      <span class="t-fn">print</span>(<span class="t-string">"Tamaño del estado:"</span>, <span class="t-var">env</span>.observation_space.shape)  <span class="t-comment"># → (8,)</span><br><br>
+      <span class="t-comment"># Ver cuántas acciones puede tomar</span><br>
+      <span class="t-fn">print</span>(<span class="t-string">"Número de acciones:"</span>, <span class="t-var">env</span>.action_space.n)  <span class="t-comment"># → 4</span><br><br>
+      <span class="t-comment"># Tomar una acción aleatoria y ver qué pasa</span><br>
+      <span class="t-var">accion</span> = <span class="t-var">env</span>.action_space.<span class="t-fn">sample</span>()<br>
+      <span class="t-var">estado</span>, <span class="t-var">recompensa</span>, <span class="t-var">terminado</span>, <span class="t-var">truncado</span>, <span class="t-var">info</span> = <span class="t-var">env</span>.<span class="t-fn">step</span>(<span class="t-var">accion</span>)<br>
+      <span class="t-fn">print</span>(<span class="t-string">"Recompensa:"</span>, <span class="t-var">recompensa</span>)
+    </div>
+  </div>
+
+  <!-- env.step explanation -->
+  <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:12px 16px;">
+    <p style="font-size:0.5em; color:var(--text-muted); margin-bottom:8px;"><strong style="color:var(--accent-cyan);">env.step(accion)</strong> — lo que devuelve en cada paso:</p>
+    <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:6px;">
+      <div style="background:rgba(59,130,246,0.1); border-radius:8px; padding:8px; font-size:0.5em; text-align:center; border:1px solid rgba(59,130,246,0.3);">
+        <div style="font-family:var(--font-mono); color:var(--accent-cyan);">estado</div>
+        <div style="color:var(--text-muted); margin-top:3px;">Los 8 números del nuevo estado</div>
+      </div>
+      <div style="background:rgba(34,197,94,0.1); border-radius:8px; padding:8px; font-size:0.5em; text-align:center; border:1px solid rgba(34,197,94,0.3);">
+        <div style="font-family:var(--font-mono); color:#22c55e;">recompensa</div>
+        <div style="color:var(--text-muted); margin-top:3px;">Puntos de este paso</div>
+      </div>
+      <div style="background:rgba(251,191,36,0.1); border-radius:8px; padding:8px; font-size:0.5em; text-align:center; border:1px solid rgba(251,191,36,0.3);">
+        <div style="font-family:var(--font-mono); color:var(--accent-gold);">terminado</div>
+        <div style="color:var(--text-muted); margin-top:3px;">¿Aterrizó o chocó?</div>
+      </div>
+      <div style="background:rgba(168,85,247,0.1); border-radius:8px; padding:8px; font-size:0.5em; text-align:center; border:1px solid rgba(168,85,247,0.3);">
+        <div style="font-family:var(--font-mono); color:var(--accent-violet);">truncado</div>
+        <div style="color:var(--text-muted); margin-top:3px;">¿Se acabó el tiempo?</div>
+      </div>
+      <div style="background:rgba(255,255,255,0.04); border-radius:8px; padding:8px; font-size:0.5em; text-align:center; border:1px solid rgba(255,255,255,0.1);">
+        <div style="font-family:var(--font-mono); color:var(--text-muted);">info</div>
+        <div style="color:var(--text-muted); margin-top:3px;">Info extra del entorno</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Crear y entrenar el modelo ── -->
+<section>
+  <span class="slide-tag">1.5 · Código</span>
+  <h2>Crear y entrenar el agente con PPO 🤖</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;"><strong>PPO</strong> (que estudiaremos en detalle en el capítulo 8) es el algoritmo que le dice a la nave qué hacer. Por ahora lo usamos como una "caja negra" poderosa. Con Stable-Baselines3 son solo 3 líneas:</p>
+
+  <div class="terminal" style="margin-bottom:12px;">
+    <div class="terminal-body">
+      <span class="t-comment"># 1. Crear 16 copias del entorno en paralelo (aprende más rápido)</span><br>
+      <span class="t-var">env</span> = <span class="t-fn">make_vec_env</span>(<span class="t-string">"LunarLander-v2"</span>, n_envs=<span class="t-number">16</span>)<br><br>
+      <span class="t-comment"># 2. Definir el modelo PPO</span><br>
+      <span class="t-var">modelo</span> = <span class="t-fn">PPO</span>(<br>
+      &nbsp;&nbsp;policy=<span class="t-string">"MlpPolicy"</span>,  <span class="t-comment"># red neuronal simple (capas de neuronas)</span><br>
+      &nbsp;&nbsp;env=<span class="t-var">env</span>,<br>
+      &nbsp;&nbsp;n_steps=<span class="t-number">1024</span>, batch_size=<span class="t-number">64</span>, n_epochs=<span class="t-number">4</span>,<br>
+      &nbsp;&nbsp;gamma=<span class="t-number">0.999</span>, gae_lambda=<span class="t-number">0.98</span>,<br>
+      &nbsp;&nbsp;verbose=<span class="t-number">1</span>  <span class="t-comment"># muestra el progreso</span><br>
+      )<br><br>
+      <span class="t-comment"># 3. ¡A entrenar! (~20 min con GPU)</span><br>
+      <span class="t-var">modelo</span>.<span class="t-fn">learn</span>(total_timesteps=<span class="t-number">1_000_000</span>)
+    </div>
+  </div>
+
+  <div class="cols2">
+    <div class="key-idea">
+      <span class="ki-label">🧠 ¿Qué es MlpPolicy?</span>
+      <p>"Mlp" viene de <em>Multi-Layer Perceptron</em> — una red neuronal con capas de neuronas, perfecta cuando el estado son números (no imágenes). Más adelante, para juegos de Atari usaremos <code>CnnPolicy</code> que procesa imágenes.</p>
+    </div>
+    <div class="card card-gold">
+      <p>☕ <strong>Tómate un descanso</strong> — el entrenamiento de 1 millón de pasos tarda aproximadamente 20 minutos en la GPU gratuita de Colab. Es normal. ¡El agente está aprendiendo miles de aterrizajes!</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Evaluar el agente ── -->
+<section>
+  <span class="slide-tag">1.5 · Evaluación</span>
+  <h2>Evaluar el agente: ¿qué tan bien aterrizó? 📊</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">Una vez entrenado, debemos medir el desempeño en un entorno <em>diferente</em> al de entrenamiento — así evitamos hacer trampa.</p>
+
+  <div class="terminal" style="margin-bottom:12px;">
+    <div class="terminal-body">
+      <span class="t-keyword">from</span> <span class="t-var">stable_baselines3.common.evaluation</span> <span class="t-keyword">import</span> <span class="t-fn">evaluate_policy</span><br>
+      <span class="t-keyword">from</span> <span class="t-var">stable_baselines3.common.monitor</span> <span class="t-keyword">import</span> <span class="t-fn">Monitor</span><br><br>
+      <span class="t-comment"># Entorno NUEVO solo para evaluar (importante: no el de entrenamiento)</span><br>
+      <span class="t-var">env_eval</span> = <span class="t-fn">Monitor</span>(<span class="t-fn">gym.make</span>(<span class="t-string">"LunarLander-v2"</span>))<br><br>
+      <span class="t-comment"># Evalúa 10 partidas y devuelve la recompensa promedio</span><br>
+      <span class="t-var">recompensa_media</span>, <span class="t-var">desv_std</span> = <span class="t-fn">evaluate_policy</span>(<br>
+      &nbsp;&nbsp;<span class="t-var">modelo</span>, <span class="t-var">env_eval</span>,<br>
+      &nbsp;&nbsp;n_eval_episodes=<span class="t-number">10</span>, deterministic=<span class="t-keyword">True</span><br>
+      )<br>
+      <span class="t-fn">print</span>(<span class="t-string">f"Recompensa media: </span>{<span class="t-var">recompensa_media</span>:.2f}<span class="t-string"> ± </span>{<span class="t-var">desv_std</span>:.2f}<span class="t-string">"</span>)
+    </div>
+  </div>
+
+  <div class="result-line" style="font-size:0.6em; font-weight:700;">
+    ✅ Resultado esperado: Recompensa media: 200.20 ± 20.80
+  </div>
+
+  <div class="card card-gold" style="margin-top:10px;">
+    <p>🏆 <strong>Meta del curso:</strong> Para obtener el certificado necesitas que tu modelo obtenga <strong>recompensa media − desviación estándar ≥ 200</strong>. Si no llegas, prueba entrenar más pasos o ajustar el valor de gamma.</p>
+  </div>
+</section>
+
+<!-- ── Subir al Hub ── -->
+<section>
+  <span class="slide-tag">1.5 · Hugging Face Hub</span>
+  <h2>Compartir tu agente con el mundo 🌍</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">Una vez que el agente tiene buen desempeño, lo <strong>publicamos en el Hugging Face Hub</strong> con una sola función. Esto genera automáticamente una tarjeta de modelo, un video de la nave aterrizando y la puntuación.</p>
+
+  <div class="terminal" style="margin-bottom:12px;">
+    <div class="terminal-body">
+      <span class="t-comment"># Primero inicia sesión en Hugging Face</span><br>
+      <span class="t-keyword">from</span> <span class="t-var">huggingface_hub</span> <span class="t-keyword">import</span> <span class="t-fn">notebook_login</span><br>
+      <span class="t-fn">notebook_login</span>()  <span class="t-comment"># pega tu token aquí</span><br><br>
+      <span class="t-comment"># Publicar el modelo en el Hub</span><br>
+      <span class="t-keyword">from</span> <span class="t-var">huggingface_sb3</span> <span class="t-keyword">import</span> <span class="t-fn">package_to_hub</span><br>
+      <span class="t-fn">package_to_hub</span>(<br>
+      &nbsp;&nbsp;model=<span class="t-var">modelo</span>,<br>
+      &nbsp;&nbsp;model_name=<span class="t-string">"ppo-LunarLander-v2"</span>,<br>
+      &nbsp;&nbsp;model_architecture=<span class="t-string">"PPO"</span>,<br>
+      &nbsp;&nbsp;env_id=<span class="t-string">"LunarLander-v2"</span>,<br>
+      &nbsp;&nbsp;eval_env=<span class="t-var">env_eval</span>,<br>
+      &nbsp;&nbsp;repo_id=<span class="t-string">"TU_USUARIO/ppo-LunarLander-v2"</span>,  <span class="t-comment"># ← cambia esto</span><br>
+      &nbsp;&nbsp;commit_message=<span class="t-string">"Mi primer agente entrenado 🚀"</span><br>
+      )
+    </div>
+  </div>
+
+  <!-- Hub card visual -->
+  <div class="hub-card">
+    <div class="cols3" style="gap:10px;">
+      <div style="text-align:center; font-size:0.54em; color:var(--text-muted);">
+        <div style="font-size:1.8em; margin-bottom:4px;">🎬</div>
+        <div style="color:var(--accent-cyan);">Video de la nave</div>
+        Replay automático del aterrizaje
+      </div>
+      <div style="text-align:center; font-size:0.54em; color:var(--text-muted);">
+        <div style="font-size:1.8em; margin-bottom:4px;">📊</div>
+        <div style="color:var(--accent-violet);">Puntuación pública</div>
+        Visible en el leaderboard
+      </div>
+      <div style="text-align:center; font-size:0.54em; color:var(--text-muted);">
+        <div style="font-size:1.8em; margin-bottom:4px;">🔗</div>
+        <div style="color:var(--accent-gold);">Código reutilizable</div>
+        Otros pueden cargar tu modelo
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Retos opcionales ── -->
+<section>
+  <span class="slide-tag">1.5 · Retos</span>
+  <h2>¿Ya aterrizaste? ¡Ahora supérate! 🏆</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:12px;">Si tu nave ya aterrizó bien, aquí hay retos opcionales para seguir aprendiendo:</p>
+
+  <div class="cols2">
+    <div class="card card-cyan">
+      <span class="card-icon">⏱️</span>
+      <h3>Entrenar más pasos</h3>
+      <p>Cambia <code>total_timesteps=1_000_000</code> a <code>2_000_000</code>. ¿Sube la puntuación? ¿Cuánto más? Compara los resultados.</p>
+    </div>
+    <div class="card card-violet">
+      <span class="card-icon">🎛️</span>
+      <h3>Cambiar hiperparámetros</h3>
+      <p>Prueba distintos valores de <code>gamma</code> (0.99, 0.995, 0.999) y observa cómo cambia el comportamiento de la nave.</p>
+    </div>
+    <div class="card card-gold">
+      <span class="card-icon">🌍</span>
+      <h3>Otro entorno</h3>
+      <p>Cambia <code>"LunarLander-v2"</code> por <code>"CartPole-v1"</code> (equilibrar un palo) o <code>"MountainCar-v0"</code>. El mismo código, diferente problema.</p>
+    </div>
+    <div class="card">
+      <span class="card-icon">🤝</span>
+      <h3>Cargar un modelo de otro</h3>
+      <p>Usa <code>load_from_hub</code> para descargar el agente de un compañero y evalúa si tiene mejor puntuación que el tuyo.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     CAP 1.6 — SECCIÓN BREAK
+══════════════════════════════════════════ -->
+<section>
+  <div class="section-slide" style="position:relative; overflow:hidden;">
+    <div style="font-size:3.5em; margin-bottom:6px;">🐶</div>
+    <div class="chapter-badge" style="font-size:0.38em; border-color:var(--accent-gold); color:var(--accent-gold); background:rgba(251,191,36,0.07); margin-top:8px;">Capítulo 1.6</div>
+    <h1>Huggy el Perro:<br>RL en Entornos 3D</h1>
+    <p style="font-size:0.6em; color:var(--text-muted); max-width:520px; text-align:center; margin-top:10px;">
+      Entrena a un perro virtual en un entorno 3D y juega con él en tu navegador.
+    </p>
+  </div>
+</section>
+
+<!-- ── ¿Qué es Huggy? ── -->
+<section>
+  <span class="slide-tag">1.6 · Huggy</span>
+  <h2>¿Quién es Huggy? 🐶</h2>
+
+  <div class="cols2" style="margin-top:10px;">
+    <div>
+      <div style="background:var(--bg-card); border:1px solid rgba(251,191,36,0.3); border-radius:14px; padding:16px; text-align:center; position:relative; overflow:hidden;">
+        <div style="position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg, var(--accent-gold), var(--accent-cyan));"></div>
+        <!-- Huggy visual representation -->
+        <div style="font-size:4em; margin: 10px 0; line-height:1.1;">🐕</div>
+        <div style="font-family:var(--font-mono); font-size:0.5em; color:var(--accent-gold); letter-spacing:0.1em; margin-bottom:4px;">HUGGY THE DOG</div>
+        <div style="font-size:0.52em; color:var(--text-muted); line-height:1.5;">
+          Un perro virtual en Unity 3D<br>
+          Basado en "Puppo the Corgi"<br>
+          del equipo de Unity ML-Agents
+        </div>
+        <!-- Stick visual -->
+        <div style="margin-top:14px; display:flex; align-items:center; justify-content:center; gap:20px;">
+          <div style="font-size:2em;" class="moon-float">🎾</div>
+          <div style="font-size:0.52em; color:var(--accent-gold); font-family:var(--font-mono);">← ¡ve a buscarla!</div>
+        </div>
+        <div style="margin-top:8px; font-size:0.46em; color:var(--text-muted);">
+          <span class="paw">🐾</span><span class="paw">🐾</span><span class="paw">🐾</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <div class="card card-gold">
+        <h3 style="font-size:0.8em;">¿Cuál es su misión?</h3>
+        <p>Huggy tiene que <strong>correr hacia un palo</strong> que le lanzamos. El palo aparece en una posición aleatoria del campo. Cuando lo alcanza, desaparece y aparece en otro lugar. Así practica sin parar.</p>
+      </div>
+      <div class="card card-cyan">
+        <h3 style="font-size:0.8em;">¿Por qué es interesante?</h3>
+        <p>A diferencia de LunarLander (2D, 4 botones), Huggy vive en un <strong>mundo 3D</strong> con un espacio de acciones <strong>continuo</strong> — controla la rotación exacta de cada articulación de sus patas.</p>
+      </div>
+      <div class="card card-violet">
+        <h3 style="font-size:0.8em;">¿Cómo jugar?</h3>
+        <p>Una vez entrenado, puedes jugar con Huggy en tu navegador en:<br>
+        <a href="https://huggingface.co/spaces/ThomasSimonini/Huggy" style="color:var(--accent-violet); font-family:var(--font-mono); font-size:0.85em;">🤗 spaces/ThomasSimonini/Huggy</a></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Qué "ve" Huggy ── -->
+<section>
+  <span class="slide-tag">1.6 · Observaciones</span>
+  <h2>¿Qué información recibe Huggy? 👀</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">Huggy <strong>no ve con ojos</strong> como nosotros. En cambio, recibe un conjunto de números que describen su situación:</p>
+
+  <div class="cols3" style="margin-bottom:12px;">
+    <div class="card card-cyan">
+      <span class="card-icon">📍</span>
+      <h3>Posición del palo</h3>
+      <p>¿Está el palo delante, detrás, a la izquierda o a la derecha? Huggy recibe las coordenadas relativas.</p>
+      <div style="margin-top:8px; text-align:center; font-size:1.4em;">🎾</div>
+    </div>
+    <div class="card card-violet">
+      <span class="card-icon">🧭</span>
+      <h3>Orientación propia</h3>
+      <p>¿Hacia dónde apunta Huggy? ¿Está mirando al palo o está de espaldas?</p>
+      <div style="margin-top:8px; text-align:center; font-size:1.4em;">🧭</div>
+    </div>
+    <div class="card card-gold">
+      <span class="card-icon">🦵</span>
+      <h3>Estado de las patas</h3>
+      <p>La <strong>orientación de cada articulación</strong> de sus 4 patas. Esto le permite saber cómo está caminando.</p>
+      <div style="margin-top:8px; text-align:center; font-size:1.4em;">🦴</div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">🔑 La diferencia con LunarLander</span>
+    <p>LunarLander tiene 8 números de estado. Huggy tiene <strong>muchos más</strong> porque debe rastrear cada articulación de cada pata. Y sus <strong>acciones son continuas</strong> — no elige entre 4 botones, sino que decide el ángulo exacto de cada motor de articulación.</p>
+  </div>
+</section>
+
+<!-- ── Función de recompensa de Huggy ── -->
+<section>
+  <span class="slide-tag">1.6 · Recompensas</span>
+  <h2>¿Cómo aprende Huggy a correr bien? 🏃</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">La función de recompensa de Huggy está <strong>diseñada cuidadosamente</strong> para que aprenda a correr de forma natural, no arrastrarse ni girar en círculos:</p>
+
+  <div class="cols2" style="margin-bottom:12px;">
+    <div>
+      <h3 style="font-size:0.8em; color:var(--accent-green); margin-bottom:8px;">Recompensas positivas ✅</h3>
+      <div class="step-row">
+        <div class="step-circle" style="background:rgba(34,197,94,0.3); border:1px solid #22c55e; color:#22c55e; font-size:0.65em;">🎯</div>
+        <div class="step-text"><strong style="color:#22c55e;">Bonus de orientación</strong><br>+puntos por estar orientado hacia el palo. Cuanto más directo, mejor.</div>
+      </div>
+      <div class="step-row" style="margin-top:6px;">
+        <div class="step-circle" style="background:rgba(34,197,94,0.3); border:1px solid #22c55e; color:#22c55e; font-size:0.65em;">🏆</div>
+        <div class="step-text"><strong style="color:#22c55e;">Recompensa por llegar</strong><br>+puntos grandes cuando Huggy alcanza el palo. ¡Objetivo cumplido!</div>
+      </div>
+    </div>
+    <div>
+      <h3 style="font-size:0.8em; color:var(--accent-red); margin-bottom:8px;">Penalizaciones ❌</h3>
+      <div class="step-row">
+        <div class="step-circle" style="background:rgba(239,68,68,0.2); border:1px solid #ef4444; color:#ef4444; font-size:0.65em;">⏱️</div>
+        <div class="step-text"><strong style="color:#ef4444;">Penalización de tiempo</strong><br>−puntos por cada paso que pasa sin llegar. Esto lo obliga a correr rápido.</div>
+      </div>
+      <div class="step-row" style="margin-top:6px;">
+        <div class="step-circle" style="background:rgba(239,68,68,0.2); border:1px solid #ef4444; color:#ef4444; font-size:0.65em;">🌀</div>
+        <div class="step-text"><strong style="color:#ef4444;">Penalización por girar</strong><br>−puntos si Huggy da vueltas o se mueve de manera ineficiente.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-gold">
+    <p>🎨 <strong>Diseño de recompensas es un arte:</strong> Si solo le das +1 por llegar, Huggy podría aprender a gatear lentamente en lugar de correr. Las penalizaciones de tiempo y rotación lo "empujan" hacia el comportamiento deseado. Este proceso se llama <em>reward shaping</em>.</p>
+  </div>
+</section>
+
+<!-- ── Motor articulaciones ── -->
+<section>
+  <span class="slide-tag">1.6 · Acciones</span>
+  <h2>Las acciones de Huggy: mover articulaciones 🦴</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:12px;">Huggy no tiene botones. En cambio, su política decide <strong>cuánto rotar cada motor</strong> de sus articulaciones para avanzar.</p>
+
+  <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:16px 20px; margin-bottom:14px;">
+    <div style="display:flex; gap:16px; align-items:center; justify-content:center;">
+      <!-- Dog body diagram CSS -->
+      <div style="position:relative; width:200px; height:130px; flex-shrink:0;">
+        <!-- Body -->
+        <div style="position:absolute; left:60px; top:40px; width:80px; height:45px; background:rgba(251,191,36,0.15); border:2px solid rgba(251,191,36,0.4); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.3em;">🐕</div>
+        <!-- Head -->
+        <div style="position:absolute; left:125px; top:30px; width:36px; height:36px; background:rgba(251,191,36,0.12); border:1px solid rgba(251,191,36,0.3); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.9em;">😊</div>
+        <!-- Tail -->
+        <div style="position:absolute; left:48px; top:45px; font-size:1.2em; animation: wag-tail 0.5s ease-in-out infinite; transform-origin: right center;">〰️</div>
+        <!-- Legs -->
+        <div style="position:absolute; left:68px; top:80px; width:14px; height:28px; background:rgba(34,211,238,0.2); border:1px solid var(--accent-cyan); border-radius:4px; display:flex; align-items:center; justify-content:center;">
+          <div style="width:2px; height:100%; background:var(--accent-cyan); border-radius:2px;"></div>
+        </div>
+        <div style="position:absolute; left:88px; top:80px; width:14px; height:28px; background:rgba(34,211,238,0.2); border:1px solid var(--accent-cyan); border-radius:4px; display:flex; align-items:center; justify-content:center;">
+          <div style="width:2px; height:100%; background:var(--accent-cyan); border-radius:2px;"></div>
+        </div>
+        <div style="position:absolute; left:108px; top:80px; width:14px; height:28px; background:rgba(168,85,247,0.2); border:1px solid var(--accent-violet); border-radius:4px;">
+          <div style="width:2px; height:100%; background:var(--accent-violet); border-radius:2px; margin-left:6px;"></div>
+        </div>
+        <div style="position:absolute; left:128px; top:80px; width:14px; height:28px; background:rgba(168,85,247,0.2); border:1px solid var(--accent-violet); border-radius:4px;">
+          <div style="width:2px; height:100%; background:var(--accent-violet); border-radius:2px; margin-left:6px;"></div>
+        </div>
+        <!-- Labels -->
+        <div style="position:absolute; left:55px; top:112px; font-size:0.4em; color:var(--accent-cyan); font-family:var(--font-mono);">patas traseras</div>
+        <div style="position:absolute; left:100px; top:112px; font-size:0.4em; color:var(--accent-violet); font-family:var(--font-mono);">patas delanteras</div>
+      </div>
+
+      <div style="flex:1;">
+        <p style="font-size:0.58em; color:var(--text-muted); line-height:1.6;">La política de Huggy produce un <strong>vector de números continuos</strong> — uno por cada motor de articulación:</p>
+        <div style="font-family:var(--font-mono); font-size:0.5em; margin:10px 0; color:var(--text-primary);">
+          acción = [<span style="color:var(--accent-cyan);">+0.3</span>, <span style="color:var(--accent-cyan);">-0.7</span>, <span style="color:var(--accent-cyan);">+0.1</span>, <span style="color:var(--accent-cyan);">+0.5</span>, <span style="color:var(--accent-violet);">-0.2</span>, <span style="color:var(--accent-violet);">+0.8</span>, ...]
+        </div>
+        <p style="font-size:0.55em; color:var(--text-muted);">Cada número en el rango [−1, +1] indica cuánto rotar ese motor. <strong>Cien veces más complejo</strong> que presionar un botón — por eso el aprendizaje por refuerzo profundo es necesario aquí.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">🤔 ¿Por qué usar RL para esto?</span>
+    <p>Programar manualmente cómo debe moverse cada pata de un perro para correr sería casi imposible. El RL aprende por prueba y error, como un cachorro aprendiendo a caminar. Después de millones de pasos, Huggy desarrolla un trote natural que nadie le programó explícitamente.</p>
+  </div>
+</section>
+
+<!-- ── Cómo entrenar a Huggy ── -->
+<section>
+  <span class="slide-tag">1.6 · Entrenamiento</span>
+  <h2>¿Cómo entrenamos a Huggy? 🏋️</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">Huggy usa <strong>Unity ML-Agents</strong>, la herramienta de RL de Unity (el motor de muchos videojuegos). El proceso es parecido al de LunarLander, pero con un entorno 3D.</p>
+
+  <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:16px 20px; margin-bottom:12px;">
+    <div style="position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,var(--accent-gold),var(--accent-cyan)); border-radius:14px 14px 0 0;"></div>
+
+    <div class="step-row">
+      <div class="step-circle">1</div>
+      <div class="step-content"><strong>Clonar el repositorio de ML-Agents</strong><br>
+      Se descarga el entorno 3D de Huggy (un ejecutable de Unity compilado para Linux).</div>
+    </div>
+    <div class="step-row" style="margin-top:8px;">
+      <div class="step-circle">2</div>
+      <div class="step-content"><strong>Configurar los hiperparámetros</strong><br>
+      Se usa un archivo <code>Huggy.yaml</code> con los parámetros del entrenamiento PPO:
+      <div class="terminal" style="margin-top:6px;">
+        <div class="terminal-body">
+          <span class="t-var">batch_size</span>: <span class="t-number">2048</span> &nbsp;<span class="t-var">gamma</span>: <span class="t-number">0.995</span> &nbsp;<span class="t-var">max_steps</span>: <span class="t-number">2000000</span>
+        </div>
+      </div>
+      </div>
+    </div>
+    <div class="step-row" style="margin-top:8px;">
+      <div class="step-circle">3</div>
+      <div class="step-content"><strong>Lanzar el entrenamiento</strong><br>
+      <div class="terminal" style="margin-top:6px;">
+        <div class="terminal-body">
+          <span class="t-prompt">!</span>mlagents-learn <span class="t-string">./config/ppo/Huggy.yaml</span> <span class="t-string">--env="./training-envs-executables/linux/Huggy"</span> --run-id=<span class="t-string">huggy-entrenado</span> --no-graphics
+        </div>
+      </div>
+      </div>
+    </div>
+    <div class="step-row" style="margin-top:8px;">
+      <div class="step-circle">4</div>
+      <div class="step-content"><strong>Subir al Hub y jugar</strong><br>
+      Con <code>mlagents-push-to-hf</code>, el modelo sube al Hub. Luego juegas en el navegador en el Space oficial.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── LunarLander vs Huggy comparativa ── -->
+<section>
+  <span class="slide-tag">1.6 · Comparativa</span>
+  <h2>LunarLander vs. Huggy: dos mundos distintos 🌍</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:12px;">Ambos usan PPO y la misma idea fundamental de RL. Pero son entornos muy diferentes:</p>
+
+  <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:14px; overflow:hidden;">
+    <div style="display:grid; grid-template-columns:1.5fr 1fr 1fr; background:var(--bg-panel);">
+      <div style="padding:10px 14px; font-family:var(--font-mono); font-size:0.5em; color:var(--text-muted); letter-spacing:0.1em; text-transform:uppercase;">Característica</div>
+      <div style="padding:10px 14px; text-align:center; font-size:0.5em; font-family:var(--font-mono); color:var(--accent-cyan); letter-spacing:0.08em; text-transform:uppercase;">🌕 LunarLander</div>
+      <div style="padding:10px 14px; text-align:center; font-size:0.5em; font-family:var(--font-mono); color:var(--accent-gold); letter-spacing:0.08em; text-transform:uppercase;">🐶 Huggy</div>
+    </div>
+    <div style="display:grid; grid-template-columns:1.5fr 1fr 1fr; border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px; font-size:0.54em; color:var(--text-muted);">Dimensiones del mundo</div>
+      <div style="padding:8px 14px; font-size:0.54em; color:var(--accent-cyan); text-align:center;">2D</div>
+      <div style="padding:8px 14px; font-size:0.54em; color:var(--accent-gold); text-align:center;">3D</div>
+    </div>
+    <div style="display:grid; grid-template-columns:1.5fr 1fr 1fr; border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px; font-size:0.54em; color:var(--text-muted);">Tamaño del estado</div>
+      <div style="padding:8px 14px; font-size:0.54em; color:var(--accent-cyan); text-align:center;">8 números</div>
+      <div style="padding:8px 14px; font-size:0.54em; color:var(--accent-gold); text-align:center;">Muchos más</div>
+    </div>
+    <div style="display:grid; grid-template-columns:1.5fr 1fr 1fr; border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px; font-size:0.54em; color:var(--text-muted);">Tipo de acciones</div>
+      <div style="padding:8px 14px; font-size:0.54em; color:var(--accent-cyan); text-align:center;">Discretas (4 botones)</div>
+      <div style="padding:8px 14px; font-size:0.54em; color:var(--accent-gold); text-align:center;">Continuas (ángulos exactos)</div>
+    </div>
+    <div style="display:grid; grid-template-columns:1.5fr 1fr 1fr; border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px; font-size:0.54em; color:var(--text-muted);">Herramienta</div>
+      <div style="padding:8px 14px; font-size:0.54em; color:var(--accent-cyan); text-align:center;">Gymnasium + SB3</div>
+      <div style="padding:8px 14px; font-size:0.54em; color:var(--accent-gold); text-align:center;">Unity ML-Agents</div>
+    </div>
+    <div style="display:grid; grid-template-columns:1.5fr 1fr 1fr; border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px; font-size:0.54em; color:var(--text-muted);">Algoritmo</div>
+      <div style="padding:8px 14px; font-size:0.54em; color:var(--accent-cyan); text-align:center;">PPO</div>
+      <div style="padding:8px 14px; font-size:0.54em; color:var(--accent-gold); text-align:center;">PPO</div>
+    </div>
+    <div style="display:grid; grid-template-columns:1.5fr 1fr 1fr; border-top:1px solid rgba(255,255,255,0.05); background:rgba(255,255,255,0.02);">
+      <div style="padding:8px 14px; font-size:0.54em; color:var(--text-muted);">¿Puedes jugar?</div>
+      <div style="padding:8px 14px; font-size:0.54em; color:var(--accent-cyan); text-align:center;">🎬 Video replay</div>
+      <div style="padding:8px 14px; font-size:0.54em; color:var(--accent-gold); text-align:center;">🕹️ Interactivo en navegador</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Qué es el ML-Agents de Unity ── -->
+<section>
+  <span class="slide-tag">1.6 · Unity ML-Agents</span>
+  <h2>¿Qué es Unity y por qué se usa en RL? 🎮</h2>
+
+  <div class="cols2" style="margin-top:10px;">
+    <div class="card card-gold">
+      <span class="card-icon">🎮</span>
+      <h3>Unity es un motor de videojuegos</h3>
+      <p>Es el software detrás de miles de videojuegos populares. Permite crear mundos 3D con física realista, iluminación, y objetos que interactúan.</p>
+      <div style="margin-top:8px; font-size:0.54em; color:var(--text-muted);">Juegos creados con Unity: Among Us, Hollow Knight, Cuphead, Pokémon GO</div>
+    </div>
+    <div class="card card-violet">
+      <span class="card-icon">🤖</span>
+      <h3>ML-Agents es su capa de RL</h3>
+      <p>Unity creó una extensión que convierte cualquier escena de Unity en un <strong>entorno de aprendizaje por refuerzo</strong>. Tú defines las observaciones, acciones y recompensas — Unity se encarga de la física y los gráficos.</p>
+    </div>
+  </div>
+
+  <div style="margin-top:12px; background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:14px 18px;">
+    <p style="font-size:0.52em; color:var(--text-muted); margin-bottom:8px;"><strong style="color:var(--accent-cyan);">¿Por qué es mejor que Gymnasium para algunos problemas?</strong></p>
+    <div class="cols3" style="gap:10px;">
+      <div style="font-size:0.52em; text-align:center;">
+        <div style="font-size:1.8em; margin-bottom:4px;">🌍</div>
+        <div style="color:var(--accent-cyan);">Entornos 3D complejos</div>
+        <div style="color:var(--text-muted); margin-top:3px;">Física realista, gravedad, colisiones</div>
+      </div>
+      <div style="font-size:0.52em; text-align:center;">
+        <div style="font-size:1.8em; margin-bottom:4px;">👀</div>
+        <div style="color:var(--accent-violet);">Visualización en tiempo real</div>
+        <div style="color:var(--text-muted); margin-top:3px;">Puedes ver al agente entrenando</div>
+      </div>
+      <div style="font-size:0.52em; text-align:center;">
+        <div style="font-size:1.8em; margin-bottom:4px;">⚡</div>
+        <div style="color:var(--accent-gold);">Paralelización</div>
+        <div style="color:var(--text-muted); margin-top:3px;">Muchas copias del entorno en paralelo</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Quiz ── -->
+<section>
+  <span class="slide-tag">Quiz</span>
+  <h2>🧠 Mini Quiz — Capítulos 1.5 y 1.6</h2>
+  <p style="font-size:0.58em; color:var(--text-muted); margin-bottom:14px;">¿Entendiste todo? Compruébalo:</p>
+
+  <div class="step-row">
+    <div class="step-num">Q1</div>
+    <div class="step-text">¿Por qué evaluamos el agente en un entorno <em>diferente</em> al que usamos para entrenarlo? ¿Qué problema evitamos con eso?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q2</div>
+    <div class="step-text">LunarLander tiene 4 acciones posibles. Huggy tiene acciones continuas. ¿Cuál de los dos es más difícil de entrenar? ¿Por qué?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q3</div>
+    <div class="step-text">¿Qué hace <code>make_vec_env("LunarLander-v2", n_envs=16)</code>? ¿Por qué usamos 16 copias en lugar de 1?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q4</div>
+    <div class="step-text">Huggy recibe una penalización de tiempo en cada paso. ¿Qué comportamiento genera esto? ¿Qué pasaría si no hubiera esa penalización?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q5</div>
+    <div class="step-text">¿Qué hace <code>package_to_hub()</code>? Nombra al menos 3 cosas que genera automáticamente.</div>
+  </div>
+</section>
+
+<!-- ── Slide final ── -->
+<section>
+  <div class="title-slide" style="align-items:center; text-align:center; position:relative; overflow:hidden;">
+    <div class="space-bg">
+      <div class="space-star" style="width:2px;height:2px;top:8%;left:12%;animation-duration:2.1s;"></div>
+      <div class="space-star" style="width:3px;height:3px;top:20%;left:72%;animation-duration:3.4s;animation-delay:0.5s;"></div>
+      <div class="space-star" style="width:2px;height:2px;top:65%;left:88%;animation-duration:2.8s;animation-delay:1s;"></div>
+    </div>
+
+    <div style="font-size:2.5em; margin-bottom:8px;">🚀 🌕 🐶</div>
+    <div class="chapter-badge" style="font-size:0.36em;">Capítulos 1.5 y 1.6 completados</div>
+    <h1 style="text-align:center; font-size:1.7em;">
+      ¡El Módulo 1<br>está completo!<br>
+      <span class="gradient-text-cyan" style="font-size:0.85em;">¡Eres un creador de agentes! 🎓</span>
+    </h1>
+    <div class="divider" style="margin:14px auto;"></div>
+    <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:4px; font-size:0.58em; color:var(--text-muted);">
+      <span>✅ ¿Qué es RL?</span>
+      <span style="color:var(--border);">·</span>
+      <span>✅ Recompensas y retorno</span>
+      <span style="color:var(--border);">·</span>
+      <span>✅ Exploración vs. explotación</span>
+      <span style="color:var(--border);">·</span>
+      <span>✅ Políticas y valores</span>
+      <span style="color:var(--border);">·</span>
+      <span>✅ LunarLander en Colab</span>
+      <span style="color:var(--border);">·</span>
+      <span>✅ Huggy en 3D</span>
+    </div>
+    <div style="margin-top:20px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+      <span class="pill">Próximo: Módulo 2 — Q-Learning desde cero 🧊</span>
+    </div>
+    <p style="font-size:0.5em; color:var(--text-muted); margin-top:14px; max-width:520px;">En el módulo 2 implementarás tu primera Q-table con NumPy y entrenas al agente en FrozenLake y Taxi. ¡Se pone serio!</p>
+  </div>
+</section>
+
+</div><!-- /slides -->
+</div><!-- /reveal -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+<script src="../assets/js/reveal-config.js"></script>
+</body>
+</html>

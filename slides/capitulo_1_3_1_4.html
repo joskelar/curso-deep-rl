@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capítulos 1.3 & 1.4 — Exploración vs Explotación · Políticas y Valores</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/black.min.css">
+<link rel="stylesheet" href="../assets/css/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"></script>
+
+<style>
+/* ── Overrides locales para este capítulo ── */
+
+/* Fondo animado de partículas en slides de portada/sección */
+@keyframes float-particle {
+  0%   { transform: translateY(0px) rotate(0deg); opacity: 0.6; }
+  50%  { transform: translateY(-18px) rotate(180deg); opacity: 0.3; }
+  100% { transform: translateY(0px) rotate(360deg); opacity: 0.6; }
+}
+
+.particle {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: float-particle linear infinite;
+}
+
+/* Balanza visual para exploración/explotación */
+.scale-container {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0;
+  margin: 10px 0;
+  position: relative;
+}
+
+.scale-arm {
+  width: 260px;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent-blue), var(--accent-violet));
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  transform-origin: center;
+}
+
+.scale-pan {
+  width: 90px;
+  min-height: 60px;
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 0.48em;
+  text-align: center;
+  line-height: 1.4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.pan-explore {
+  background: rgba(59,130,246,0.18);
+  border: 1px solid var(--accent-blue);
+  color: var(--accent-cyan);
+}
+
+.pan-exploit {
+  background: rgba(168,85,247,0.18);
+  border: 1px solid var(--accent-violet);
+  color: var(--accent-violet);
+}
+
+/* Barra de epsilon */
+.epsilon-bar-track {
+  height: 16px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 6px 0 2px 0;
+  position: relative;
+}
+
+.epsilon-bar-fill {
+  height: 100%;
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan));
+  transition: width 0.4s;
+  position: relative;
+}
+
+.epsilon-bar-fill::after {
+  content: attr(data-label);
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: white;
+  white-space: nowrap;
+}
+
+/* Mapa de valor (cuadrícula de celdas con colores) */
+.value-grid {
+  display: grid;
+  gap: 3px;
+  margin: 8px auto;
+}
+
+.vg-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.52em;
+  font-weight: 700;
+  aspect-ratio: 1;
+  transition: all 0.3s;
+}
+
+/* Dado animado para probabilidad */
+@keyframes spin-dice {
+  0%   { transform: rotate(0deg); }
+  25%  { transform: rotate(90deg); }
+  50%  { transform: rotate(180deg); }
+  75%  { transform: rotate(270deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.dice-spin {
+  display: inline-block;
+  animation: spin-dice 1.5s cubic-bezier(.68,-0.55,.265,1.55) infinite;
+}
+
+/* Flecha de progreso animada */
+@keyframes pulse-arrow {
+  0%, 100% { opacity: 1; transform: translateX(0); }
+  50%       { opacity: 0.5; transform: translateX(6px); }
+}
+
+.pulse-arrow {
+  animation: pulse-arrow 1.2s ease-in-out infinite;
+  display: inline-block;
+}
+
+/* Probability bars */
+.prob-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 5px 0;
+}
+.prob-label {
+  font-family: var(--font-mono);
+  font-size: 0.52em;
+  min-width: 80px;
+  color: var(--text-muted);
+}
+.prob-track {
+  flex: 1;
+  height: 18px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.prob-fill {
+  height: 100%;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  padding-left: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.48em;
+  font-weight: 700;
+  color: white;
+}
+
+/* Camino resaltado en la grilla de valor */
+.path-highlight {
+  box-shadow: 0 0 0 2px var(--accent-gold);
+  transform: scale(1.08);
+}
+
+/* Tooltip flotante */
+.tooltip-float {
+  position: absolute;
+  background: var(--bg-card);
+  border: 1px solid var(--accent-gold);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.44em;
+  color: var(--accent-gold);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Brain icon pulsante */
+@keyframes brain-pulse {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 6px rgba(168,85,247,0.6)); }
+  50%       { transform: scale(1.06); filter: drop-shadow(0 0 14px rgba(168,85,247,0.9)); }
+}
+.brain-pulse { animation: brain-pulse 2s ease-in-out infinite; display: inline-block; }
+
+/* Sección de resumen con línea de tiempo */
+.timeline {
+  position: relative;
+  padding-left: 24px;
+  margin: 10px 0;
+}
+.timeline::before {
+  content: "";
+  position: absolute;
+  left: 8px; top: 0; bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, var(--accent-blue), var(--accent-violet));
+}
+.timeline-item {
+  position: relative;
+  margin-bottom: 10px;
+  font-size: 0.62em;
+  line-height: 1.5;
+}
+.timeline-item::before {
+  content: "";
+  position: absolute;
+  left: -20px;
+  top: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 8px var(--accent-cyan);
+}
+</style>
+</head>
+
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ══════════════════════════════════════════
+     PORTADA
+══════════════════════════════════════════ -->
+<section>
+  <div class="title-slide" style="position:relative; overflow:hidden;">
+
+    <!-- Partículas decorativas -->
+    <div class="particle" style="width:8px;height:8px;background:rgba(59,130,246,0.5);top:12%;left:8%;animation-duration:6s;"></div>
+    <div class="particle" style="width:5px;height:5px;background:rgba(168,85,247,0.5);top:60%;left:5%;animation-duration:8s;animation-delay:1s;"></div>
+    <div class="particle" style="width:10px;height:10px;background:rgba(34,211,238,0.3);top:25%;right:12%;animation-duration:7s;animation-delay:2s;"></div>
+    <div class="particle" style="width:6px;height:6px;background:rgba(168,85,247,0.4);top:75%;right:8%;animation-duration:5s;animation-delay:0.5s;"></div>
+    <div class="particle" style="width:4px;height:4px;background:rgba(251,191,36,0.5);top:45%;left:15%;animation-duration:9s;animation-delay:3s;"></div>
+
+    <div class="chapter-badge">Capítulos 1.3 + 1.4 · Módulo 1</div>
+    <h1>¿Explorar o<br>Aprovechar? ·<br><span class="gradient-text">Políticas y Valores</span></h1>
+    <div class="divider"></div>
+    <p style="font-size:0.62em; color:var(--text-muted); max-width:620px; margin-top:8px; line-height:1.7;">
+      El dilema más importante del RL · La estrategia ε-greedy ·<br>
+      El "cerebro" del agente: políticas deterministas y aleatorias ·<br>
+      Métodos basados en valor vs. métodos basados en política
+    </p>
+    <div style="margin-top:24px; display:flex; gap:10px; flex-wrap:wrap;">
+      <span class="pill">Deep RL Course</span>
+      <span class="pill">Unit 1 — HuggingFace 🤗</span>
+      <span class="pill">Jose Miguel Lara Rangel</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── AGENDA ── -->
+<section>
+  <span class="slide-tag">Contenido</span>
+  <h2>¿Qué vamos a aprender hoy?</h2>
+  <div class="cols2" style="margin-top:12px;">
+    <div>
+      <div class="chapter-badge" style="font-size:0.36em;">Capítulo 1.3</div>
+      <div class="card card-cyan" style="margin-top:6px;">
+        <span class="card-icon">⚖️</span>
+        <p><strong style="color:var(--accent-cyan);">Exploración vs. Explotación</strong><br>El dilema central de cualquier agente que aprende. ¿Hago lo que ya sé o pruebo algo nuevo? La estrategia ε-greedy como solución práctica.</p>
+      </div>
+    </div>
+    <div>
+      <div class="chapter-badge" style="font-size:0.36em; border-color:var(--accent-violet); color:var(--accent-violet); background:rgba(168,85,247,0.07);">Capítulo 1.4</div>
+      <div class="card card-violet" style="margin-top:6px;">
+        <span class="card-icon">🧠</span>
+        <p><strong style="color:var(--accent-violet);">Políticas y Valores</strong><br>El "cerebro" del agente: qué es una política, tipos de políticas, y las dos grandes formas de resolver RL — por valores o por política directa.</p>
+      </div>
+    </div>
+  </div>
+  <div class="key-idea" style="margin-top:14px;">
+    <span class="ki-label">🎯 Conexión con capítulos anteriores</span>
+    <p>Ya sabemos qué quiere el agente: maximizar el retorno G<sub>t</sub>. Ahora veremos <em>cómo decide qué hacer</em> para lograrlo, y el trampa en que puede caer si no explora lo suficiente.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     CAP 1.3 — SECCIÓN BREAK
+══════════════════════════════════════════ -->
+<section>
+  <div class="section-slide" style="position:relative; overflow:hidden;">
+    <div class="particle" style="width:120px;height:120px;background:rgba(59,130,246,0.06);border-radius:50%;top:10%;left:5%;animation-duration:10s;"></div>
+    <div class="particle" style="width:80px;height:80px;background:rgba(168,85,247,0.08);border-radius:50%;bottom:15%;right:8%;animation-duration:8s;animation-delay:2s;"></div>
+    <span class="big-emoji">⚖️</span>
+    <div class="chapter-badge" style="font-size:0.38em;">Capítulo 1.3</div>
+    <h1>Exploración<br>vs.<br>Explotación</h1>
+    <p style="font-size:0.6em; color:var(--text-muted); max-width:500px; text-align:center; margin-top:10px;">
+      ¿Hago lo que ya sé que funciona, o me aventuro a descubrir algo mejor?
+    </p>
+  </div>
+</section>
+
+<!-- ── El problema del restaurante ── -->
+<section>
+  <span class="slide-tag">1.3 · El Dilema</span>
+  <h2>Un dilema que todos hemos vivido 🍕</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:14px;">Antes de entrar al mundo del RL, pensemos en algo cotidiano:</p>
+
+  <div class="cols2">
+    <div class="card card-violet" style="padding:22px;">
+      <span style="font-size:2.5em; display:block; margin-bottom:10px;">🏠</span>
+      <h3 style="color:var(--accent-violet); font-size:0.9em; margin-bottom:8px;">Aprovechar lo conocido</h3>
+      <p>Siempre vas al mismo restaurante de pizza que conoces. Sabes que está rico. <strong style="color:var(--accent-violet);">Nunca te arriesgas a que esté cerrado o esté malo.</strong></p>
+      <p style="margin-top:10px; color:var(--text-muted); font-size:0.92em;">Pero… ¿qué tal si hay un lugar increíble a dos cuadras que nunca has probado?</p>
+    </div>
+    <div class="card card-cyan" style="padding:22px;">
+      <span style="font-size:2.5em; display:block; margin-bottom:10px;">🗺️</span>
+      <h3 style="color:var(--accent-cyan); font-size:0.9em; margin-bottom:8px;">Explorar lo desconocido</h3>
+      <p>Decides probar un restaurante nuevo cada semana. A veces estará malísimo. Pero <strong style="color:var(--accent-cyan);">a veces descubrirás tu lugar favorito de toda la vida.</strong></p>
+      <p style="margin-top:10px; color:var(--text-muted); font-size:0.92em;">El riesgo es real, pero también lo es la recompensa potencial.</p>
+    </div>
+  </div>
+
+  <div class="key-idea" style="margin-top:14px;">
+    <span class="ki-label">⚖️ El dilema</span>
+    <p>Este mismo problema lo enfrenta cualquier agente de RL: ¿sigo haciendo lo que ya sé que da puntos, o pruebo acciones nuevas que podrían ser mejores (o peores)?</p>
+  </div>
+</section>
+
+<!-- ── El ratón con queso visual ── -->
+<section>
+  <span class="slide-tag">1.3 · Trampa de la Explotación</span>
+  <h2>La trampa: quedarse con el queso pequeño 🐭</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">Mira este laberinto. El ratón empieza en el centro. ¿Qué debería hacer?</p>
+
+  <!-- Maze diagram built in CSS -->
+  <div style="display:flex; gap:20px; align-items:flex-start; margin-top:4px;">
+    <div style="flex:1.2;">
+      <!-- Maze visual -->
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:16px; position:relative;">
+        <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:4px; max-width:260px; margin:0 auto;">
+          <!-- Row 1 -->
+          <div style="aspect-ratio:1; background:rgba(59,130,246,0.08); border-radius:6px; display:flex;align-items:center;justify-content:center; font-size:1.1em;">🧱</div>
+          <div style="aspect-ratio:1; background:rgba(34,211,238,0.12); border-radius:6px; display:flex;align-items:center;justify-content:center; font-size:1.1em; border:1px solid rgba(34,211,238,0.3);">+1🧀</div>
+          <div style="aspect-ratio:1; background:rgba(59,130,246,0.08); border-radius:6px;"></div>
+          <div style="aspect-ratio:1; background:rgba(59,130,246,0.08); border-radius:6px;"></div>
+          <div style="aspect-ratio:1; background:rgba(251,191,36,0.18); border-radius:6px; display:flex;align-items:center;justify-content:center; font-size:0.7em; border:1px solid rgba(251,191,36,0.5); color:var(--accent-gold); font-weight:700;">+1000🏆</div>
+          <!-- Row 2 -->
+          <div style="aspect-ratio:1; background:rgba(59,130,246,0.08); border-radius:6px;"></div>
+          <div style="aspect-ratio:1; background:rgba(59,130,246,0.08); border-radius:6px;"></div>
+          <div style="aspect-ratio:1; background:rgba(59,130,246,0.08); border-radius:6px; display:flex;align-items:center;justify-content:center; font-size:0.9em;">🐭</div>
+          <div style="aspect-ratio:1; background:rgba(59,130,246,0.08); border-radius:6px;"></div>
+          <div style="aspect-ratio:1; background:rgba(59,130,246,0.08); border-radius:6px;"></div>
+          <!-- Row 3 -->
+          <div style="aspect-ratio:1; background:rgba(34,211,238,0.12); border-radius:6px; display:flex;align-items:center;justify-content:center; font-size:1.1em; border:1px solid rgba(34,211,238,0.3);">+1🧀</div>
+          <div style="aspect-ratio:1; background:rgba(59,130,246,0.08); border-radius:6px;"></div>
+          <div style="aspect-ratio:1; background:rgba(59,130,246,0.08); border-radius:6px;"></div>
+          <div style="aspect-ratio:1; background:rgba(59,130,246,0.08); border-radius:6px;"></div>
+          <div style="aspect-ratio:1; background:rgba(59,130,246,0.08); border-radius:6px;"></div>
+          <!-- Row 4 -->
+          <div style="aspect-ratio:1; background:rgba(59,130,246,0.08); border-radius:6px;"></div>
+          <div style="aspect-ratio:1; background:rgba(59,130,246,0.08); border-radius:6px;"></div>
+          <div style="aspect-ratio:1; background:rgba(59,130,246,0.08); border-radius:6px;"></div>
+          <div style="aspect-ratio:1; background:rgba(59,130,246,0.08); border-radius:6px;"></div>
+          <div style="aspect-ratio:1; background:rgba(34,211,238,0.12); border-radius:6px; display:flex;align-items:center;justify-content:center; font-size:1.1em; border:1px solid rgba(34,211,238,0.3);">+1🧀</div>
+          <!-- Row 5 -->
+          <div style="aspect-ratio:1; background:rgba(59,130,246,0.08); border-radius:6px;"></div>
+          <div style="aspect-ratio:1; background:rgba(59,130,246,0.08); border-radius:6px;"></div>
+          <div style="aspect-ratio:1; background:rgba(59,130,246,0.08); border-radius:6px;"></div>
+          <div style="aspect-ratio:1; background:rgba(59,130,246,0.08); border-radius:6px;"></div>
+          <div style="aspect-ratio:1; background:rgba(59,130,246,0.08); border-radius:6px;"></div>
+        </div>
+        <p style="font-size:0.44em; color:var(--text-muted); text-align:center; margin-top:10px;">El ratón 🐭 está en el centro. Hay quesos pequeños (+1) cercanos y un tesoro de +1000 en la esquina.</p>
+      </div>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:10px;">
+      <div class="card card-pink">
+        <h3 style="font-size:0.8em;">😤 Solo explotando</h3>
+        <p>El ratón va al queso más cercano (+1) una y otra vez. <strong style="color:var(--accent-pink);">Nunca descubre el queso de +1000.</strong> Se queda atrapado en una solución mediocre.</p>
+      </div>
+      <div class="card card-cyan">
+        <h3 style="font-size:0.8em;">🗺️ Con un poco de exploración</h3>
+        <p>A veces el ratón prueba caminos desconocidos. En uno de esos viajes, <strong style="color:var(--accent-cyan);">descubre el tesoro de +1000</strong> y desde entonces siempre va ahí.</p>
+      </div>
+      <div class="card card-gold">
+        <h3 style="font-size:0.8em;">🎯 El balance correcto</h3>
+        <p>Ni siempre explorar (perderías tiempo yendo a lugares malos) ni siempre explotar (nunca mejorarías). <strong style="color:var(--accent-gold);">Se necesita equilibrio.</strong></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── El dilema en RL formal ── -->
+<section>
+  <span class="slide-tag">1.3 · Definición Formal</span>
+  <h2>Exploración y Explotación: definición precisa</h2>
+
+  <div class="cols2" style="margin-top:12px;">
+    <div class="card card-blue" style="border-left-color:var(--accent-blue); padding:24px;">
+      <span style="font-size:3em; display:block; margin-bottom:8px; text-align:center;">🔍</span>
+      <h3 style="text-align:center; color:var(--accent-cyan); font-size:1em;">Exploración</h3>
+      <p style="text-align:center;">Probar <strong class="hl-cyan">acciones al azar</strong> para descubrir nueva información sobre el entorno. A veces la acción es mala, pero aprendes algo nuevo.</p>
+      <div style="margin-top:12px; font-family:var(--font-mono); font-size:0.5em; color:var(--text-muted); text-align:center; border-top:1px solid var(--border); padding-top:10px;">
+        "No sé qué pasa si hago esto,<br>pero lo voy a intentar."
+      </div>
+    </div>
+    <div class="card card-violet" style="padding:24px;">
+      <span style="font-size:3em; display:block; margin-bottom:8px; text-align:center;">💰</span>
+      <h3 style="text-align:center; color:var(--accent-violet); font-size:1em;">Explotación</h3>
+      <p style="text-align:center;">Usar el <strong class="hl-violet">conocimiento ya adquirido</strong> para maximizar la recompensa. Siempre eliges la acción que sabes que es la mejor.</p>
+      <div style="margin-top:12px; font-family:var(--font-mono); font-size:0.5em; color:var(--text-muted); text-align:center; border-top:1px solid var(--border); padding-top:10px;">
+        "Sé que esta acción me da<br>la mayor recompensa conocida."
+      </div>
+    </div>
+  </div>
+
+  <div class="key-idea" style="margin-top:14px;">
+    <span class="ki-label">⚠️ El problema</span>
+    <p>Un agente que <strong>solo explota</strong> se queda atascado en una solución mediocre — como el ratón del queso. Uno que <strong>solo explora</strong> nunca converge a una buena política. Necesitamos una <strong>estrategia que balancea ambas.</strong></p>
+  </div>
+</section>
+
+<!-- ── ε-greedy visual ── -->
+<section>
+  <span class="slide-tag">1.3 · Estrategia ε-greedy</span>
+  <h2>La solución: la estrategia ε-greedy (épsilon-greedy)</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">La estrategia más usada en la práctica. La idea es elegir con cierta probabilidad si explorar o explotar.</p>
+
+  <!-- ε-greedy diagram -->
+  <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:16px 20px; margin-bottom:12px; position:relative;">
+    <div style="position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan),var(--accent-violet));border-radius:14px 14px 0 0;"></div>
+
+    <div style="display:flex; align-items:center; gap:14px; margin-bottom:12px;">
+      <div style="font-size:2em; flex-shrink:0;">🎲</div>
+      <p style="font-size:0.6em; margin:0;">En cada paso, el agente <strong>lanza un dado virtual</strong>. Según el resultado, decide entre explorar o explotar.</p>
+    </div>
+
+    <!-- Probability visualization -->
+    <div style="margin-bottom:8px; font-family:var(--font-mono); font-size:0.5em; color:var(--text-muted); letter-spacing:0.08em;">ε = 0.1  (10% explorar · 90% explotar)</div>
+    <div class="epsilon-bar-track">
+      <div class="epsilon-bar-fill" style="width:10%; background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan));" data-label="Explorar 10%"></div>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:0.46em; color:var(--text-muted); margin-top:3px; font-family:var(--font-mono);">
+      <span style="color:var(--accent-cyan);">← Explorar (ε)</span>
+      <span style="color:var(--accent-violet);">Explotar (1-ε) →</span>
+    </div>
+
+    <div class="cols2" style="margin-top:12px; gap:10px;">
+      <div style="background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.3); border-radius:10px; padding:10px 14px; font-size:0.56em;">
+        <strong style="color:var(--accent-cyan);">Si el número aleatorio &lt; ε:</strong><br>
+        👉 Acción aleatoria — ¡a explorar!
+      </div>
+      <div style="background:rgba(168,85,247,0.1); border:1px solid rgba(168,85,247,0.3); border-radius:10px; padding:10px 14px; font-size:0.56em;">
+        <strong style="color:var(--accent-violet);">Si el número aleatorio ≥ ε:</strong><br>
+        👉 Mejor acción conocida — ¡a explotar!
+      </div>
+    </div>
+  </div>
+
+  <div class="math-block" style="font-size:0.8em; padding:10px 20px;">
+    \[
+      A_t = \begin{cases}
+        \text{acción aleatoria} & \text{con probabilidad } \varepsilon \\
+        \arg\max_a Q(s,a) & \text{con probabilidad } 1 - \varepsilon
+      \end{cases}
+    \]
+  </div>
+  <div class="math-explain">
+    ε (épsilon) controla cuánto exploramos · argmax Q(s,a) = "la mejor acción conocida"
+  </div>
+</section>
+
+<!-- ── Decaimiento de ε ── -->
+<section>
+  <span class="slide-tag">1.3 · Decaimiento de ε</span>
+  <h2>Al principio explora mucho, al final explota más 📉</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:12px;">En la práctica, el valor de ε <strong>no se mantiene fijo</strong>. Comienza alto (mucha exploración) y va bajando a medida que el agente aprende más.</p>
+
+  <!-- Timeline of epsilon decay -->
+  <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:16px 20px; margin-bottom:14px;">
+    <div style="display:flex; gap:6px; align-items:stretch; margin-bottom:14px;">
+      <!-- Inicio -->
+      <div style="flex:1; background:rgba(59,130,246,0.15); border:1px solid rgba(59,130,246,0.4); border-radius:10px; padding:10px; text-align:center; font-size:0.52em;">
+        <div style="font-size:2em; margin-bottom:4px;">🐣</div>
+        <div style="font-family:var(--font-mono); color:var(--accent-blue); font-size:1.1em; font-weight:700;">ε = 1.0</div>
+        <div style="color:var(--text-muted); margin-top:4px;">Inicio del<br>entrenamiento</div>
+        <div style="color:var(--accent-cyan); margin-top:6px;">100% exploración<br>¡No sé nada aún!</div>
+      </div>
+      <div style="display:flex;align-items:center;font-size:1.5em; color:var(--accent-cyan); padding:0 4px;"><span class="pulse-arrow">→</span></div>
+      <!-- Medio -->
+      <div style="flex:1; background:rgba(92,92,200,0.15); border:1px solid rgba(92,92,200,0.4); border-radius:10px; padding:10px; text-align:center; font-size:0.52em;">
+        <div style="font-size:2em; margin-bottom:4px;">🐥</div>
+        <div style="font-family:var(--font-mono); color:#7c7cf0; font-size:1.1em; font-weight:700;">ε = 0.5</div>
+        <div style="color:var(--text-muted); margin-top:4px;">Entrenamiento<br>a la mitad</div>
+        <div style="color:#7c7cf0; margin-top:6px;">50% explorar<br>50% explotar</div>
+      </div>
+      <div style="display:flex;align-items:center;font-size:1.5em; color:var(--accent-cyan); padding:0 4px;"><span class="pulse-arrow">→</span></div>
+      <!-- Final -->
+      <div style="flex:1; background:rgba(168,85,247,0.15); border:1px solid rgba(168,85,247,0.4); border-radius:10px; padding:10px; text-align:center; font-size:0.52em;">
+        <div style="font-size:2em; margin-bottom:4px;">🦅</div>
+        <div style="font-family:var(--font-mono); color:var(--accent-violet); font-size:1.1em; font-weight:700;">ε = 0.05</div>
+        <div style="color:var(--text-muted); margin-top:4px;">Entrenamiento<br>avanzado</div>
+        <div style="color:var(--accent-violet); margin-top:6px;">5% explorar<br>95% explotar</div>
+      </div>
+    </div>
+
+    <!-- Decay curve visual -->
+    <div style="position:relative; height:50px; background:rgba(255,255,255,0.03); border-radius:8px; overflow:hidden;">
+      <div style="position:absolute; inset:0; display:flex; align-items:center; padding:0 10px;">
+        <svg width="100%" height="40" viewBox="0 0 400 40" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="decay-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1"/>
+              <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1"/>
+            </linearGradient>
+          </defs>
+          <path d="M 0,4 Q 100,4 200,20 Q 300,32 400,36"
+                fill="none" stroke="url(#decay-grad)" stroke-width="2.5" stroke-linecap="round"/>
+          <circle cx="0" cy="4" r="4" fill="#3b82f6"/>
+          <circle cx="200" cy="20" r="4" fill="#7c7cf0"/>
+          <circle cx="400" cy="36" r="4" fill="#a855f7"/>
+        </svg>
+      </div>
+      <div style="position:absolute; left:6px; bottom:4px; font-family:var(--font-mono); font-size:0.38em; color:var(--text-muted);">ε alto → explorar</div>
+      <div style="position:absolute; right:6px; bottom:4px; font-family:var(--font-mono); font-size:0.38em; color:var(--text-muted);">ε bajo → explotar</div>
+    </div>
+  </div>
+
+  <div class="card card-gold">
+    <p>🎓 <strong>Analogía perfecta:</strong> Es como cuando aprendes algo nuevo — al principio pruebas todo (exploración alta), y cuando ya eres bueno, confías en lo que sabes (explotación alta). Un estudiante nuevo prueba muchas técnicas de estudio; uno experto sabe cuáles funcionan.</p>
+  </div>
+</section>
+
+<!-- ── Resumen Cap 1.3 ── -->
+<section>
+  <span class="slide-tag">1.3 · Resumen</span>
+  <h2>Resumen del dilema Exploración vs. Explotación</h2>
+
+  <div style="display:flex; gap:14px; margin-top:10px; align-items:center; justify-content:center;">
+    <!-- Left pan -->
+    <div class="scale-pan pan-explore" style="min-width:150px; border-radius:12px; padding:14px;">
+      <span style="font-size:2em;">🔍</span>
+      <strong style="font-size:0.9em;">EXPLORACIÓN</strong>
+      <span>Acciones al azar</span>
+      <span>Descubres cosas nuevas</span>
+      <span>Puede salir mal</span>
+    </div>
+
+    <!-- Center pivot -->
+    <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+      <div style="font-size:2.5em;">⚖️</div>
+      <div style="width:3px; height:50px; background:linear-gradient(180deg,var(--accent-cyan),var(--accent-violet)); border-radius:2px;"></div>
+      <div style="font-family:var(--font-mono); font-size:0.44em; color:var(--accent-gold); letter-spacing:0.1em; text-transform:uppercase;">Balance</div>
+    </div>
+
+    <!-- Right pan -->
+    <div class="scale-pan pan-exploit" style="min-width:150px; border-radius:12px; padding:14px;">
+      <span style="font-size:2em;">💰</span>
+      <strong style="font-size:0.9em;">EXPLOTACIÓN</strong>
+      <span>Mejor acción conocida</span>
+      <span>Maximizas recompensa</span>
+      <span>Puedes estancarte</span>
+    </div>
+  </div>
+
+  <div class="cols2" style="margin-top:14px;">
+    <div class="key-idea">
+      <span class="ki-label">✅ Solución: ε-greedy</span>
+      <p>Con probabilidad ε (pequeña) haz algo aleatorio. Con probabilidad 1-ε haz lo mejor que conoces. ε baja conforme el agente aprende.</p>
+    </div>
+    <div class="card card-gold">
+      <p>🔮 <strong>Importante:</strong> En los próximos capítulos veremos cómo Q-Learning usa exactamente esta estrategia para entrenar. ¡Es el corazón del algoritmo!</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     CAP 1.4 — SECCIÓN BREAK
+══════════════════════════════════════════ -->
+<section>
+  <div class="section-slide" style="position:relative; overflow:hidden;">
+    <div class="particle" style="width:100px;height:100px;background:rgba(168,85,247,0.07);border-radius:50%;top:8%;right:10%;animation-duration:9s;"></div>
+    <div class="particle" style="width:60px;height:60px;background:rgba(34,211,238,0.07);border-radius:50%;bottom:20%;left:12%;animation-duration:7s;animation-delay:1.5s;"></div>
+    <span class="big-emoji"><span class="brain-pulse">🧠</span></span>
+    <div class="chapter-badge" style="font-size:0.38em; border-color:var(--accent-violet); color:var(--accent-violet); background:rgba(168,85,247,0.07); margin-top:10px;">Capítulo 1.4</div>
+    <h1>Políticas y Valores:<br>Cómo Decide<br>el Agente</h1>
+    <p style="font-size:0.6em; color:var(--text-muted); max-width:500px; text-align:center; margin-top:10px;">
+      El "cerebro" del agente y las dos formas de entrenarlo.
+    </p>
+  </div>
+</section>
+
+<!-- ── Qué es la política ── -->
+<section>
+  <span class="slide-tag">1.4 · La Política π</span>
+  <h2>La Política π: el cerebro del agente <span class="brain-pulse">🧠</span></h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">La <strong class="hl-violet">política</strong> (en inglés: <em>policy</em>, símbolo: <strong>π</strong>) es la función que le dice al agente qué hacer en cada situación.</p>
+
+  <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:18px 22px; margin-bottom:14px; position:relative; overflow:hidden;">
+    <div style="position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,var(--accent-violet),var(--accent-pink));"></div>
+    <div class="diagram-row" style="margin:0;">
+      <div class="dbox" style="min-width:130px; border-color:var(--accent-blue); background:rgba(59,130,246,0.1);">
+        <div style="font-size:1.4em;">🌍</div>
+        <div style="font-size:0.8em; color:var(--accent-cyan); font-weight:700;">Estado s</div>
+        <div style="font-size:0.65em; color:var(--text-muted); margin-top:4px;">Lo que ve el agente ahora mismo</div>
+      </div>
+      <div class="darrow-label">
+        <span style="color:var(--text-muted); font-size:0.9em;">entra a</span>
+        <span class="darrow">→</span>
+      </div>
+      <div class="dbox" style="min-width:160px; border-color:var(--accent-violet); background:rgba(168,85,247,0.12); box-shadow:var(--glow-violet);">
+        <div style="font-size:1.4em;"><span class="brain-pulse">🧠</span></div>
+        <div style="font-size:0.9em; color:var(--accent-violet); font-weight:700;">Política π</div>
+        <div style="font-size:0.65em; color:var(--text-muted); margin-top:4px;">La función que decide</div>
+      </div>
+      <div class="darrow-label">
+        <span style="color:var(--text-muted); font-size:0.9em;">produce</span>
+        <span class="darrow">→</span>
+      </div>
+      <div class="dbox" style="min-width:130px; border-color:var(--accent-gold); background:rgba(251,191,36,0.1);">
+        <div style="font-size:1.4em;">🎯</div>
+        <div style="font-size:0.8em; color:var(--accent-gold); font-weight:700;">Acción a</div>
+        <div style="font-size:0.65em; color:var(--text-muted); margin-top:4px;">Lo que hace el agente</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cols2">
+    <div class="card card-violet">
+      <p>🎯 <strong>El objetivo del entrenamiento</strong> es encontrar la <strong class="hl-violet">política óptima π*</strong> — aquella que maximiza el retorno esperado. El asterisco (*) significa "la mejor posible".</p>
+    </div>
+    <div class="card card-gold">
+      <p>🎮 <strong>Analogía:</strong> En un videojuego, la política es como el "instinto" del jugador experto: ve la pantalla (estado) y de inmediato sabe qué botón presionar (acción). Ese instinto se construye con práctica.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Política Determinista ── -->
+<section>
+  <span class="slide-tag">1.4 · Política Determinista</span>
+  <h2>Tipo 1: Política Determinista — siempre la misma respuesta</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">Una política <strong>determinista</strong> es simple: dado el mismo estado, <strong>siempre produce la misma acción</strong>. No hay aleatoriedad.</p>
+
+  <div class="math-block" style="margin-bottom:14px; font-size:0.9em;">
+    \[ a = \pi(s) \]
+  </div>
+  <div class="math-explain" style="margin-bottom:14px;">
+    "La acción a es una función directa del estado s. Mismo estado → misma acción siempre."
+  </div>
+
+  <!-- Visual example with a grid world -->
+  <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:16px; margin-bottom:12px;">
+    <p style="font-size:0.52em; color:var(--text-muted); margin-bottom:10px; text-align:center;">Ejemplo: política determinista en un laberinto simple 3×3</p>
+    <div style="display:flex; gap:20px; align-items:center; justify-content:center;">
+      <div style="display:grid; grid-template-columns:repeat(3,52px); gap:4px;">
+        <div style="width:52px;height:52px;background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.3);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.3em;">🤖</div>
+        <div style="width:52px;height:52px;background:rgba(59,130,246,0.08);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1em; color:var(--accent-cyan);">→</div>
+        <div style="width:52px;height:52px;background:rgba(59,130,246,0.08);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1em; color:var(--accent-cyan);">↓</div>
+        <div style="width:52px;height:52px;background:rgba(59,130,246,0.08);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1em; color:var(--accent-cyan);">↑</div>
+        <div style="width:52px;height:52px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1em;">🧱</div>
+        <div style="width:52px;height:52px;background:rgba(59,130,246,0.08);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1em; color:var(--accent-cyan);">↓</div>
+        <div style="width:52px;height:52px;background:rgba(59,130,246,0.08);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1em; color:var(--accent-cyan);">→</div>
+        <div style="width:52px;height:52px;background:rgba(59,130,246,0.08);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1em; color:var(--accent-cyan);">→</div>
+        <div style="width:52px;height:52px;background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.4);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.3em;">🏆</div>
+      </div>
+      <div style="font-size:0.54em; color:var(--text-muted); max-width:220px; line-height:1.6;">
+        Cada celda tiene <strong style="color:var(--accent-cyan);">una sola flecha</strong> — la acción que siempre toma el agente en ese estado. Sin importar cuántas veces pase por aquí, siempre hace lo mismo.<br><br>
+        <span style="color:var(--accent-gold);">🏆 = meta · 🧱 = pared</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-cyan">
+    <p>✅ <strong>Ventajas:</strong> Simple y predecible. <strong>Desventajas:</strong> No puede manejar situaciones ambiguas donde a veces conviene hacer una cosa y a veces otra. Para eso necesitamos la política aleatoria.</p>
+  </div>
+</section>
+
+<!-- ── Política Estocástica ── -->
+<section>
+  <span class="slide-tag">1.4 · Política Aleatoria</span>
+  <h2>Tipo 2: Política Aleatoria — probabilidades en lugar de certezas</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">Una política <strong>aleatoria</strong> (también llamada estocástica) no devuelve una acción fija, sino <strong>qué tan probable</strong> es cada acción en ese estado.</p>
+
+  <div class="math-block" style="margin-bottom:10px; font-size:0.88em;">
+    \[ \pi(a \mid s) = P(A = a \mid S = s) \]
+  </div>
+  <div class="math-explain" style="margin-bottom:14px;">
+    π(a|s) = "probabilidad de hacer la acción a, dado que estoy en el estado s"
+  </div>
+
+  <!-- Probability distribution visual -->
+  <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:16px 20px;">
+    <p style="font-size:0.5em; color:var(--text-muted); margin-bottom:10px;">Ejemplo: Mario en el estado "plataforma con enemigo a la derecha"</p>
+
+    <div class="prob-bar-row">
+      <span class="prob-label">⬆️ Saltar</span>
+      <div class="prob-track">
+        <div class="prob-fill" style="width:60%; background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan));">60%</div>
+      </div>
+    </div>
+    <div class="prob-bar-row">
+      <span class="prob-label">⬅️ Izquierda</span>
+      <div class="prob-track">
+        <div class="prob-fill" style="width:25%; background:linear-gradient(90deg,#4f6adf,#7b5af0);">25%</div>
+      </div>
+    </div>
+    <div class="prob-bar-row">
+      <span class="prob-label">⬇️ Agachar</span>
+      <div class="prob-track">
+        <div class="prob-fill" style="width:10%; background:linear-gradient(90deg,var(--accent-violet),var(--accent-pink));">10%</div>
+      </div>
+    </div>
+    <div class="prob-bar-row">
+      <span class="prob-label">➡️ Derecha</span>
+      <div class="prob-track">
+        <div class="prob-fill" style="width:5%; background:linear-gradient(90deg,#ef4444,#dc2626);">5%</div>
+      </div>
+    </div>
+    <p style="font-size:0.46em; color:var(--text-muted); text-align:center; margin-top:8px;">El agente <em>probablemente</em> saltará (60%), pero no siempre — a veces retrocederá o se agachará. La suma siempre da 100%.</p>
+  </div>
+</section>
+
+<!-- ── ¿Por qué es útil la política aleatoria? ── -->
+<section>
+  <span class="slide-tag">1.4 · ¿Para qué sirve la aleatoriedad?</span>
+  <h2>¿Para qué sirve una política aleatoria?</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:12px;">Podría parecer que la aleatoriedad es una desventaja, pero en realidad tiene ventajas importantes:</p>
+
+  <div class="cols2" style="margin-bottom:12px;">
+    <div class="card card-cyan">
+      <span class="card-icon">🔍</span>
+      <h3>Exploración automática</h3>
+      <p>Como la política no siempre elige la misma acción, el agente <strong>explora naturalmente</strong> sin necesidad de un mecanismo externo. No necesita ε-greedy por separado.</p>
+    </div>
+    <div class="card card-violet">
+      <span class="card-icon">🎭</span>
+      <h3>Situaciones ambiguas</h3>
+      <p>A veces dos estados parecen idénticos pero requieren acciones diferentes. Una política aleatoria puede <strong>mezclar las dos acciones</strong> de manera inteligente.</p>
+    </div>
+  </div>
+
+  <!-- Perceptual aliasing example -->
+  <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:14px 18px;">
+    <p style="font-size:0.52em; color:var(--text-muted); margin-bottom:8px;"><strong style="color:var(--accent-gold);">Ejemplo:</strong> La aspiradora que se confunde 🤖🧹</p>
+    <div class="cols2" style="gap:10px;">
+      <div style="background:rgba(59,130,246,0.06); border-radius:8px; padding:10px; font-size:0.52em; text-align:center;">
+        <div style="font-size:2em; margin-bottom:6px;">🤖</div>
+        <div style="color:var(--accent-cyan);">Estado A: pared arriba y abajo</div>
+        <div style="color:var(--text-muted); margin-top:4px;">Necesita ir a la derecha<br>para alcanzar el polvo</div>
+      </div>
+      <div style="background:rgba(168,85,247,0.06); border-radius:8px; padding:10px; font-size:0.52em; text-align:center;">
+        <div style="font-size:2em; margin-bottom:6px;">🤖</div>
+        <div style="color:var(--accent-violet);">Estado B: pared arriba y abajo</div>
+        <div style="color:var(--text-muted); margin-top:4px;">Necesita ir a la izquierda<br>para alcanzar el polvo</div>
+      </div>
+    </div>
+    <p style="font-size:0.5em; color:var(--accent-gold); margin-top:8px; text-align:center;">Una política determinista se quedaría atascada. Una aleatoria puede ir a la derecha el 50% del tiempo y a la izquierda el otro 50%, llegando al polvo en ambos casos.</p>
+  </div>
+</section>
+
+<!-- ── Los dos enfoques ── -->
+<section>
+  <span class="slide-tag">1.4 · Dos Enfoques</span>
+  <h2>Dos caminos para entrenar al agente 🛤️</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">Hay dos grandes maneras de encontrar la política óptima π*. Ambas funcionan, pero tienen fortalezas diferentes:</p>
+
+  <div class="compare-grid" style="margin-bottom:14px;">
+    <div>
+      <div class="compare-head blue">Métodos por Política</div>
+      <div class="compare-body">
+        <p>El agente aprende <strong>directamente qué acción tomar</strong> en cada estado. Entrena la política π de forma directa, sin calcular valores intermedios.</p>
+        <div style="margin:10px 0; text-align:center;">
+          <div style="font-size:1.4em;">🌍 → 🧠π → 🎯</div>
+          <div style="font-size:0.52em; color:var(--text-muted); margin-top:4px;">Estado entra, acción sale directamente</div>
+        </div>
+        <p style="color:var(--accent-blue); margin-top:6px;">Algoritmos: REINFORCE, PPO, A2C</p>
+        <p style="font-size:0.85em; color:var(--text-muted);">(Capítulos 4.x, 6.x, 8.x)</p>
+      </div>
+    </div>
+    <div>
+      <div class="compare-head violet">Métodos por Valor</div>
+      <div class="compare-body">
+        <p>El agente aprende primero <strong>cuánto vale cada estado</strong> (o par estado-acción). Luego deriva la política eligiendo siempre la acción que lleva al estado más valioso.</p>
+        <div style="margin:10px 0; text-align:center;">
+          <div style="font-size:1.4em;">🌍 → 💎V(s) → 🎯</div>
+          <div style="font-size:0.52em; color:var(--text-muted); margin-top:4px;">Primero evalúa, luego actúa</div>
+        </div>
+        <p style="color:var(--accent-violet); margin-top:6px;">Algoritmos: Q-Learning, DQN</p>
+        <p style="font-size:0.85em; color:var(--text-muted);">(Capítulos 2.x, 3.x)</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Función de Valor V(s) ── -->
+<section>
+  <span class="slide-tag">1.4 · Función de Valor V(s)</span>
+  <h2>Métodos por Valor: el "mapa de calor" del entorno 🗺️</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">En los métodos por valor, el agente aprende una <strong>función de valor V(s)</strong>: un número para cada estado que dice cuánto retorno espera obtener si empieza ahí.</p>
+
+  <div style="display:flex; gap:16px; align-items:flex-start;">
+    <!-- Value grid -->
+    <div style="flex:1.1;">
+      <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:14px;">
+        <p style="font-size:0.48em; color:var(--text-muted); margin-bottom:10px; text-align:center;">Función de valor en un laberinto — los números indican "qué tan bueno es estar aquí"</p>
+        <div class="value-grid" style="grid-template-columns:repeat(4,1fr); max-width:270px; margin:0 auto;">
+          <!-- Row 1 -->
+          <div class="vg-cell" style="background:rgba(168,85,247,0.15); color:var(--accent-violet);">-7</div>
+          <div class="vg-cell" style="background:rgba(120,80,240,0.2); color:#9d7ef0;">-6</div>
+          <div class="vg-cell" style="background:rgba(80,100,230,0.2); color:#7a9ae8;">-5</div>
+          <div class="vg-cell" style="background:rgba(50,130,220,0.2); color:var(--accent-blue);">-4</div>
+          <!-- Row 2 -->
+          <div class="vg-cell" style="background:rgba(168,85,247,0.1); color:var(--accent-violet);">-6</div>
+          <div class="vg-cell" style="background:rgba(255,255,255,0.04); color:var(--text-muted); font-size:0.7em;">🧱</div>
+          <div class="vg-cell" style="background:rgba(255,255,255,0.04); color:var(--text-muted); font-size:0.7em;">🧱</div>
+          <div class="vg-cell" style="background:rgba(50,150,220,0.25); color:var(--accent-blue);">-3</div>
+          <!-- Row 3 -->
+          <div class="vg-cell" style="background:rgba(168,85,247,0.08); color:var(--accent-violet);">-5</div>
+          <div class="vg-cell" style="background:rgba(255,255,255,0.04); color:var(--text-muted); font-size:0.7em;">🧱</div>
+          <div class="vg-cell" style="background:rgba(30,170,210,0.3); color:var(--accent-cyan);">-2</div>
+          <div class="vg-cell" style="background:rgba(30,200,200,0.35); color:var(--accent-cyan);">-1</div>
+          <!-- Row 4 -->
+          <div class="vg-cell" style="background:rgba(168,85,247,0.05); color:var(--text-muted);">-4</div>
+          <div class="vg-cell" style="background:rgba(30,180,210,0.2); color:var(--accent-cyan);">-3</div>
+          <div class="vg-cell" style="background:rgba(20,210,180,0.3); color:var(--accent-cyan);">-2</div>
+          <div class="vg-cell path-highlight" style="background:rgba(251,191,36,0.25); color:var(--accent-gold); font-size:0.8em;">🏆</div>
+        </div>
+        <p style="font-size:0.44em; color:var(--text-muted); text-align:center; margin-top:8px;">Los números más altos (menos negativos) = más cerca de la meta 🏆</p>
+      </div>
+    </div>
+
+    <!-- Explanation -->
+    <div style="flex:1; display:flex; flex-direction:column; gap:10px;">
+      <div class="card card-violet">
+        <h3 style="font-size:0.78em;">¿Cómo usa el valor la política?</h3>
+        <p>El agente siempre <strong>elige la acción que lo lleva al estado de mayor valor</strong>. En el laberinto: si estoy en -7, voy al estado -6 (más alto). De -6 voy a -5… hasta llegar al trofeo.</p>
+      </div>
+      <div class="timeline">
+        <div class="timeline-item"><strong style="color:var(--accent-violet);">-7</strong> → voy al <strong style="color:#9d7ef0;">-6</strong></div>
+        <div class="timeline-item"><strong style="color:#9d7ef0;">-6</strong> → voy al <strong style="color:#7a9ae8;">-5</strong></div>
+        <div class="timeline-item"><strong style="color:#7a9ae8;">-5</strong> → voy al <strong style="color:var(--accent-blue);">-4</strong></div>
+        <div class="timeline-item">… y así hasta llegar al 🏆</div>
+      </div>
+      <div class="math-block" style="padding:10px 14px; font-size:0.82em;">
+        \[ V_\pi(s) = \mathbb{E}_\pi[G_t \mid S_t = s] \]
+      </div>
+      <div class="math-explain">V(s) = retorno esperado si comienzo en s y sigo π</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Función Q(s,a) ── -->
+<section>
+  <span class="slide-tag">1.4 · Función Q(s,a)</span>
+  <h2>La función Q(s,a): valor de una acción específica</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">V(s) dice cuánto vale un <em>estado</em>. La función Q(s,a) da un paso más: dice cuánto vale <strong>tomar una acción concreta desde un estado concreto</strong>.</p>
+
+  <div class="cols2" style="margin-bottom:12px;">
+    <div class="card" style="padding:20px;">
+      <h3 style="font-size:0.82em; margin-bottom:8px;">V(s) — Valor del estado</h3>
+      <div class="math-block" style="font-size:0.85em; padding:8px 14px;">\[ V(s) \]</div>
+      <p style="margin-top:8px;">"¿Qué tan bueno es estar en este estado?" — no especifica qué acción tomar.</p>
+      <div style="margin-top:10px; font-size:0.54em; color:var(--text-muted);">Ejemplo: El estado "Mario en el aire" tiene un valor V = −2 (moderadamente malo).</div>
+    </div>
+    <div class="card card-violet" style="padding:20px;">
+      <h3 style="font-size:0.82em; margin-bottom:8px;">Q(s,a) — Valor del par estado-acción</h3>
+      <div class="math-block" style="font-size:0.85em; padding:8px 14px;">\[ Q(s,a) \]</div>
+      <p style="margin-top:8px;">"¿Qué tan bueno es hacer la acción a en el estado s?" — específica la acción también.</p>
+      <div style="margin-top:10px; font-size:0.54em; color:var(--text-muted);">Ejemplo: Q("Mario en el aire", "girar") = −5 (malo) · Q("Mario en el aire", "caer") = +2 (bueno).</div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">🔮 Spoiler: el próximo capítulo</span>
+    <p><strong>Q-Learning</strong> (Capítulo 2.x) es un algoritmo que aprende esta función Q(s,a) y la guarda en una <strong>tabla llamada Q-table</strong>. Para cada par (estado, acción), tiene un número que indica cuánto vale. El agente siempre elige la acción con el Q más alto.</p>
+  </div>
+</section>
+
+<!-- ── Métodos por Política ── -->
+<section>
+  <span class="slide-tag">1.4 · Métodos por Política</span>
+  <h2>Métodos por Política: aprender a actuar directamente 🎯</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:10px;">En los métodos por política, <strong>no calculamos valores</strong>. En su lugar, entrenamos directamente una función que dado un estado produce una acción (o distribución de acciones).</p>
+
+  <!-- Policy-based flow -->
+  <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:16px 20px; margin-bottom:14px;">
+    <div style="display:flex; gap:8px; align-items:center; justify-content:center; flex-wrap:wrap;">
+      <div class="dbox" style="min-width:100px; border-color:var(--accent-blue); background:rgba(59,130,246,0.1);">
+        <div style="font-size:1.3em;">🌍</div>
+        <div style="font-size:0.7em; color:var(--accent-cyan);">Estado s</div>
+      </div>
+      <div class="darrow">→</div>
+      <div class="dbox" style="min-width:160px; border-color:var(--accent-violet); background:rgba(168,85,247,0.12); box-shadow:var(--glow-violet);">
+        <div style="font-size:1.3em;">🧠</div>
+        <div style="font-size:0.75em; color:var(--accent-violet); font-weight:700;">Red neuronal<br>= política π<sub>θ</sub></div>
+        <div style="font-size:0.56em; color:var(--text-muted); margin-top:4px;">Parametrizada por θ</div>
+      </div>
+      <div class="darrow">→</div>
+      <div class="dbox" style="min-width:170px; border-color:var(--accent-gold); background:rgba(251,191,36,0.08);">
+        <div style="font-size:1.1em;">📊</div>
+        <div style="font-size:0.7em; color:var(--accent-gold);">Distribución de acciones</div>
+        <div style="font-size:0.52em; color:var(--text-muted); margin-top:4px;">P(izq)=25%, P(der)=70%…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cols3" style="margin-bottom:10px;">
+    <div class="card card-cyan">
+      <span class="card-icon">✅</span>
+      <p><strong>Funciona con acciones continuas</strong><br>Puede elegir ángulos, velocidades, fuerzas exactas — no solo botones discretos.</p>
+    </div>
+    <div class="card card-violet">
+      <span class="card-icon">✅</span>
+      <p><strong>Exploración natural</strong><br>La política aleatoria ya explora sola, sin necesitar ε-greedy por separado.</p>
+    </div>
+    <div class="card card-gold">
+      <span class="card-icon">⚠️</span>
+      <p><strong>Más difícil de entrenar</strong><br>Puede caer en mínimos locales. El entrenamiento es menos estable que con valores.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Comparativa final ── -->
+<section>
+  <span class="slide-tag">1.4 · Comparativa</span>
+  <h2>Los dos caminos: ¿cuál elegir?</h2>
+  <p style="font-size:0.62em; color:var(--text-muted); margin-bottom:12px;">Ambos enfoques son válidos. La elección depende del problema. Este cuadro resume las diferencias clave:</p>
+
+  <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:14px;">
+    <!-- Header -->
+    <div style="display:grid; grid-template-columns:1.2fr 1fr 1fr; background:var(--bg-panel);">
+      <div style="padding:10px 14px; font-family:var(--font-mono); font-size:0.5em; color:var(--text-muted); letter-spacing:0.1em; text-transform:uppercase;">Característica</div>
+      <div style="padding:10px 14px; font-family:var(--font-mono); font-size:0.5em; color:var(--accent-blue); letter-spacing:0.1em; text-transform:uppercase; text-align:center;">Por Valor</div>
+      <div style="padding:10px 14px; font-family:var(--font-mono); font-size:0.5em; color:var(--accent-violet); letter-spacing:0.1em; text-transform:uppercase; text-align:center;">Por Política</div>
+    </div>
+    <!-- Rows -->
+    <div style="display:grid; grid-template-columns:1.2fr 1fr 1fr; border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px; font-size:0.56em; color:var(--text-muted);">¿Qué aprende?</div>
+      <div style="padding:8px 14px; font-size:0.56em; color:var(--text-primary); text-align:center;">El valor de cada estado o acción</div>
+      <div style="padding:8px 14px; font-size:0.56em; color:var(--text-primary); text-align:center;">Directamente qué acción tomar</div>
+    </div>
+    <div style="display:grid; grid-template-columns:1.2fr 1fr 1fr; border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px; font-size:0.56em; color:var(--text-muted);">Tipo de acciones</div>
+      <div style="padding:8px 14px; font-size:0.56em; color:var(--accent-blue); text-align:center;">Mejor con discretas (botones)</div>
+      <div style="padding:8px 14px; font-size:0.56em; color:var(--accent-violet); text-align:center;">Funciona con continuas (ángulos)</div>
+    </div>
+    <div style="display:grid; grid-template-columns:1.2fr 1fr 1fr; border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px; font-size:0.56em; color:var(--text-muted);">Exploración</div>
+      <div style="padding:8px 14px; font-size:0.56em; color:var(--accent-blue); text-align:center;">Manual (ε-greedy)</div>
+      <div style="padding:8px 14px; font-size:0.56em; color:var(--accent-violet); text-align:center;">Automática (política aleatoria)</div>
+    </div>
+    <div style="display:grid; grid-template-columns:1.2fr 1fr 1fr; border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px; font-size:0.56em; color:var(--text-muted);">Estabilidad</div>
+      <div style="padding:8px 14px; font-size:0.56em; color:var(--accent-blue); text-align:center;">Alta (más predecible)</div>
+      <div style="padding:8px 14px; font-size:0.56em; color:var(--accent-violet); text-align:center;">Variable (puede ser inestable)</div>
+    </div>
+    <div style="display:grid; grid-template-columns:1.2fr 1fr 1fr; border-top:1px solid rgba(255,255,255,0.05);">
+      <div style="padding:8px 14px; font-size:0.56em; color:var(--text-muted);">Primer ejemplo en el curso</div>
+      <div style="padding:8px 14px; font-size:0.56em; color:var(--accent-blue); text-align:center;">Q-Learning / FrozenLake ❄️</div>
+      <div style="padding:8px 14px; font-size:0.56em; color:var(--accent-violet); text-align:center;">REINFORCE / CartPole 🏋️</div>
+    </div>
+  </div>
+
+  <div class="card card-gold">
+    <p>🤝 <strong>Los mejores algoritmos combinan ambos</strong> — Actor-Critic (A2C, PPO) usa una red para la política (actor) y otra para los valores (crítico). Lo estudiaremos en los capítulos 6 y 8.</p>
+  </div>
+</section>
+
+<!-- ── Glosario ── -->
+<section>
+  <span class="slide-tag">Glosario</span>
+  <h2>Glosario de los capítulos 1.3 y 1.4</h2>
+  <div style="margin-top:10px;">
+    <div class="gloss-row">
+      <span class="gloss-term">Exploración</span>
+      <span class="gloss-def">Probar acciones al azar para descubrir nueva información sobre el entorno. Puede salir mal, pero permite mejorar.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Explotación</span>
+      <span class="gloss-def">Usar lo que ya se sabe para maximizar la recompensa. Predecible, pero puede quedar atrapado en soluciones mediocres.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">ε-greedy</span>
+      <span class="gloss-def">Estrategia que balancea exploración y explotación: con probabilidad ε explora, con probabilidad 1-ε explota. ε disminuye con el tiempo.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Política (π)</span>
+      <span class="gloss-def">La función que decide qué hacer en cada estado. Es el "cerebro" del agente. El objetivo del entrenamiento es encontrar la política óptima π*.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Política determinista</span>
+      <span class="gloss-def">Dado un estado, siempre produce la misma acción. Sin aleatoriedad: a = π(s).</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Política aleatoria</span>
+      <span class="gloss-def">Dado un estado, produce una distribución de probabilidades sobre las acciones: π(a|s) = P(A=a | S=s).</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Función de valor V(s)</span>
+      <span class="gloss-def">Número que representa cuánto retorno espera el agente si comienza en el estado s y sigue su política.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Función Q(s,a)</span>
+      <span class="gloss-def">Número que representa cuánto retorno espera el agente si hace la acción a en el estado s, y luego sigue su política. Base de Q-Learning.</span>
+    </div>
+    <div class="gloss-row">
+      <span class="gloss-term">Por valor / por política</span>
+      <span class="gloss-def">Los dos grandes enfoques del RL. Por valor: aprende V(s) o Q(s,a) para derivar la política. Por política: aprende π directamente.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── Resumen integrado ── -->
+<section>
+  <span class="slide-tag">Resumen</span>
+  <h2>Todo junto: el mapa conceptual del módulo 1</h2>
+
+  <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:18px 22px; margin-bottom:14px; position:relative; overflow:hidden;">
+    <div style="position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan),var(--accent-violet));"></div>
+
+    <!-- Concept map flow -->
+    <div style="display:flex; flex-direction:column; gap:8px; font-size:0.58em;">
+      <div style="display:flex; gap:8px; align-items:center;">
+        <div style="background:rgba(59,130,246,0.15); border:1px solid rgba(59,130,246,0.4); border-radius:8px; padding:6px 12px; color:var(--accent-cyan); min-width:120px; text-align:center;"><strong>Agente</strong></div>
+        <div style="color:var(--text-muted);">aprende en</div>
+        <div style="background:rgba(168,85,247,0.15); border:1px solid rgba(168,85,247,0.4); border-radius:8px; padding:6px 12px; color:var(--accent-violet); min-width:120px; text-align:center;"><strong>Entorno</strong></div>
+        <div style="color:var(--text-muted);">recibiendo</div>
+        <div style="background:rgba(34,197,94,0.15); border:1px solid rgba(34,197,94,0.4); border-radius:8px; padding:6px 12px; color:#22c55e; min-width:120px; text-align:center;"><strong>Recompensas</strong></div>
+      </div>
+      <div style="padding-left:20px; color:var(--text-muted);">↳ quiere maximizar el <strong style="color:var(--accent-gold);">Retorno G<sub>t</sub></strong> (suma descontada por γ)</div>
+      <div style="padding-left:20px; color:var(--text-muted);">↳ usa una <strong style="color:var(--accent-violet);">Política π</strong> para decidir acciones</div>
+      <div style="padding-left:40px; color:var(--text-muted);">↳ debe <strong style="color:var(--accent-cyan);">balancear exploración y explotación</strong> (ε-greedy)</div>
+      <div style="padding-left:40px; color:var(--text-muted);">↳ puede ser <strong style="color:var(--accent-blue);">determinista</strong> (misma acción siempre) o <strong style="color:var(--accent-violet);">aleatoria</strong> (distribución)</div>
+      <div style="padding-left:20px; color:var(--text-muted);">↳ se entrena por <strong style="color:var(--accent-blue);">valores</strong> (Q-Learning, DQN) <em>o</em> por <strong style="color:var(--accent-violet);">política directa</strong> (PPO, A2C)</div>
+    </div>
+  </div>
+
+  <div class="cols2">
+    <div class="card card-cyan">
+      <p>📘 <strong>Próximo capítulo:</strong> usaremos todo esto en la práctica. Entrenarás una nave espacial para aterrizar en la Luna (LunarLander 🌕) con un algoritmo que se llama PPO.</p>
+    </div>
+    <div class="card card-violet">
+      <p>🧠 <strong>Luego:</strong> aprenderemos Q-Learning desde cero — implementarás tu primera Q-table, que es exactamente la función Q(s,a) que vimos hoy.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Quiz ── -->
+<section>
+  <span class="slide-tag">Quiz</span>
+  <h2>🧠 Mini Quiz — Comprueba lo que aprendiste</h2>
+  <p style="font-size:0.58em; color:var(--text-muted); margin-bottom:14px;">Responde sin ver las diapositivas anteriores. ¡Es la mejor forma de saber si de verdad lo entendiste!</p>
+
+  <div class="step-row">
+    <div class="step-num">Q1</div>
+    <div class="step-text">Un agente siempre va al mismo lugar y obtiene una recompensa de +1. Existe otro lugar con +100 que nunca ha visitado. ¿Qué está haciendo mal? ¿Cómo lo corregiría la estrategia ε-greedy?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q2</div>
+    <div class="step-text">¿Cuál es la diferencia entre una política determinista y una aleatoria? Da un ejemplo de cuándo sería mejor cada una.</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q3</div>
+    <div class="step-text">Si la función de valor de un estado es V(s) = −3, ¿significa que el agente es malo o que el estado es malo? ¿Qué significa ese número en términos de recompensas?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q4</div>
+    <div class="step-text">¿Cuál es la diferencia entre V(s) y Q(s,a)? ¿Cuál es más útil si quieres saber exactamente qué botón presionar?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q5</div>
+    <div class="step-text">Nombra un algoritmo que usa métodos por valor y uno que usa métodos por política. ¿En qué parte del curso los estudiaremos?</div>
+  </div>
+</section>
+
+<!-- ── Slide final ── -->
+<section>
+  <div class="title-slide" style="align-items:center; text-align:center;">
+    <div style="font-size:3em; margin-bottom:0.3em;">🎉</div>
+    <div class="chapter-badge" style="font-size:0.36em;">Capítulos 1.3 y 1.4 completados</div>
+    <h1 style="text-align:center; font-size:1.7em;">
+      ¡Ya tienes las bases<br>completas del<br>
+      <span class="gradient-text-cyan">Módulo 1!</span>
+    </h1>
+    <div class="divider" style="margin:16px auto;"></div>
+    <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:4px; font-size:0.6em; color:var(--text-muted);">
+      <span>✅ ¿Qué es el RL?</span>
+      <span style="color:var(--border);">·</span>
+      <span>✅ Recompensas y retorno</span>
+      <span style="color:var(--border);">·</span>
+      <span>✅ Exploración vs. Explotación</span>
+      <span style="color:var(--border);">·</span>
+      <span>✅ Políticas y valores</span>
+    </div>
+    <div style="margin-top:22px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+      <span class="pill">Próximo: Cap. 1.5 — ¡Manos a la obra! LunarLander 🌕</span>
+    </div>
+    <p style="font-size:0.52em; color:var(--text-muted); margin-top:16px; max-width:500px;">En el próximo capítulo usaremos todo lo aprendido para entrenar tu primera nave espacial real. Prepara tu cuenta de Hugging Face 🤗</p>
+  </div>
+</section>
+
+</div><!-- /slides -->
+</div><!-- /reveal -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+<script src="../assets/js/reveal-config.js"></script>
+</body>
+</html>

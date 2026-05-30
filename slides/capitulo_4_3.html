@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capítulo 4.3 — ¡Manos a la obra! REINFORCE en CartPole y PixelCopter</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/theme/black.min.css">
+<link rel="stylesheet" href="../assets/css/theme.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js"></script>
+
+<style>
+/* ── Animaciones ── */
+@keyframes pole-wobble {
+  0%,100% { transform: rotate(0deg); transform-origin: bottom center; }
+  25%      { transform: rotate(-12deg); transform-origin: bottom center; }
+  75%      { transform: rotate(12deg); transform-origin: bottom center; }
+}
+@keyframes cart-slide {
+  0%,100% { transform: translateX(0); }
+  50%      { transform: translateX(18px); }
+}
+@keyframes copter-fly {
+  0%,100% { transform: translateY(0); }
+  40%      { transform: translateY(-14px); }
+  70%      { transform: translateY(6px); }
+}
+@keyframes rotor-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes score-grow {
+  from { width: 0; }
+  to   { width: var(--w); }
+}
+@keyframes bug-pulse {
+  0%,100% { background: rgba(239,68,68,0.1); }
+  50%      { background: rgba(239,68,68,0.3); }
+}
+
+/* ── CartPole visual ── */
+.cartpole-scene {
+  background: #050814;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 12px;
+  position: relative;
+  height: 110px;
+  overflow: hidden;
+}
+.cp-track {
+  position: absolute;
+  bottom: 16px; left: 10%; right: 10%;
+  height: 3px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 2px;
+}
+.cp-cart {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px; height: 16px;
+  background: rgba(59,130,246,0.4);
+  border: 1px solid rgba(59,130,246,0.7);
+  border-radius: 4px;
+  animation: cart-slide 2s ease-in-out infinite;
+}
+.cp-pole {
+  position: absolute;
+  bottom: 34px;
+  left: 50%;
+  width: 3px; height: 50px;
+  background: linear-gradient(0deg, var(--accent-cyan), var(--accent-violet));
+  transform-origin: bottom center;
+  transform: translateX(-50%);
+  border-radius: 2px;
+  animation: pole-wobble 2.5s ease-in-out infinite;
+}
+.cp-wheel {
+  position: absolute;
+  bottom: 14px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.3);
+  border: 1px solid rgba(255,255,255,0.5);
+}
+
+/* ── PixelCopter scene ── */
+.copter-scene {
+  background: #050814;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 12px;
+  position: relative;
+  height: 110px;
+  overflow: hidden;
+}
+.pc-tunnel-top {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 28px;
+  background: rgba(59,130,246,0.12);
+  border-bottom: 2px solid rgba(59,130,246,0.3);
+}
+.pc-tunnel-bot {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 28px;
+  background: rgba(59,130,246,0.12);
+  border-top: 2px solid rgba(59,130,246,0.3);
+}
+.pc-copter {
+  position: absolute;
+  left: 22%;
+  top: 50%;
+  transform: translateY(-50%);
+  animation: copter-fly 2s ease-in-out infinite;
+  font-size: 1.3em;
+}
+.pc-rotor {
+  position: absolute;
+  top: -6px; left: 0;
+  width: 22px; height: 3px;
+  background: rgba(34,211,238,0.6);
+  border-radius: 2px;
+  transform-origin: center;
+  animation: rotor-spin 0.15s linear infinite;
+}
+.pc-obstacle {
+  position: absolute;
+  background: rgba(168,85,247,0.25);
+  border: 1px solid rgba(168,85,247,0.4);
+  border-radius: 2px;
+}
+
+/* ── Terminal / código ── */
+.terminal {
+  background: #020812;
+  border: 1px solid rgba(34,211,238,0.3);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.48em;
+  color: #a8c8e8;
+  line-height: 1.85;
+  position: relative;
+}
+.terminal::before {
+  content: "● ● ●";
+  position: absolute;
+  top: 7px; left: 10px;
+  font-size: 0.75em;
+  color: var(--text-muted);
+  letter-spacing: 4px;
+}
+.terminal .tb { margin-top: 14px; }
+.t-c { color: #4a5568; }
+.t-k { color: #c678dd; }
+.t-s { color: #98c379; }
+.t-n { color: #d19a66; }
+.t-f { color: #61afef; }
+.t-v { color: #e5c07b; }
+.t-o { color: #22c55e; }
+.t-hi { color: var(--accent-gold); font-weight: 700; }
+.t-bug { color: #ef4444; font-weight: 700; }
+
+/* ── Score bars ── */
+.score-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+.sr-label {
+  font-family: var(--font-mono);
+  font-size: 0.5em;
+  color: var(--text-muted);
+  min-width: 100px;
+}
+.sr-track {
+  flex: 1;
+  height: 14px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.sr-fill {
+  height: 100%;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  padding-left: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.45em;
+  font-weight: 700;
+  color: white;
+}
+.sr-val {
+  font-family: var(--font-mono);
+  font-size: 0.5em;
+  min-width: 50px;
+  text-align: right;
+}
+
+/* ── Architecture diagram ── */
+.nn-arch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  justify-content: center;
+}
+.nn-layer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.nn-neuron {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  border: 1px solid;
+}
+.nn-label {
+  font-family: var(--font-mono);
+  font-size: 0.38em;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 4px;
+  max-width: 60px;
+}
+.nn-arrow {
+  color: var(--accent-cyan);
+  font-size: 0.9em;
+  align-self: center;
+  margin-bottom: 14px;
+}
+
+/* ── Bug card ── */
+.bug-card {
+  background: rgba(239,68,68,0.06);
+  border: 1px solid rgba(239,68,68,0.35);
+  border-radius: 10px;
+  padding: 12px 14px;
+  animation: bug-pulse 2s ease-in-out infinite;
+  margin: 6px 0;
+}
+
+/* ── Fix card ── */
+.fix-card {
+  background: rgba(34,197,94,0.06);
+  border: 1px solid rgba(34,197,94,0.35);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 6px 0;
+}
+
+/* ── Returns diagram ── */
+.returns-timeline {
+  display: flex;
+  gap: 0;
+  align-items: flex-end;
+  overflow-x: auto;
+  padding: 6px 0;
+}
+.rt-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+.rt-node {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.48em;
+  font-weight: 700;
+  border: 2px solid;
+  margin-bottom: 4px;
+}
+.rt-conn {
+  width: 20px; height: 2px;
+  background: var(--border);
+  align-self: center;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+.rt-label {
+  font-family: var(--font-mono);
+  font-size: 0.36em;
+  color: var(--text-muted);
+  text-align: center;
+  max-width: 40px;
+}
+</style>
+</head>
+
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ══ PORTADA ══════════════════════════════ -->
+<section>
+  <div class="title-slide" style="position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-60px;right:-60px;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(34,211,238,0.1) 0%,transparent 70%);pointer-events:none;"></div>
+    <div class="chapter-badge">Capítulo 4.3 · Módulo 4</div>
+    <h1>¡Manos a la obra!<br>
+      <span class="gradient-text">REINFORCE</span><br>
+      con PyTorch 🔥</h1>
+    <div class="divider"></div>
+    <p style="font-size:0.62em;color:var(--text-muted);max-width:640px;margin-top:8px;line-height:1.7;">
+      Implementar REINFORCE desde cero ·<br>
+      Equilibrar el palo en CartPole-v1 🏋️ ·<br>
+      Volar por el túnel en PixelCopter 🚁 ·
+      Subir ambos modelos al Hub 🤗
+    </p>
+    <div style="margin-top:24px;display:flex;gap:10px;flex-wrap:wrap;">
+      <span class="pill">Unit 4 Hands-on — HuggingFace 🤗</span>
+      <span class="pill">Jose Miguel Lara Rangel</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── Objetivo ── -->
+<section>
+  <span class="slide-tag">4.3 · Objetivo</span>
+  <h2>¿Qué vamos a construir hoy? 🏗️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">En este capítulo escribimos el algoritmo REINFORCE línea por línea en PyTorch — sin ninguna librería de alto nivel. Al terminar, el mismo código entrenará dos agentes distintos:</p>
+
+  <div class="cols2" style="margin-bottom:14px;">
+    <div class="card card-cyan" style="padding:16px;">
+      <div style="display:flex;justify-content:center;margin-bottom:10px;">
+        <div class="cartpole-scene" style="width:180px;height:90px;">
+          <div class="cp-track"></div>
+          <div class="cp-cart">
+            <div class="cp-wheel" style="left:4px;"></div>
+            <div class="cp-wheel" style="right:4px;"></div>
+          </div>
+          <div class="cp-pole"></div>
+        </div>
+      </div>
+      <h3 style="font-size:0.82em;text-align:center;">CartPole-v1 🏋️</h3>
+      <p>Mantener un palo en equilibrio sobre un carrito. Acción: mover el carrito a la izquierda o a la derecha.</p>
+      <div style="font-family:var(--font-mono);font-size:0.5em;color:var(--accent-cyan);margin-top:8px;text-align:center;">
+        Estado: 4 valores · Acciones: 2<br>
+        Meta: recompensa media ≥ 350
+      </div>
+    </div>
+    <div class="card card-violet" style="padding:16px;">
+      <div style="display:flex;justify-content:center;margin-bottom:10px;">
+        <div class="copter-scene" style="width:180px;height:90px;">
+          <div class="pc-tunnel-top"></div>
+          <div class="pc-tunnel-bot"></div>
+          <div class="pc-obstacle" style="right:30%;top:28px;width:12px;height:32px;"></div>
+          <div class="pc-obstacle" style="right:55%;bottom:28px;width:12px;height:24px;"></div>
+          <div class="pc-copter">
+            🚁
+            <div class="pc-rotor"></div>
+          </div>
+        </div>
+      </div>
+      <h3 style="font-size:0.82em;text-align:center;">PixelCopter 🚁</h3>
+      <p>Volar un helicóptero por un túnel con obstáculos. Acción: encender el motor (subir) o no (bajar).</p>
+      <div style="font-family:var(--font-mono);font-size:0.5em;color:var(--accent-violet);margin-top:8px;text-align:center;">
+        Estado: 7 valores · Acciones: 2<br>
+        Meta: recompensa media ≥ 5
+      </div>
+    </div>
+  </div>
+
+  <div class="key-idea">
+    <span class="ki-label">🎯 Por qué dos entornos</span>
+    <p>CartPole es simple y predecible — ideal para depurar la implementación y verificar que funciona. PixelCopter es más difícil. Si el código funciona en ambos con la misma función <code>reinforce()</code>, la implementación es general y robusta.</p>
+  </div>
+</section>
+
+<!-- ── Setup ── -->
+<section>
+  <span class="slide-tag">4.3 · Setup</span>
+  <h2>Preparar el entorno en Colab 💻</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Importante: este notebook usa <code>gym</code> (versión antigua) en lugar de <code>gymnasium</code>, porque la librería <code>gym-games</code> (que incluye PixelCopter) aún no fue actualizada.</p>
+
+  <div class="terminal" style="margin-bottom:12px;">
+    <div class="tb">
+      <span class="t-c"># 1. Instalar pantalla virtual (para grabar videos en Colab)</span><br>
+      <span class="t-f">!</span>apt install -y python-opengl ffmpeg xvfb<br>
+      <span class="t-f">!</span>pip install pyvirtualdisplay pyglet==1.5.1<br><br>
+      <span class="t-c"># 2. Instalar todas las dependencias del notebook</span><br>
+      <span class="t-f">!</span>pip install -r https://raw.githubusercontent.com/huggingface/deep-rl-class/main/notebooks/unit4/requirements-unit4.txt<br><br>
+      <span class="t-c"># 3. Importar todo lo necesario</span><br>
+      <span class="t-k">import</span> <span class="t-v">numpy</span> <span class="t-k">as</span> <span class="t-v">np</span><br>
+      <span class="t-k">import</span> <span class="t-v">torch</span>, <span class="t-v">torch.nn</span> <span class="t-k">as</span> <span class="t-v">nn</span>, <span class="t-v">torch.nn.functional</span> <span class="t-k">as</span> <span class="t-v">F</span><br>
+      <span class="t-k">from</span> <span class="t-v">torch.distributions</span> <span class="t-k">import</span> <span class="t-f">Categorical</span>  <span class="t-c"># clave para política aleatoria</span><br>
+      <span class="t-k">import</span> <span class="t-v">gym</span>, <span class="t-v">gym_pygame</span>
+    </div>
+  </div>
+
+  <div class="cols2">
+    <div class="card card-gold">
+      <p>⚠️ <strong>gym vs gymnasium:</strong> En este notebook, <code>env.step()</code> devuelve <code>(estado, recompensa, done, info)</code> — sin <code>truncated</code>. En notebooks anteriores usamos <code>gymnasium</code> que sí tiene ese campo extra. No mezcles las dos librerías en el mismo notebook.</p>
+    </div>
+    <div class="card card-cyan">
+      <p>🎮 <strong>¿Qué es gym_pygame?</strong> Es una colección de entornos adicionales para gym, creados con la librería gráfica PyGame. Incluye PixelCopter, FlappyBird, y otros juegos clásicos. Se instala junto con las dependencias del notebook.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Arquitectura de la red ── -->
+<section>
+  <span class="slide-tag">4.3 · La Red Neuronal</span>
+  <h2>La red neuronal que implementa la política 🧠</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">La clase <code>Policy</code> es el corazón del agente. Implementa π<sub>θ</sub> como una red con dos capas totalmente conectadas:</p>
+
+  <!-- Architecture diagram -->
+  <div class="nn-arch" style="margin-bottom:14px;">
+    <!-- Input -->
+    <div class="nn-layer">
+      <div class="nn-neuron" style="border-color:var(--accent-blue);background:rgba(59,130,246,0.2);"></div>
+      <div class="nn-neuron" style="border-color:var(--accent-blue);background:rgba(59,130,246,0.2);"></div>
+      <div class="nn-neuron" style="border-color:var(--accent-blue);background:rgba(59,130,246,0.2);"></div>
+      <div class="nn-neuron" style="border-color:var(--accent-blue);background:rgba(59,130,246,0.2);"></div>
+      <div class="nn-label" style="color:var(--accent-blue);">Estado s<br>(s_size)</div>
+    </div>
+    <div class="nn-arrow">→</div>
+    <!-- FC1 -->
+    <div class="nn-layer">
+      <div class="nn-neuron" style="border-color:var(--accent-cyan);background:rgba(34,211,238,0.15);"></div>
+      <div class="nn-neuron" style="border-color:var(--accent-cyan);background:rgba(34,211,238,0.15);"></div>
+      <div class="nn-neuron" style="border-color:var(--accent-cyan);background:rgba(34,211,238,0.15);"></div>
+      <div class="nn-neuron" style="border-color:var(--accent-cyan);background:rgba(34,211,238,0.15);"></div>
+      <div class="nn-neuron" style="border-color:var(--accent-cyan);background:rgba(34,211,238,0.15);"></div>
+      <div class="nn-neuron" style="border-color:var(--accent-cyan);background:rgba(34,211,238,0.15);"></div>
+      <div class="nn-label">fc1<br>h_size<br>+ ReLU</div>
+    </div>
+    <div class="nn-arrow">→</div>
+    <!-- FC2 -->
+    <div class="nn-layer">
+      <div class="nn-neuron" style="border-color:var(--accent-violet);background:rgba(168,85,247,0.15);"></div>
+      <div class="nn-neuron" style="border-color:var(--accent-violet);background:rgba(168,85,247,0.15);"></div>
+      <div class="nn-label">fc2<br>a_size</div>
+    </div>
+    <div class="nn-arrow">→</div>
+    <!-- Softmax -->
+    <div class="nn-layer">
+      <div style="width:32px;height:32px;background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.4);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:0.5em;color:var(--accent-gold);">∑=1</div>
+      <div class="nn-label" style="color:var(--accent-gold);">Softmax<br>probabilidades</div>
+    </div>
+    <div class="nn-arrow">→</div>
+    <!-- Output -->
+    <div class="nn-layer">
+      <div class="nn-neuron" style="border-color:#22c55e;background:rgba(34,197,94,0.2);"></div>
+      <div class="nn-neuron" style="border-color:#22c55e;background:rgba(34,197,94,0.15);"></div>
+      <div class="nn-label" style="color:#22c55e;">P(a|s)<br>por acción</div>
+    </div>
+  </div>
+
+  <div class="terminal" style="margin-bottom:10px;">
+    <div class="tb">
+      <span class="t-k">class</span> <span class="t-f">Policy</span>(nn.Module):<br>
+      &nbsp;&nbsp;<span class="t-k">def</span> <span class="t-f">__init__</span>(<span class="t-v">self</span>, s_size, a_size, h_size):<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="t-f">super</span>(Policy, <span class="t-v">self</span>).__init__()<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="t-v">self</span>.fc1 = nn.<span class="t-f">Linear</span>(s_size, h_size)<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="t-v">self</span>.fc2 = nn.<span class="t-f">Linear</span>(h_size, a_size)<br><br>
+      &nbsp;&nbsp;<span class="t-k">def</span> <span class="t-f">forward</span>(<span class="t-v">self</span>, x):<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;x = F.<span class="t-f">relu</span>(<span class="t-v">self</span>.fc1(x))<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;x = <span class="t-v">self</span>.fc2(x)<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="t-k">return</span> F.<span class="t-f">softmax</span>(x, dim=<span class="t-n">1</span>)  <span class="t-c"># probabilidades que suman 1</span>
+    </div>
+  </div>
+
+  <div class="card card-violet" style="padding:12px 14px;">
+    <p>🔑 <strong>Categorical</strong>: PyTorch tiene una distribución especial para acciones discretas. Con <code>m = Categorical(probs)</code> podemos muestrear una acción con <code>m.sample()</code> y obtener su log-probabilidad con <code>m.log_prob(accion)</code> — exactamente lo que necesita REINFORCE.</p>
+  </div>
+</section>
+
+<!-- ── El bug del método act ── -->
+<section>
+  <span class="slide-tag">4.3 · Bug Educativo</span>
+  <h2>El bug del método act: ¿puedes encontrarlo? 🐛</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">El notebook original de HuggingFace introduce <strong>intencionalmente un bug</strong> en el método <code>act()</code> para que practiques la depuración. ¿Lo encuentras?</p>
+
+  <div class="bug-card">
+    <div style="font-family:var(--font-mono);font-size:0.46em;color:#a8c8e8;line-height:1.9;">
+      <span class="t-k">def</span> <span class="t-f">act</span>(<span class="t-v">self</span>, state):<br>
+      &nbsp;&nbsp;state = torch.<span class="t-f">from_numpy</span>(state).float().<span class="t-f">unsqueeze</span>(<span class="t-n">0</span>).to(device)<br>
+      &nbsp;&nbsp;probs = <span class="t-v">self</span>.<span class="t-f">forward</span>(state).cpu()<br>
+      &nbsp;&nbsp;m = <span class="t-f">Categorical</span>(probs)<br>
+      &nbsp;&nbsp;<span class="t-bug">action = np.argmax(m)</span>  <span class="t-c"># ← ¿ves el problema?</span><br>
+      &nbsp;&nbsp;<span class="t-k">return</span> action.item(), m.<span class="t-f">log_prob</span>(action)
+    </div>
+  </div>
+
+  <div class="key-idea" style="margin:10px 0;">
+    <span class="ki-label">🔍 Pista</span>
+    <p>Recuerda el Cap. 4.1: una política aleatoria debe <strong>muestrear</strong> una acción de la distribución, no elegir siempre la más probable. <code>np.argmax(m)</code> no hace eso — y además, devuelve algo que no es un Tensor, lo que rompe <code>m.log_prob(action)</code>.</p>
+  </div>
+
+  <div class="fix-card">
+    <div style="font-size:0.54em;color:#22c55e;font-family:var(--font-mono);margin-bottom:6px;">✅ La corrección:</div>
+    <div style="font-family:var(--font-mono);font-size:0.46em;color:#a8c8e8;line-height:1.9;">
+      &nbsp;&nbsp;<span class="t-o">action = m.sample()</span>  <span class="t-c"># muestrea de la distribución → Tensor ✓</span><br>
+      &nbsp;&nbsp;<span class="t-k">return</span> action.item(), m.<span class="t-f">log_prob</span>(action)  <span class="t-c"># ahora funciona</span>
+    </div>
+    <p style="font-size:0.52em;color:var(--text-muted);margin-top:8px;">Con <code>m.sample()</code> el agente no siempre elige la acción más probable — explora, y además devuelve un Tensor compatible con log_prob.</p>
+  </div>
+</section>
+
+<!-- ── El retorno descontado hacia atrás ── -->
+<section>
+  <span class="slide-tag">4.3 · Retorno hacia atrás</span>
+  <h2>El truco del retorno calculado hacia atrás ⏪</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">En REINFORCE necesitamos calcular el retorno G<sub>t</sub> para cada paso del episodio — pero solo las <strong>recompensas futuras</strong> cuentan, no las pasadas. El notebook usa un truco eficiente:</p>
+
+  <!-- Episode returns diagram -->
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:14px 18px;margin-bottom:14px;">
+    <p style="font-size:0.48em;color:var(--text-muted);margin-bottom:10px;">Episodio de 4 pasos: recompensas [+1, +1, +1, +1], γ=1.0</p>
+    <div class="returns-timeline" style="justify-content:center;">
+      <div class="rt-step">
+        <div class="rt-node" style="border-color:var(--accent-blue);background:rgba(59,130,246,0.15);color:var(--accent-blue);">t=0</div>
+        <div class="rt-label">R=+1<br><strong style="color:var(--accent-blue);">G=4</strong></div>
+      </div>
+      <div class="rt-conn"></div>
+      <div class="rt-step">
+        <div class="rt-node" style="border-color:var(--accent-cyan);background:rgba(34,211,238,0.12);color:var(--accent-cyan);">t=1</div>
+        <div class="rt-label">R=+1<br><strong style="color:var(--accent-cyan);">G=3</strong></div>
+      </div>
+      <div class="rt-conn"></div>
+      <div class="rt-step">
+        <div class="rt-node" style="border-color:var(--accent-violet);background:rgba(168,85,247,0.12);color:var(--accent-violet);">t=2</div>
+        <div class="rt-label">R=+1<br><strong style="color:var(--accent-violet);">G=2</strong></div>
+      </div>
+      <div class="rt-conn"></div>
+      <div class="rt-step">
+        <div class="rt-node" style="border-color:var(--accent-gold);background:rgba(251,191,36,0.12);color:var(--accent-gold);">t=3</div>
+        <div class="rt-label">R=+1<br><strong style="color:var(--accent-gold);">G=1</strong></div>
+      </div>
+    </div>
+    <p style="font-size:0.44em;color:var(--text-muted);text-align:center;margin-top:8px;">Las acciones tempranas (t=0) tienen más peso (G=4) porque afectan más recompensas futuras. Las tardías (t=3) solo tienen su recompensa propia (G=1).</p>
+  </div>
+
+  <div class="terminal">
+    <div class="tb">
+      <span class="t-c"># Calcular retornos hacia atrás (eficiente en O(N))</span><br>
+      returns = deque(maxlen=max_t)<br>
+      <span class="t-k">for</span> t <span class="t-k">in</span> <span class="t-f">range</span>(n_steps)[::-<span class="t-n">1</span>]:  <span class="t-c"># ← de atrás hacia adelante</span><br>
+      &nbsp;&nbsp;disc_return_t = (returns[<span class="t-n">0</span>] <span class="t-k">if</span> <span class="t-f">len</span>(returns) > <span class="t-n">0</span> <span class="t-k">else</span> <span class="t-n">0</span>)<br>
+      &nbsp;&nbsp;returns.<span class="t-f">appendleft</span>(gamma * disc_return_t + rewards[t])  <span class="t-c"># G_t = r_t + γ·G_{t+1}</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── La función de pérdida ── -->
+<section>
+  <span class="slide-tag">4.3 · Función de Pérdida</span>
+  <h2>Minimizar la pérdida = maximizar el retorno 📉→📈</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">PyTorch usa <strong>minimización</strong> de pérdidas. Para convertir nuestro <em>ascenso</em> de gradiente en descenso, simplemente negamos la función objetivo:</p>
+
+  <div class="terminal" style="margin-bottom:14px;">
+    <div class="tb">
+      <span class="t-c"># Estandarizar los retornos (más estabilidad en el entrenamiento)</span><br>
+      returns = torch.<span class="t-f">tensor</span>(returns)<br>
+      returns = (returns - returns.<span class="t-f">mean</span>()) / (returns.<span class="t-f">std</span>() + eps)  <span class="t-c"># normalizar</span><br><br>
+      <span class="t-c"># Calcular la pérdida de la política</span><br>
+      policy_loss = []<br>
+      <span class="t-k">for</span> log_prob, disc_return <span class="t-k">in</span> <span class="t-f">zip</span>(saved_log_probs, returns):<br>
+      &nbsp;&nbsp;policy_loss.<span class="t-f">append</span>(<span class="t-hi">-log_prob</span> * disc_return)  <span class="t-c"># ← negativo: min pérdida = max retorno</span><br>
+      policy_loss = torch.<span class="t-f">cat</span>(policy_loss).<span class="t-f">sum</span>()<br><br>
+      <span class="t-c"># Paso de actualización</span><br>
+      optimizer.<span class="t-f">zero_grad</span>()<br>
+      policy_loss.<span class="t-f">backward</span>()   <span class="t-c"># calcula los gradientes</span><br>
+      optimizer.<span class="t-f">step</span>()          <span class="t-c"># actualiza los pesos θ</span>
+    </div>
+  </div>
+
+  <div class="cols2">
+    <div class="key-idea" style="margin:0;">
+      <span class="ki-label">🔢 ¿Por qué estandarizar?</span>
+      <p>Si un episodio da G=500 y otro G=2, los gradientes serán muy diferentes en magnitud. Restar la media y dividir entre la desviación estándar hace que todos los episodios contribuyan por igual al aprendizaje.</p>
+    </div>
+    <div class="card card-gold" style="margin:0;">
+      <p>➖ <strong>El signo negativo:</strong> Queremos maximizar J(θ) = E[G]. Como PyTorch minimiza, escribimos la pérdida como <code>−log π(a|s) × G</code>. Minimizar esto es equivalente a maximizar <code>log π(a|s) × G</code>.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Hiperparámetros CartPole ── -->
+<section>
+  <span class="slide-tag">4.3 · CartPole</span>
+  <h2>Entrenando CartPole-v1 con REINFORCE 🏋️</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">Los hiperparámetros y el flujo de entrenamiento para el primer agente:</p>
+
+  <div class="terminal" style="margin-bottom:12px;">
+    <div class="tb">
+      <span class="t-c"># Hiperparámetros del curso HuggingFace</span><br>
+      cartpole_params = {<br>
+      &nbsp;&nbsp;<span class="t-s">"h_size"</span>: <span class="t-n">16</span>,            <span class="t-c"># neuronas en la capa oculta</span><br>
+      &nbsp;&nbsp;<span class="t-s">"n_training_episodes"</span>: <span class="t-n">1000</span>,  <span class="t-c"># 1,000 episodios</span><br>
+      &nbsp;&nbsp;<span class="t-s">"max_t"</span>: <span class="t-n">1000</span>,         <span class="t-c"># máx 1000 pasos por episodio</span><br>
+      &nbsp;&nbsp;<span class="t-s">"gamma"</span>: <span class="t-n">1.0</span>,          <span class="t-c"># sin descuento (tarea corta)</span><br>
+      &nbsp;&nbsp;<span class="t-s">"lr"</span>: <span class="t-n">1e-2</span>,           <span class="t-c"># tasa de aprendizaje = 0.01</span><br>
+      }<br><br>
+      <span class="t-c"># Crear política y optimizador Adam</span><br>
+      policy = <span class="t-f">Policy</span>(s_size=<span class="t-n">4</span>, a_size=<span class="t-n">2</span>, h_size=<span class="t-n">16</span>).to(device)<br>
+      optimizer = optim.<span class="t-f">Adam</span>(policy.parameters(), lr=<span class="t-n">1e-2</span>)<br><br>
+      <span class="t-c"># Entrenar — ~2 min en CPU, &lt;1 min con GPU</span><br>
+      scores = <span class="t-f">reinforce</span>(policy, optimizer, <span class="t-n">1000</span>, <span class="t-n">1000</span>, <span class="t-n">1.0</span>, print_every=<span class="t-n">100</span>)
+    </div>
+  </div>
+
+  <!-- Progress during training -->
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:12px 16px;">
+    <p style="font-size:0.48em;color:var(--text-muted);margin-bottom:8px;">Progresión típica durante el entrenamiento de CartPole:</p>
+    <div class="score-row">
+      <span class="sr-label">Ep. 100</span>
+      <div class="sr-track"><div class="sr-fill" style="width:12%;background:rgba(239,68,68,0.6);">25</div></div>
+      <span class="sr-val" style="color:#ef4444;">~25</span>
+    </div>
+    <div class="score-row">
+      <span class="sr-label">Ep. 300</span>
+      <div class="sr-track"><div class="sr-fill" style="width:40%;background:rgba(251,191,36,0.6);">125</div></div>
+      <span class="sr-val" style="color:var(--accent-gold);">~125</span>
+    </div>
+    <div class="score-row">
+      <span class="sr-label">Ep. 600</span>
+      <div class="sr-track"><div class="sr-fill" style="width:75%;background:rgba(34,211,238,0.6);">280</div></div>
+      <span class="sr-val" style="color:var(--accent-cyan);">~280</span>
+    </div>
+    <div class="score-row">
+      <span class="sr-label">Ep. 1000 ✅</span>
+      <div class="sr-track"><div class="sr-fill" style="width:95%;background:linear-gradient(90deg,rgba(34,197,94,0.7),rgba(34,211,238,0.7));">≥350</div></div>
+      <span class="sr-val" style="color:#22c55e;font-weight:700;">≥350 🏆</span>
+    </div>
+    <p style="font-size:0.42em;color:var(--accent-cyan);margin-top:6px;">Meta de certificación HF: recompensa media ≥ 350</p>
+  </div>
+</section>
+
+<!-- ── PixelCopter: entorno más difícil ── -->
+<section>
+  <span class="slide-tag">4.3 · PixelCopter</span>
+  <h2>PixelCopter: el mismo código, más dificultad 🚁</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">El mismo algoritmo <code>reinforce()</code> entrena al helicóptero. Solo cambian los hiperparámetros (red más grande, más episodios) porque el entorno es más complejo:</p>
+
+  <div class="terminal" style="margin-bottom:12px;">
+    <div class="tb">
+      <span class="t-c"># PixelCopter tiene 7 variables de estado vs 4 de CartPole</span><br>
+      <span class="t-c"># Necesita una red neuronal más grande</span><br>
+      pixelcopter_params = {<br>
+      &nbsp;&nbsp;<span class="t-s">"h_size"</span>: <span class="t-n">64</span>,            <span class="t-c"># 4× más grande que CartPole</span><br>
+      &nbsp;&nbsp;<span class="t-s">"n_training_episodes"</span>: <span class="t-n">50_000</span>, <span class="t-c"># 50× más episodios</span><br>
+      &nbsp;&nbsp;<span class="t-s">"max_t"</span>: <span class="t-n">10_000</span>,<br>
+      &nbsp;&nbsp;<span class="t-s">"gamma"</span>: <span class="t-n">0.99</span>,         <span class="t-c"># sí usamos descuento aquí</span><br>
+      &nbsp;&nbsp;<span class="t-s">"lr"</span>: <span class="t-n">1e-4</span>,           <span class="t-c"># tasa mucho más pequeña (más estable)</span><br>
+      }<br><br>
+      <span class="t-c"># Para PixelCopter usamos una red de 3 capas (más profunda)</span><br>
+      <span class="t-k">class</span> <span class="t-f">Policy</span>(nn.Module):  <span class="t-c"># nueva versión para PixelCopter</span><br>
+      &nbsp;&nbsp;<span class="t-k">def</span> <span class="t-f">__init__</span>(<span class="t-v">self</span>, s_size, a_size, h_size):<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="t-v">self</span>.fc1 = nn.<span class="t-f">Linear</span>(s_size, h_size)<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="t-v">self</span>.fc2 = nn.<span class="t-f">Linear</span>(h_size, h_size * <span class="t-n">2</span>)  <span class="t-c"># capa extra</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="t-v">self</span>.fc3 = nn.<span class="t-f">Linear</span>(h_size * <span class="t-n">2</span>, a_size)
+    </div>
+  </div>
+
+  <div class="card card-violet">
+    <p>⏱️ <strong>50,000 episodios tarda ~60 min en Colab GPU.</strong> Puedes bajar <code>n_training_episodes</code> a 10,000–20,000 para una versión más rápida — el agente no llegará a la meta de certificación (≥5) pero sí aprenderá a volar correctamente. Para la certificación necesitas los 50,000 completos.</p>
+  </div>
+</section>
+
+<!-- ── Subir al Hub ── -->
+<section>
+  <span class="slide-tag">4.3 · Hub</span>
+  <h2>Publicar ambos modelos en el Hub 🤗</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:10px;">El notebook incluye una función <code>push_to_hub()</code> que evalúa el agente, graba un video replay, genera una tarjeta de modelo y sube todo automáticamente:</p>
+
+  <div class="terminal" style="margin-bottom:12px;">
+    <div class="tb">
+      <span class="t-c"># 1. Iniciar sesión en Hugging Face</span><br>
+      <span class="t-k">from</span> <span class="t-v">huggingface_hub</span> <span class="t-k">import</span> <span class="t-f">notebook_login</span><br>
+      <span class="t-f">notebook_login</span>()  <span class="t-c"># pega tu token con permiso "Write"</span><br><br>
+      <span class="t-c"># 2. Subir CartPole</span><br>
+      <span class="t-f">push_to_hub</span>(<br>
+      &nbsp;&nbsp;repo_id=<span class="t-s">"TU_USUARIO/Reinforce-CartPole-v1"</span>,<br>
+      &nbsp;&nbsp;model=cartpole_policy,<br>
+      &nbsp;&nbsp;hyperparameters=cartpole_params,<br>
+      &nbsp;&nbsp;eval_env=eval_env, video_fps=<span class="t-n">30</span><br>
+      )<br><br>
+      <span class="t-c"># 3. Subir PixelCopter (mismo proceso)</span><br>
+      <span class="t-f">push_to_hub</span>(<br>
+      &nbsp;&nbsp;repo_id=<span class="t-s">"TU_USUARIO/Reinforce-PixelCopter-PLE-v0"</span>,<br>
+      &nbsp;&nbsp;model=pixelcopter_policy,<br>
+      &nbsp;&nbsp;hyperparameters=pixelcopter_params,<br>
+      &nbsp;&nbsp;eval_env=eval_env_pc, video_fps=<span class="t-n">30</span><br>
+      )
+    </div>
+  </div>
+
+  <div class="cols2">
+    <div class="card card-cyan">
+      <p>✅ <strong>Criterios de certificación HF:</strong><br>CartPole: recompensa media ≥ 350<br>PixelCopter: recompensa media ≥ 5</p>
+    </div>
+    <div class="card card-gold">
+      <p>🏆 <strong>Para ver el leaderboard:</strong> Busca tu modelo en el Hub — la tarjeta de modelo generada automáticamente incluye la puntuación, el video del agente jugando y los hiperparámetros usados.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Retos opcionales ── -->
+<section>
+  <span class="slide-tag">4.3 · Retos</span>
+  <h2>Retos adicionales para seguir mejorando 🔥</h2>
+  <p style="font-size:0.62em;color:var(--text-muted);margin-bottom:12px;">Si ya lograste las metas de certificación, el curso propone estos desafíos adicionales:</p>
+
+  <div class="cols2">
+    <div class="card card-cyan" style="padding:14px;">
+      <span class="card-icon">⚙️</span>
+      <h3>Experimentar con hiperparámetros</h3>
+      <p>Cambia <code>gamma</code>, <code>h_size</code>, <code>lr</code> y observa cómo afectan la velocidad de aprendizaje y la estabilidad. ¿Qué pasa si usas <code>gamma=0.9</code> en CartPole?</p>
+    </div>
+    <div class="card card-violet" style="padding:14px;">
+      <span class="card-icon">🖼️</span>
+      <h3>CNN para entornos de imagen</h3>
+      <p>El curso sugiere adaptar el código para usar una CNN en lugar de capas totalmente conectadas, si el estado fueran imágenes (como en Atari). Sería el puente natural desde el Módulo 3.</p>
+    </div>
+    <div class="card card-gold" style="padding:14px;">
+      <span class="card-icon">🎮</span>
+      <h3>Otro entorno de gym-games</h3>
+      <p>gym_pygame incluye FlappyBird, Pong y más juegos. Adapta el código de PixelCopter a otro de estos entornos — el cambio es mínimo.</p>
+    </div>
+    <div class="card" style="padding:14px;">
+      <span class="card-icon">📊</span>
+      <h3>Comparar con PPO</h3>
+      <p>Entrena el mismo CartPole con PPO de Stable-Baselines3 y compara la velocidad de convergencia. ¿Cuántos episodios tarda cada uno en llegar a 350?</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Quiz ── -->
+<section>
+  <span class="slide-tag">Quiz</span>
+  <h2>🧠 Mini Quiz — Capítulo 4.3</h2>
+  <p style="font-size:0.58em;color:var(--text-muted);margin-bottom:14px;">Pon a prueba lo que codificaste:</p>
+
+  <div class="step-row">
+    <div class="step-num">Q1</div>
+    <div class="step-text">¿Por qué usamos <code>m.sample()</code> y no <code>np.argmax(m)</code> para elegir la acción? ¿Qué tipo de política genera cada uno?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q2</div>
+    <div class="step-text">¿Por qué calculamos los retornos hacia atrás (de t=T a t=0) en lugar de hacia adelante? ¿Qué ventaja computacional da la colección <code>deque</code>?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q3</div>
+    <div class="step-text">La pérdida es <code>-log_prob × disc_return</code>. Si una acción tiene log_prob = −0.2 y el retorno fue G = +50, ¿cuánto vale la pérdida? ¿Subirá o bajará la probabilidad de esa acción?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q4</div>
+    <div class="step-text">PixelCopter necesita una red de 3 capas con h_size=64 y CartPole solo 2 capas con h_size=16. ¿Por qué? ¿Qué diferencia entre los dos entornos justifica la red más grande?</div>
+  </div>
+  <div class="step-row" style="margin-top:10px;">
+    <div class="step-num">Q5</div>
+    <div class="step-text">El notebook usa <code>gamma=1.0</code> para CartPole pero <code>gamma=0.99</code> para PixelCopter. ¿Por qué tiene sentido usar gamma distinto según el tipo de tarea?</div>
+  </div>
+</section>
+
+<!-- ── Slide final ── -->
+<section>
+  <div class="title-slide" style="align-items:center;text-align:center;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-50px;right:-50px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(34,211,238,0.1) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="font-size:2.8em;margin-bottom:8px;">🏋️ 🚁 🤗</div>
+    <div class="chapter-badge" style="font-size:0.36em;">Capítulo 4.3 completado · Módulo 4 finalizado</div>
+    <h1 style="text-align:center;font-size:1.6em;">
+      ¡Implementaste REINFORCE<br>desde cero!<br>
+      <span class="gradient-text-cyan" style="font-size:0.85em;">El Módulo 4 está completo 🎓</span>
+    </h1>
+    <div class="divider" style="margin:14px auto;"></div>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:4px;font-size:0.56em;color:var(--text-muted);">
+      <span>✅ Métodos de política</span><span style="color:var(--border);">·</span>
+      <span>✅ Intuición de REINFORCE</span><span style="color:var(--border);">·</span>
+      <span>✅ Clase Policy en PyTorch</span><span style="color:var(--border);">·</span>
+      <span>✅ CartPole ≥350</span><span style="color:var(--border);">·</span>
+      <span>✅ PixelCopter ≥5</span>
+    </div>
+    <div style="margin-top:18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <span class="pill">Próximo: Módulo 5 — Unity ML-Agents 🎮</span>
+    </div>
+    <p style="font-size:0.5em;color:var(--text-muted);margin-top:14px;max-width:560px;">En el Módulo 5 entrenamos agentes en entornos 3D de Unity: el oso Julien que dispara bolas de nieve, las pirámides con curiosidad intrínseca, y el concepto de motivación por exploración.</p>
+  </div>
+</section>
+
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+<script src="../assets/js/reveal-config.js"></script>
+</body>
+</html>
