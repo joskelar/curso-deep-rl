@@ -545,35 +545,34 @@
       <div class="card-footer">🤗 Unit 8 — HuggingFace</div>
     </a>
 
-    <a href="#" class="chapter-card status-pending" style="cursor:default; pointer-events:none;">
-      <div class="card-header"><span class="card-emoji">💀</span><span class="status-badge badge-pending">Pendiente</span></div>
-      <div class="card-num">Capítulo 8.4</div>
-      <div class="card-title">PPO Escalado: Entrenando en VizDoom</div>
-      <div class="card-footer">🤗 Unit 8 Part 2 — HuggingFace</div>
-    </a>
-
-    <a href="#" class="chapter-card status-pending" style="cursor:default; pointer-events:none;">
-      <div class="card-header"><span class="card-emoji">👁️</span><span class="status-badge badge-pending">Pendiente</span></div>
-      <div class="card-num">Capítulo 9.1</div>
-      <div class="card-title">Aprendizaje por Imitación: Aprender Viendo a un Experto</div>
-      <div class="card-footer">🤗 Bonus Unit 5 — HuggingFace</div>
-    </a>
-
-    <a href="#" class="chapter-card status-pending" style="cursor:default; pointer-events:none;">
-      <div class="card-header"><span class="card-emoji">🗺️</span><span class="status-badge badge-pending">Pendiente</span></div>
-      <div class="card-num">Capítulo 9.2</div>
-      <div class="card-title">Tópicos Avanzados: Lo que Viene Después</div>
-      <div class="card-footer">🤗 Bonus Unit 3 — HuggingFace</div>
-    </a>
-
-    <a href="#" class="chapter-card status-pending" style="cursor:default; pointer-events:none;">
-      <div class="card-header"><span class="card-emoji">🏁</span><span class="status-badge badge-pending">Pendiente</span></div>
-      <div class="card-num">Capítulo 9.3</div>
-      <div class="card-title">Proyecto Final: Tu Propio Agente, Tu Propio Entorno</div>
-      <div class="card-footer">🤗 Material original del curso</div>
-    </a>
-
   </div><!-- /chapters-grid etapa 3 -->
+
+  <!-- ─── CONTENIDO ADICIONAL ─────────────────── -->
+  <div class="stage-title" style="margin-top:32px;">Contenido Adicional del Curso HF (fuera del alcance de esta adaptación)</div>
+  <p style="font-size:0.82em;color:var(--text-muted);max-width:720px;margin:0 auto 16px;text-align:center;line-height:1.6;">
+    Los siguientes temas pertenecen al curso original de HuggingFace pero no están cubiertos en esta adaptación para preparatoria.
+    Puedes explorarlos directamente en <a href="https://huggingface.co/learn/deep-rl-course" target="_blank" style="color:var(--accent-cyan);">huggingface.co/learn/deep-rl-course</a>.
+  </p>
+  <div class="chapters-grid" style="opacity:0.5;">
+    <div class="chapter-card" style="cursor:default;pointer-events:none;border-style:dashed;">
+      <div class="card-header"><span class="card-emoji">💀</span><span class="status-badge" style="background:rgba(255,255,255,0.05);color:var(--text-muted);border:1px solid var(--border);">Externo</span></div>
+      <div class="card-num">Cap. 8.4 (HF)</div>
+      <div class="card-title">PPO Escalado: VizDoom</div>
+      <div class="card-footer">🤗 Unit 8 Part 2 — HuggingFace</div>
+    </div>
+    <div class="chapter-card" style="cursor:default;pointer-events:none;border-style:dashed;">
+      <div class="card-header"><span class="card-emoji">👁️</span><span class="status-badge" style="background:rgba(255,255,255,0.05);color:var(--text-muted);border:1px solid var(--border);">Externo</span></div>
+      <div class="card-num">Bonus (HF)</div>
+      <div class="card-title">Aprendizaje por Imitación</div>
+      <div class="card-footer">🤗 Bonus Unit 5 — HuggingFace</div>
+    </div>
+    <div class="chapter-card" style="cursor:default;pointer-events:none;border-style:dashed;">
+      <div class="card-header"><span class="card-emoji">🗺️</span><span class="status-badge" style="background:rgba(255,255,255,0.05);color:var(--text-muted);border:1px solid var(--border);">Externo</span></div>
+      <div class="card-num">Bonus (HF)</div>
+      <div class="card-title">Decision Transformers y RL Offline</div>
+      <div class="card-footer">🤗 Bonus Unit 3 — HuggingFace</div>
+    </div>
+  </div>
 
 
   <!-- ─── NOTEBOOKS ────────────────────────── -->
@@ -581,25 +580,60 @@
 
   <div class="notebooks-grid">
 
-    <div class="notebook-card" style="opacity:0.5;">
-      <div class="nb-label">📒 Notebook 1</div>
-      <div class="nb-title">LunarLander con PPO</div>
-      <div class="nb-desc">Entrenar tu primer agente de RL y subirlo al Hugging Face Hub.</div>
-      <a href="#" class="colab-btn">⚡ Abrir en Colab (próximamente)</a>
+    <div class="notebook-card">
+      <div class="nb-label">📒 Notebook 1 · Módulo 1</div>
+      <div class="nb-title">LunarLander con PPO (SB3)</div>
+      <div class="nb-desc">Tu primer agente de Deep RL. PPO con Stable-Baselines3, 16 entornos en paralelo, evaluar y visualizar en video.</div>
+      <a href="https://colab.research.google.com/github/joskelar/curso-deep-rl/blob/main/notebooks/unit1_lunarlander.ipynb" target="_blank" class="colab-btn">⚡ Abrir en Colab</a>
     </div>
 
-    <div class="notebook-card" style="opacity:0.5;">
-      <div class="nb-label">📒 Notebook 2</div>
+    <div class="notebook-card">
+      <div class="nb-label">📒 Notebook Bonus · Módulo 1</div>
+      <div class="nb-title">Huggy el Perro en 3D 🐶</div>
+      <div class="nb-desc">Entrena a Huggy con ML-Agents para que aprenda a correr y atrapar el palo. Acciones continuas, 243 observaciones, jugable en el navegador.</div>
+      <a href="https://colab.research.google.com/github/joskelar/curso-deep-rl/blob/main/notebooks/bonus1_huggy.ipynb" target="_blank" class="colab-btn">⚡ Abrir en Colab</a>
+    </div>
+
+    <div class="notebook-card">
+      <div class="nb-label">📒 Notebook 2 · Módulo 2</div>
       <div class="nb-title">Q-Learning en FrozenLake y Taxi</div>
-      <div class="nb-desc">Implementar Q-Learning con NumPy desde cero.</div>
-      <a href="#" class="colab-btn">⚡ Abrir en Colab (próximamente)</a>
+      <div class="nb-desc">Implementa Q-Learning desde cero con NumPy. Q-table, política ε-greedy, ecuación de Bellman. Mismo código, 16 y 500 estados.</div>
+      <a href="https://colab.research.google.com/github/joskelar/curso-deep-rl/blob/main/notebooks/unit2_qlearning.ipynb" target="_blank" class="colab-btn">⚡ Abrir en Colab</a>
     </div>
 
-    <div class="notebook-card" style="opacity:0.5;">
-      <div class="nb-label">📒 Notebook 3</div>
-      <div class="nb-title">REINFORCE en CartPole</div>
-      <div class="nb-desc">Policy gradient con PyTorch, código pre-estructurado.</div>
-      <a href="#" class="colab-btn">⚡ Abrir en Colab (próximamente)</a>
+    <div class="notebook-card">
+      <div class="nb-label">📒 Notebook 3 · Módulo 3</div>
+      <div class="nb-title">DQN y Space Invaders (RL-Zoo)</div>
+      <div class="nb-desc">Analiza el YAML de DQN, entrena con RL-Baselines3-Zoo, interpreta los logs y analiza el comportamiento de un agente pre-entrenado en BeamRider.</div>
+      <a href="https://colab.research.google.com/github/joskelar/curso-deep-rl/blob/main/notebooks/unit3_dqn_atari.ipynb" target="_blank" class="colab-btn">⚡ Abrir en Colab</a>
+    </div>
+
+    <div class="notebook-card">
+      <div class="nb-label">📒 Notebook 4 · Módulo 4</div>
+      <div class="nb-title">REINFORCE en CartPole y PixelCopter</div>
+      <div class="nb-desc">Implementa REINFORCE en PyTorch desde cero. Red neuronal Policy, retorno hacia atrás, el bug educativo de act() y la diferencia entre determinista y estocástico.</div>
+      <a href="https://colab.research.google.com/github/joskelar/curso-deep-rl/blob/main/notebooks/unit4_reinforce.ipynb" target="_blank" class="colab-btn">⚡ Abrir en Colab</a>
+    </div>
+
+    <div class="notebook-card">
+      <div class="nb-label">📒 Notebook 5 · Módulo 5</div>
+      <div class="nb-title">ML-Agents: SnowballTarget y Pirámides</div>
+      <div class="nb-desc">Setup completo de Unity ML-Agents. SnowballTarget con PPO y Pirámides con curiosidad RND. YAML explicado, logs interpretados, resultados en el Hub.</div>
+      <a href="https://colab.research.google.com/github/joskelar/curso-deep-rl/blob/main/notebooks/unit5_mlagents.ipynb" target="_blank" class="colab-btn">⚡ Abrir en Colab</a>
+    </div>
+
+    <div class="notebook-card">
+      <div class="nb-label">📒 Notebook 6 · Módulo 6</div>
+      <div class="nb-title">A2C con el Brazo Robótico Panda 🦾</div>
+      <div class="nb-desc">A2C con Stable-Baselines3 en PandaReachDense-v3. Observaciones en diccionario, VecNormalize explicado, patrón de evaluación con estadísticas guardadas.</div>
+      <a href="https://colab.research.google.com/github/joskelar/curso-deep-rl/blob/main/notebooks/unit6_a2c_panda.ipynb" target="_blank" class="colab-btn">⚡ Abrir en Colab</a>
+    </div>
+
+    <div class="notebook-card">
+      <div class="nb-label">📒 Notebook 8 · Módulo 8</div>
+      <div class="nb-title">PPO desde Cero con CleanRL 🛡️</div>
+      <div class="nb-desc">Implementa PPO completo en PyTorch: red Actor-Crítico, GAE, el clip con torch.clamp, múltiples épocas. LunarLander-v2 — el círculo del curso se cierra.</div>
+      <a href="https://colab.research.google.com/github/joskelar/curso-deep-rl/blob/main/notebooks/unit8_ppo_cleanrl.ipynb" target="_blank" class="colab-btn">⚡ Abrir en Colab</a>
     </div>
 
   </div><!-- /notebooks-grid -->
@@ -624,7 +658,7 @@
   // Actualiza dinámicamente el porcentaje de progreso.
   // Para actualizar: cambia el valor de `done` y `total`.
   const done  = 31;  // capítulos terminados
-  const total = 17;  // total de capítulos en el índice
+  const total = 31;  // total de capítulos de esta adaptación (Módulos 1–8)
   const pct   = Math.round((done / total) * 100);
 
   document.getElementById('progress-text').textContent = done + ' / ' + total + ' capítulos (' + pct + '%)';
